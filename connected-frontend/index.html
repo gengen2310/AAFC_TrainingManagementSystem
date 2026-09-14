@@ -11433,6 +11433,7 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
         ? (() => { try { return new Date(pn.date).toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); } catch(_){ return esc(pn.date); }})()
         : '';
     const sqnName = esc(S.scopeName || (S.session && S.session.display_name) || '');
+    const wingName = esc((S.session && S.session.wing_name) || '');
     // Three spans rather than one string, so the two media can order the same
     // facts differently. On paper they sit inline and read exactly as before --
     // squadron, date, term, time -- because the separators are supplied by CSS
@@ -11445,7 +11446,7 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
     // full width. The cell stays a table-cell; the span inside it does the work.
     const nightHeaderRow = `<tr><td colspan="${totalCols+2}" class="night-header">`
         + `<span class="night-inner">`
-        + `<span class="night-sqn">${sqnName}</span>`
+        + `<span class="night-sqn">${sqnName}${wingName ? ` — ${wingName}` : ''}</span>`
         + `<span class="night-date">${esc(dateStr)}</span>`
         + `<span class="night-rest">Term ${esc(String(pn.term||'—'))} · ${esc(pn.start_time||'')}–${esc(pn.end_time||'')}</span>`
         + `</span></td></tr>`;
@@ -14349,7 +14350,7 @@ function saveFac(confirmDuplicate){
       .then(async()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
-        await reloadAndRender(); await loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+        await reloadAndRender(); try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved.', false);
       })
       .catch(e=>{
@@ -14375,7 +14376,7 @@ function saveFac(confirmDuplicate){
       // persists indefinitely, since nothing else ever resets it). Clear it so
       // the new facilitator is guaranteed visible immediately.
       const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
-      await reloadAndRender(); await loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+      await reloadAndRender(); try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
       showToast('Facilitator added at '+savedAt+'.', false);
     })
     .catch(e=>{

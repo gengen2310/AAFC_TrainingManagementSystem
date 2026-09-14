@@ -68,12 +68,12 @@ test("Planning Workspace auto-authenticates via cookie after TMS login (no secon
   // the backend validates the cookie and returns the session without a second login.
   await page.goto(PW_BASE);
 
-  // Step 3: The PW dashboard must be visible — NOT the login form.
+  // Step 3: The PW must be visible — NOT the login form.
   const loginBtn = page.getByRole("button", { name: "Log in" });
-  const dashboard = page.getByRole("heading", { name: "Dashboard" });
+  const pwMain = page.locator('[role="main"][aria-label="Planning workspace"]');
 
   // Allow up to 10s for the PW to resolve the cookie session and render.
-  await expect(dashboard).toBeVisible({ timeout: 10000 });
+  await expect(pwMain).toBeVisible({ timeout: 10000 });
   await expect(loginBtn).not.toBeVisible();
 });
 
@@ -94,7 +94,7 @@ test("Logging out of TMS invalidates the Planning Workspace session", async ({ p
 
   // Confirm PW is accessible before logout
   await page.goto(PW_BASE);
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
   // Log out from TMS — this calls POST /api/auth/logout which clears the aafc_session cookie.
   await page.goto("http://localhost:8080");

@@ -168,10 +168,11 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
   await expect(exactNight).toHaveCount(1, { timeout: 8000 });
   await page.locator("#wp-sel").selectOption({ value: testDate });
 
-  // The Publish Program button is rendered by renderWP() for S.isAdmin users.
-  // It toggles to "✓ Published" style after publish completes.
-  const publishBtn = page.locator("button", { hasText: "Publish Program" });
+  // The "Publish night" button is visible and enabled once a night is selected.
+  // Button text: "Publish night" (enabled when a single night is chosen).
+  const publishBtn = page.locator("#wp-publish-btn");
   await expect(publishBtn).toBeVisible({ timeout: 5000 });
+  await expect(publishBtn).toBeEnabled();
 
   expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
 });
@@ -212,8 +213,10 @@ test("Weekly Program header shows the Wing's real name from the session (not har
   await expect(exactNight).toHaveCount(1, { timeout: 8000 });
   await page.locator("#wp-sel").selectOption({ value: testDate });
 
-  // The no-print header div (line 8222 of index.html) should render the real wing_name.
-  const header = page.locator("#wp-content .no-print").first();
+  // DEF-06: the night-sqn span in the table header must render the real wing_name
+  // (from S.session.wing_name, populated from /api/auth/me). Wing name is appended
+  // after the squadron name with an em-dash separator.
+  const header = page.locator("#wp-content .night-sqn").first();
   await expect(header).toBeVisible({ timeout: 5000 });
   await expect(header).toContainText(wingName);
 
