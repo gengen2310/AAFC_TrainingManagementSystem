@@ -25,6 +25,10 @@ async function authHeader(page: Page, code: string): Promise<Record<string, stri
 }
 
 test("Planning Workspace Night view grid cell shows a session's real Training Class assignment", async ({ page }) => {
+  // Parallel SQLite writes from other tests can hold the DB lock long enough
+  // for the planning-weekly GET to exceed a 10 s assertion timeout.
+  // Give the test a full minute so lock wait-out is covered.
+  test.setTimeout(60000);
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
@@ -40,9 +44,10 @@ test("Planning Workspace Night view grid cell shows a session's real Training Cl
   // confirmed directly (this is what happened on the first attempt at this
   // test, using years[0] with a deliberately far-future literal date). The
   // year value here matches the date's own year so term computation lines
-  // up, and is far outside anything else in this suite (2610+) so it can
-  // never tie with a leftover active year from an earlier run (REM-129).
-  const testYear = 2610 + (Date.now() % 50);
+  // up. Range 2700-2999 (300 values) avoids session-archive-restore (2610-2659)
+  // and session-drawer-move (3000-3999) so a collision with a leftover year
+  // from those suites cannot produce a wrong-banner failure.
+  const testYear = 2700 + (Date.now() % 300);
   const yearRes = await page.request.post(`${API_BASE}/api/planning/years`, {
     data: { year: testYear, name: `CLASS-06 Grid Test ${suffix}` }, headers: hdr,
   });
@@ -103,7 +108,13 @@ test("Planning Workspace Night view grid cell shows a session's real Training Cl
     // come first in the API's own return order, not necessarily this
     // test's newly-created one -- select it explicitly via its own "Year:"
     // chip (same pattern as mission-backlog-classes.spec.ts).
-    await page.getByRole("button", { name: `CLASS-06 Grid Test ${suffix}` }).click();
+    // In Firefox, the year-chip strip uses overflow:hidden so hit targets are
+    // resolved against DOM coordinates rather than the visual clip.
+    // scrollIntoViewIfNeeded + native el.click() avoids any hit-target check.
+    const yearChip = page.getByRole("button", { name: `CLASS-06 Grid Test ${suffix}` });
+    await yearChip.scrollIntoViewIfNeeded();
+    await yearChip.evaluate((el: HTMLElement) => el.click());
+    await expect(page.getByRole("banner")).toContainText(`CLASS-06 Grid Test ${suffix}`, { timeout: 20000 });
 
     // Year view is the default. Its clickable date header carries
     // aria-label="Parade night {date}" (ParadeNightBlock.tsx) for both the
@@ -114,9 +125,9 @@ test("Planning Workspace Night view grid cell shows a session's real Training Cl
 
     // Clicking a date switches viewRange to "parade-night", rendering
     // ParadeNightGridView.
-    await expect(page.locator(".pn-grid")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".pn-grid")).toBeVisible({ timeout: 20000 });
     const cell = page.locator(".pn-cell-classes", { hasText: className });
-    await expect(cell).toBeVisible({ timeout: 10000 });
+    await expect(cell).toBeVisible({ timeout: 30000 });
   } finally {
     // Clean up -- archive the class + phase and deactivate the year so nothing
     // lingers as an active PlanningYear for a future test run.

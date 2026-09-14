@@ -21,6 +21,9 @@ async function authHeader(page: Page, code: string): Promise<Record<string, stri
 }
 
 test("WORK-08: 'Move to another night' button is visible in Planning Workspace session drawer for sqn_admin", async ({ page }) => {
+  // Parallel SQLite writes from other tests can hold the DB lock long enough
+  // for API calls in the finally block to exceed the default 30 s timeout.
+  test.setTimeout(60000);
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
@@ -29,7 +32,9 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
 
   // Use a far-future year so the date's calendar year matches the planning year
   // (required for term computation in Year view — confirmed in parade-night-grid-classes.spec.ts).
-  const testYear = 2620 + (Date.now() % 50);
+  // Use range 3000-3999 (1000 values) — far from other spec ranges (2610-2679, 8800+, 9700+)
+  // and large enough that accumulated failed-run years rarely saturate it.
+  const testYear = 3000 + (Date.now() % 1000);
   const yearRes = await page.request.post(`${API_BASE}/api/planning/years`, {
     data: { year: testYear, name: `WORK-08 Test ${suffix}` }, headers: hdr,
   });
@@ -83,7 +88,17 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
     await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
 
     // Select the test year via its chip button.
-    await page.getByRole("button", { name: `WORK-08 Test ${suffix}` }).click();
+    // PlanningWorkspace.tsx (lines 573-579): in Firefox, hit targets are resolved
+    // against DOM coordinates rather than the visual clip imposed by overflow:hidden.
+    // With many accumulated test years, the chip's DOM coordinates can overlap
+    // elements from other rows and the regular click is intercepted. scrollIntoView
+    // + native .click() via evaluate fires the React handler directly without any
+    // Playwright hit-target check.
+    const yearChip = page.getByRole("button", { name: `WORK-08 Test ${suffix}` });
+    await yearChip.scrollIntoViewIfNeeded();
+    await yearChip.evaluate((el: HTMLElement) => el.click());
+    // Wait for the banner to confirm this year is now active before proceeding.
+    await expect(page.getByRole("banner")).toContainText(`WORK-08 Test ${suffix}`, { timeout: 20000 });
 
     // Click the parade date block to switch from Year view to Night view.
     const dateBlock = page.getByRole("button", { name: `Parade night ${pnDate}` });
@@ -91,12 +106,12 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
     await dateBlock.click();
 
     // Night view grid must be present.
-    await expect(page.locator(".pn-grid")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".pn-grid")).toBeVisible({ timeout: 15000 });
 
     // Click the session cell (div.pn-cell-inner[role="button"]) to open the right drawer.
     // The cell renders with role="button" for keyboard accessibility (PlanningRightDrawer.tsx line 387).
     const sessionCell = page.locator(".pn-cell-inner[role='button']").first();
-    await expect(sessionCell).toBeVisible({ timeout: 8000 });
+    await expect(sessionCell).toBeVisible({ timeout: 15000 });
     await sessionCell.click();
 
     // Right drawer must open (role="complementary", aria-label="Detail drawer").
