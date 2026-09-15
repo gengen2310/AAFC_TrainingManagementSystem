@@ -14,9 +14,28 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
+const _createdPnIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -44,6 +63,7 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
+  _createdPnIds.push(pnId);
   await page.request.patch(`${base}/api/parade-nights/${pnId}`, { data: { notes: marker }, headers: hdr });
   const sessRes = await page.request.post(`${base}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1 }, headers: hdr,
@@ -54,6 +74,10 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 
 async function openQuickEditForFirstSession(page: Page, marker: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
+  // Synthetic fixtures deliberately live outside the active planning year to
+  // avoid collisions. Clear the UI year filter before locating the fixture;
+  // otherwise the test asserts against an intentionally filtered-out card.
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("parade-nights"));
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
