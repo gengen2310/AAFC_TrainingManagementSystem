@@ -251,7 +251,9 @@ async function openPNDetailForMarker(page: Page, marker: string) {
   await page.evaluate(() => (window as any).nav("parade-nights"));
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
-  await card.getByRole("button", { name: "Detail" }).click();
+  // The rendered Parade Night card exposes this action as "Open / edit".
+  // "Detail" was a stale selector from the retired control label.
+  await card.getByRole("button", { name: "Open / edit" }).click();
   await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 6000 });
 }
 
