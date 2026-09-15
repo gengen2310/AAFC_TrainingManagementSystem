@@ -50,10 +50,12 @@ test("an archived Flight is hidden by default, visible via Show archived, and Re
 
   await page.evaluate(() => (window as any).nav("accounts"));
   // Flights are configuration data, not part of the default Accounts tab.
-  // Enter the real panel before asserting visibility so a hidden tab cannot
-  // produce a false positive for "archived flight is hidden".
+  // The Configuration tab now uses grouped summary rows; open the Flights
+  // manager explicitly before exercising archive/restore controls.
   await page.getByRole("tab", { name: "Configuration" }).click();
   await expect(page.getByRole("tabpanel", { name: "Configuration" })).toBeVisible({ timeout: 5000 });
+  await page.evaluate(() => (window as any).openRefDataManager("flight"));
+  await expect(page.locator("#refdata-modal-title")).toHaveText("Flights");
   await expect(page.locator("#flight-table")).toBeVisible({ timeout: 5000 });
 
   // Hidden by default.
