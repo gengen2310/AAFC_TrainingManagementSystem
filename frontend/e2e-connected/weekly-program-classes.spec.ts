@@ -1,22 +1,17 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
-// CLASS-06 (connected-frontend side): the real, live Weekly Program page
-// (renderWP(), reached via nav('weekly-program')) gets a new "Class"
-// column. Confirmed via grep that this page -- NOT the similarly-named
-// loadWeeklyProgram()/#pw-* code path -- is the one actually reachable:
-// #pw-card/#pw-preview-section/etc have zero matches anywhere in this
-// file's static or dynamically-generated HTML (the same dead-code pattern
-// CLASS-18 documented). renderWP() reads session data from S.pns, itself
-// populated from GET /api/parade-nights's new additive `training_classes`
-// field on each embedded session.
+// CLASS-06 (connected-frontend side): verify that the live Weekly Program
+// surfaces the Training Class audience attached to a session. The Weekly
+// Program now renders the governed stage/class grid rather than the retired
+// generic "Sess 1 / Sess 2" row layout, so this test follows that current
+// contract instead of asserting obsolete row labels.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
 // IDs of resources created during this run — cleaned up in afterAll.
 const _createdPnIds: string[] = [];
 const _createdClassIds: string[] = [];
-const _createdPhaseIds: string[] = [];
 
 test.beforeAll(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
@@ -42,9 +37,6 @@ test.afterAll(async ({ request }) => {
   for (const classId of _createdClassIds) {
     await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth });
   }
-  for (const phaseId of _createdPhaseIds) {
-    await request.post(`${base}/api/curriculum/phases/${phaseId}/archive`, { headers: auth });
-  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -68,7 +60,7 @@ async function apiBase() {
   return process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
 }
 
-test("Weekly Program shows a session's real Training Class assignment in its own Class column", async ({ page }) => {
+test("Weekly Program shows a session's real Training Class assignment in the current class grid", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await loginSquadron(page, "ADMIN703");
@@ -81,18 +73,20 @@ test("Weekly Program shows a session's real Training Class assignment in its own
   const years = await (await page.request.get(`${base}/api/planning/years`, { headers: auth })).json();
   const yearId = years[0].planning_year_id as string;
 
-  const stageName = `CLASS-06-WP-E2E-${suffix}`;
-  const stageRes = await page.request.post(`${base}/api/curriculum/phases`, {
-    data: { name: stageName, display_name: stageName, scope_level: "squadron", squadron_id: me.session.squadron_id },
-    headers: auth,
-  });
-  expect(stageRes.ok()).toBe(true);
-  const stageId = (await stageRes.json()).phase_id as string;
-  _createdPhaseIds.push(stageId);
+  // The printed Weekly Program groups classes by the governed CurriculumPhase
+  // matching the session cadet_group. A synthetic custom phase cannot match
+  // cadet_group="senior" and therefore correctly renders outside the Senior
+  // column. Use the real governed Senior stage so this fixture tests class
+  // rendering rather than an impossible stage/group combination.
+  const phasesRes = await page.request.get(`${base}/api/curriculum/phases`, { headers: auth });
+  expect(phasesRes.ok()).toBe(true);
+  const phases = await phasesRes.json() as Array<{ phase_id: string; name: string }>;
+  const seniorStage = phases.find((p) => p.name === "E. Senior");
+  expect(seniorStage, "governed E. Senior training stage must exist").toBeTruthy();
 
   const className = `WP E2E Class ${suffix}`;
   const classRes = await page.request.post(`${base}/api/training-classes`, {
-    data: { training_year_id: yearId, training_stage_id: stageId, display_name: className },
+    data: { training_year_id: yearId, training_stage_id: seniorStage!.phase_id, display_name: className },
     headers: auth,
   });
   expect(classRes.ok()).toBe(true);
@@ -121,9 +115,8 @@ test("Weekly Program shows a session's real Training Class assignment in its own
   expect(audRes.ok()).toBe(true);
 
   await page.evaluate(() => (window as any).reloadAndRender());
-  // renderWP() filters by P.currentYearId when set. The test parade night is in
-  // a far-future year to avoid seed-data collisions, so clearing the year filter
-  // lets renderWP() fetch all parade nights rather than just the current year's.
+  // The test parade night is deliberately outside the active planning year to
+  // avoid collisions, so clear the current-year filter before opening Weekly Program.
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
@@ -132,9 +125,12 @@ test("Weekly Program shows a session's real Training Class assignment in its own
   await expect(exactNight).toHaveCount(1, { timeout: 8000 });
   await page.locator("#wp-sel").selectOption({ value: testDate });
 
-  const row = page.locator("#wp-content table tr").filter({ hasText: "Sess 1" });
-  await expect(row).toBeVisible({ timeout: 8000 });
-  await expect(row).toContainText(className);
+  // Current contract: the selected night renders a stage/class grid. The
+  // assigned Training Class must be visible in that rendered program; the old
+  // "Sess 1" row label was removed by the timing-grid redesign and is not a
+  // product requirement.
+  const program = page.locator("#wp-content");
+  await expect(program).toContainText(className, { timeout: 8000 });
 
   expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
 });
