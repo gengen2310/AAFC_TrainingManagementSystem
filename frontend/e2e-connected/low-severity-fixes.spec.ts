@@ -131,38 +131,28 @@ test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip 
 });
 
 test("HELP-04: Readiness checklist section is visible on the dashboard when a parade night has sessions", async ({ page }) => {
-  // HELP-04: exercise the exact parade night the dashboard will select rather
-  // than creating/reusing "today". A duplicate-date 409 can resolve to an
-  // archived soft-deleted night, while the dashboard intentionally ignores
-  // archived nights and chooses the next active one. That made this test seed
-  // one record and assert against another.
+  // HELP-04 must seed the same active upcoming parade night the dashboard will
+  // select. Do not read `S` through window: connected-frontend declares it as
+  // a top-level `let`, so it is intentionally not a window property.
   await loginSquadron(page, "ADMIN703");
   const base = LOCAL_API_BASE || "http://localhost:8000";
   const token = await page.evaluate(() => sessionStorage.getItem("aafc_token") ?? "");
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  // loadData() populates the same S.pns collection used by the Main TMS. Pick
-  // the earliest active non-past night from that state so the fixture follows
-  // the product's actual selection contract and never relies on a polluted
-  // duplicate-date row from an earlier E2E run.
-  await page.evaluate(() => (window as any).loadData?.());
-  const targetPn = await page.evaluate(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const pns = Array.isArray((window as any).S?.pns) ? (window as any).S.pns : [];
-    const candidates = pns
-      .filter((pn: any) => !pn.is_archived && String(pn.date || "") >= today)
-      .sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || "")));
-    const pn = candidates[0];
-    if (!pn) return null;
-    return {
-      id: pn.parade_night_id || pn.id,
-      date: pn.date,
-    };
-  });
-  expect(targetPn?.id, "seed data must expose at least one active upcoming parade night").toBeTruthy();
+  // The list endpoint is the authoritative source used to populate the Main
+  // TMS parade-night state and already excludes archived nights.
+  const pnsRes = await page.request.get(`${base}/api/parade-nights`, { headers: auth });
+  expect(pnsRes.ok()).toBe(true);
+  const pns = await pnsRes.json() as Array<{ parade_night_id?: string; id?: string; date?: string }>;
+  const today = new Date().toISOString().slice(0, 10);
+  const targetPn = pns
+    .filter((pn) => String(pn.date || "") >= today)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")))[0];
+  const targetPnId = targetPn?.parade_night_id || targetPn?.id;
+  expect(targetPnId, "seed data must expose at least one active upcoming parade night").toBeTruthy();
 
   const sessRes = await page.request.post(`${base}/api/sessions`, {
-    data: { parade_night_id: targetPn!.id, period_number: 99, custom_title: `HELP-04 ${Date.now()}` },
+    data: { parade_night_id: targetPnId, period_number: 99, custom_title: `HELP-04 ${Date.now()}` },
     headers: auth,
   });
   expect(sessRes.ok()).toBe(true);
