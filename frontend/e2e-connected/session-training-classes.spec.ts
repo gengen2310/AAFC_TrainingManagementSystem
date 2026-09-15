@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // ── Session <-> Training Class audience UI (CLASS-03's first frontend
 // consumer), wired into the real, live "Quick Edit" session flow
@@ -124,6 +125,7 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
   const testDate = new Date(2065, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  const fixtureYear = Number(testDate.slice(0, 4));
   const marker = `E2E-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -143,12 +145,13 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   });
   expect(sessRes.ok()).toBe(true);
 
-  return { className, marker };
+  return { className, marker, fixtureYear };
 }
 
-async function openQuickEditForFirstSession(page: Page, marker: string) {
+async function openQuickEditForFirstSession(page: Page, marker: string, fixtureYear: number) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await selectConnectedPlanningYear(page, fixtureYear);
+  await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -164,9 +167,9 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now());
-    const { className, marker } = await seedClassAndSession(page, token, suffix);
+    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     const classesGroup = page.locator("#qe-classes-group");
     await expect(classesGroup).toBeVisible({ timeout: 8000 });
     const checkbox = page.locator("#qe-classes-list label").filter({ hasText: className });
@@ -177,7 +180,7 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
     const reopened = page.locator("#qe-classes-list label").filter({ hasText: className });
     await expect(reopened.locator("input.qe-class-chk")).toBeChecked();
@@ -189,16 +192,16 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "b";
-    const { className, marker } = await seedClassAndSession(page, token, suffix);
+    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
     const checkbox = page.locator("#qe-classes-list label").filter({ hasText: className });
     await checkbox.locator("input.qe-class-chk").check();
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
     const reopened = page.locator("#qe-classes-list label").filter({ hasText: className });
     await expect(reopened.locator("input.qe-class-chk")).toBeChecked();
@@ -206,7 +209,7 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
     const finalCheckbox = page.locator("#qe-classes-list label").filter({ hasText: className });
     await expect(finalCheckbox.locator("input.qe-class-chk")).not.toBeChecked();
@@ -224,7 +227,7 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     const loginBody = await loginRes.json();
     const token = loginBody.token || loginBody.access_token;
     const suffix = String(Date.now()) + "c";
-    await seedClassAndSession(page, token, suffix);
+    const { marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
     if (LOCAL_API_BASE) {
       await page.addInitScript((base) => {
@@ -241,14 +244,18 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
-    await page.evaluate(() => (window as any).nav("parade-nights"));
-    await expect(page.getByRole("button", { name: "Edit Session 1" })).toHaveCount(0);
+    await selectConnectedPlanningYear(page, fixtureYear);
+    await page.evaluate("nav('parade-nights')");
+    const card = page.locator(".pn-card").filter({ hasText: marker });
+    await expect(card).toBeVisible({ timeout: 8000 });
+    await expect(card.getByRole("button", { name: "Edit Session 1" })).toHaveCount(0);
   });
 });
 
-async function openPNDetailForMarker(page: Page, marker: string) {
+async function openPNDetailForMarker(page: Page, marker: string, fixtureYear: number) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await selectConnectedPlanningYear(page, fixtureYear);
+  await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   // The rendered Parade Night card exposes this action as "Open / edit".
@@ -264,9 +271,9 @@ test.describe("Session <-> Training Class assignment via Parade Night detail mod
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "pnd1";
-    const { className, marker } = await seedClassAndSession(page, token, suffix);
+    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
-    await openPNDetailForMarker(page, marker);
+    await openPNDetailForMarker(page, marker, fixtureYear);
     const group = page.locator("#pnd-classes-group");
     await expect(group).toBeVisible({ timeout: 8000 });
     const checkbox = page.locator("#pnd-classes-list label").filter({ hasText: className });
@@ -275,7 +282,7 @@ test.describe("Session <-> Training Class assignment via Parade Night detail mod
     await page.locator("#pnd-save-btn").click();
     await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
 
-    await openPNDetailForMarker(page, marker);
+    await openPNDetailForMarker(page, marker, fixtureYear);
     await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).toBeChecked();
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
@@ -284,23 +291,23 @@ test.describe("Session <-> Training Class assignment via Parade Night detail mod
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "pnd2";
-    const { className, marker } = await seedClassAndSession(page, token, suffix);
+    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
-    await openPNDetailForMarker(page, marker);
+    await openPNDetailForMarker(page, marker, fixtureYear);
     const chk = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
     await expect(chk).toBeVisible({ timeout: 8000 });
     await chk.check();
     await page.locator("#pnd-save-btn").click();
     await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
 
-    await openPNDetailForMarker(page, marker);
+    await openPNDetailForMarker(page, marker, fixtureYear);
     const reopened = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
     await expect(reopened).toBeChecked();
     await reopened.uncheck();
     await page.locator("#pnd-save-btn").click();
     await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
 
-    await openPNDetailForMarker(page, marker);
+    await openPNDetailForMarker(page, marker, fixtureYear);
     await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).not.toBeChecked();
   });
 });
@@ -310,16 +317,17 @@ test.describe("Training Class name in compact session card (CLASS-18)", () => {
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "card";
-    const { className, marker } = await seedClassAndSession(page, token, suffix);
+    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     const cb = page.locator("#qe-classes-list label").filter({ hasText: className }).locator("input.qe-class-chk");
     await cb.check();
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
     await page.evaluate(() => (window as any).reloadAndRender());
-    await page.evaluate(() => (window as any).nav("parade-nights"));
+    await selectConnectedPlanningYear(page, fixtureYear);
+    await page.evaluate("nav('parade-nights')");
     const card = page.locator(".pn-card").filter({ hasText: marker });
     const sessInfo = card.locator(".sess-info").first();
     await expect(sessInfo).toContainText(className, { timeout: 8000 });
