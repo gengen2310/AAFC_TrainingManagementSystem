@@ -132,39 +132,46 @@ test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip 
 
 test("HELP-04: Readiness checklist section is visible on the dashboard when a parade night has sessions", async ({ page }) => {
   // HELP-04: _renderTonightReadiness() renders a "Readiness checklist" section
-  // beneath the session list when sessions_total > 0.  With 0 sessions it
-  // returns the "Not planned" early-exit card instead.  The test seeds a parade
-  // night for today's date (earliest upcoming, so the dashboard picks it as
-  // "Tonight") plus one session, then navigates to the dashboard and confirms
-  // the checklist section is visible.
+  // beneath the session list when sessions_total > 0. Seed today's parade night
+  // (which is earlier than the seeded upcoming night), add one test-owned session,
+  // then clean up only the data this test created.
   await loginSquadron(page, "ADMIN703");
   const base = LOCAL_API_BASE || "http://localhost:8000";
   const token = await page.evaluate(() => sessionStorage.getItem("aafc_token") ?? "");
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  // Seed a parade night for today so _tonight_readiness picks it as the nearest upcoming.
   const todayDate = new Date().toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { date: todayDate, parade_type: "normal" },
     headers: auth,
   });
-  // Accept both 200 (created) and 409 (already exists — use existing).
   const pnBody = await pnRes.json();
-  const pnId: string = pnRes.ok() ? pnBody.parade_night_id : pnBody.existing_id ?? pnBody.parade_night_id;
+  const createdPn = pnRes.ok();
+  const pnId: string | undefined = createdPn
+    ? pnBody.parade_night_id
+    : pnBody?.detail?.existing_id;
+  expect(pnId, `today's parade night must be created or resolved from duplicate_date: ${JSON.stringify(pnBody)}`).toBeTruthy();
 
-  if (pnId) {
-    // Add one session so planning_status is not "not_planned".
-    await page.request.post(`${base}/api/sessions`, {
-      data: { parade_night_id: pnId, period_number: 99 },
-      headers: auth,
-    });
-  }
+  const sessRes = await page.request.post(`${base}/api/sessions`, {
+    data: { parade_night_id: pnId, period_number: 99, custom_title: `HELP-04 ${Date.now()}` },
+    headers: auth,
+  });
+  expect(sessRes.ok()).toBe(true);
+  const sessionId = (await sessRes.json()).session_id as string;
 
   await page.evaluate(() => (window as any).loadData?.());
   await page.evaluate(() => (window as any).nav?.("dashboard"));
   const tonight = page.locator("#dash-tonight-section");
   await expect(tonight).toBeVisible({ timeout: 10000 });
   await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
+
+  // Leave shared seed data unchanged. If this test created the parade night,
+  // deleting it archives its test session too; otherwise remove just the session.
+  if (createdPn) {
+    await page.request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+  } else {
+    await page.request.delete(`${base}/api/sessions/${sessionId}`, { headers: auth });
+  }
 });
 
 test("HELP-05: 'What Changed?' activity feed card is present on the Needs Attention page", async ({ page }) => {
