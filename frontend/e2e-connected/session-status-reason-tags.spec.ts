@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // REM-23 continuation: #or-reason (the "reason required" modal shown when a
 // session's status changes to cancelled/not_delivered/delivered_with_issue)
@@ -55,7 +56,7 @@ async function loginSquadron(page: Page, code: string) {
 
 async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix: string) {
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
-  const testDate = new Date(2066, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  const testDate = new Date(2066, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -74,11 +75,8 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 
 async function openQuickEditForFirstSession(page: Page, marker: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  // Synthetic fixtures deliberately live outside the active planning year to
-  // avoid collisions. Clear the UI year filter before locating the fixture;
-  // otherwise the test asserts against an intentionally filtered-out card.
-  await page.evaluate(() => { (window as any).P.currentYearId = null; });
-  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await selectConnectedPlanningYear(page, 2066);
+  await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
