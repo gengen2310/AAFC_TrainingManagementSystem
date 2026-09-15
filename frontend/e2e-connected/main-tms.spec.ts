@@ -18,9 +18,10 @@ const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 // run immediately before it, can still cross the general API limiter's
 // 300 req/60s budget partway through (observed as #auth-wing-select never
 // getting populated -- a rate-limited /api/wings fetch, not a real login
-// bug). A per-file reset gives this file its own fresh budget. Best-effort;
-// see e2e-rate-limit-reset.ts for what this does and its known limitations.
-test.beforeAll(async () => {
+// bug). Reset before each independent browser scenario so failures cannot
+// depend on which test happened to run first. Best-effort; see
+// e2e-rate-limit-reset.ts for what this does and its known limitations.
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
