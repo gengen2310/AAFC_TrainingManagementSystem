@@ -13,7 +13,7 @@ const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const _createdPnIds: string[] = [];
 const _createdClassIds: string[] = [];
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
@@ -70,8 +70,32 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   const suffix = String(Date.now());
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
-  const years = await (await page.request.get(`${base}/api/planning/years`, { headers: auth })).json();
-  const yearId = years[0].planning_year_id as string;
+
+  // Weekly Program is planning-year scoped. Materialise a dedicated 2065 year
+  // first, then create both the Training Class and Parade Night in that year.
+  // The previous fixture created the class in years[0] (normally 2026) and the
+  // parade night in 2065/2066, which is not a valid same-year user workflow.
+  const fixtureYear = 2065;
+  const yearRes = await page.request.post(`${base}/api/planning/years`, {
+    data: { year: fixtureYear, name: `${fixtureYear} Weekly Program E2E` },
+    headers: auth,
+  });
+  let yearId: string;
+  if (yearRes.ok()) {
+    yearId = (await yearRes.json()).planning_year_id as string;
+  } else {
+    const body = await yearRes.json().catch(() => null);
+    if (body?.existing_id) {
+      yearId = body.existing_id as string;
+    } else {
+      const yearsRes = await page.request.get(`${base}/api/planning/years`, { headers: auth });
+      expect(yearsRes.ok()).toBe(true);
+      const years = await yearsRes.json() as Array<{ year: number; planning_year_id: string }>;
+      const existing = years.find((y) => Number(y.year) === fixtureYear);
+      expect(existing, `planning year ${fixtureYear} must exist`).toBeTruthy();
+      yearId = existing!.planning_year_id;
+    }
+  }
 
   // The printed Weekly Program groups classes by the governed CurriculumPhase
   // matching the session cadet_group. A synthetic custom phase cannot match
@@ -93,7 +117,8 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   const classId = (await classRes.json()).training_class_id as string;
   _createdClassIds.push(classId);
 
-  const testDate = new Date(2065, 6, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  // Start from January so the 0..299-day offset cannot roll into 2066.
+  const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
     headers: auth,
