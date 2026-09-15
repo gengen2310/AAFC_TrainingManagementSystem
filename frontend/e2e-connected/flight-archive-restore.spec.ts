@@ -1,10 +1,11 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
-// REM-108: Flight archive existed with no restore counterpart, and archived
-// flights were entirely invisible in the SA console (no way to even see one
-// to restore it). Added a "Show archived" toggle (matching the existing
-// Wings/Squadrons pattern) plus a Restore button.
+// Product contract: local Squadron Flights / sub-squadron groupings were
+// retired from the Main TMS UI. This regression test replaces the obsolete
+// REM-108 archive/restore workflow, which attempted to call the shared
+// Reference Data manager with an unsupported "flight" dataset and therefore
+// exercised hidden legacy markup rather than a reachable user workflow.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
@@ -29,42 +30,25 @@ async function loginSquadron(page: Page, code: string) {
   await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
 }
 
-test("an archived Flight is hidden by default, visible via Show archived, and Restore brings it back", async ({ page }) => {
+test("retired local Squadron Flights are not exposed in Account Management configuration", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
-  const base = LOCAL_API_BASE || "http://localhost:8000";
-  const token = await page.evaluate(() => sessionStorage.getItem("aafc_token"));
-  const hdr = { Authorization: `Bearer ${token}` };
-  const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
-  const squadronId = me.session.squadron_id as string;
-
-  const suffix = String(Date.now());
-  const flightName = `REM-108 E2E ${suffix}`;
-  const createRes = await page.request.post(`${base}/api/flights`, {
-    data: { name: flightName, squadron_id: squadronId },
-    headers: hdr,
-  });
-  expect(createRes.ok()).toBe(true);
-  const flightId = (await createRes.json()).flight_id as string;
-  const archiveRes = await page.request.post(`${base}/api/flights/${flightId}/archive`, { headers: hdr });
-  expect(archiveRes.ok()).toBe(true);
-
   await page.evaluate(() => (window as any).nav("accounts"));
-  await page.waitForTimeout(500);
+  await page.getByRole("tab", { name: "Configuration" }).click();
 
-  // Hidden by default.
-  await expect(page.locator("#flight-table")).not.toContainText(flightName);
+  const configuration = page.getByRole("tabpanel", { name: "Configuration" });
+  await expect(configuration).toBeVisible({ timeout: 5000 });
 
-  // Visible with "Show archived" checked, flagged as archived.
-  await page.locator("#flights-show-archived").check();
-  const row = page.locator("#flight-table tr", { hasText: flightName });
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row).toContainText("Archived");
+  // Current configuration contract is the six governed datasets. Flights are
+  // intentionally not one of them and must not be resurrected by stale UI.
+  await expect(configuration.getByRole("button", { name: /Manage Training Stages/i })).toBeVisible();
+  await expect(configuration.getByRole("button", { name: /Manage Subject Areas/i })).toBeVisible();
+  await expect(configuration.getByRole("button", { name: /Manage Session Status Reasons/i })).toBeVisible();
+  await expect(configuration.getByRole("button", { name: /Manage Activity Types/i })).toBeVisible();
+  await expect(configuration.getByRole("button", { name: /Manage Facilitator Types/i })).toBeVisible();
+  await expect(configuration.getByRole("button", { name: /Manage Training Area Capabilities/i })).toBeVisible();
 
-  // Restore brings it back into the default (unchecked) view.
-  await row.getByRole("button", { name: "Restore" }).click();
-  await page.locator("#flights-show-archived").uncheck();
-  await expect(page.locator("#flight-table tr", { hasText: flightName })).toBeVisible({ timeout: 5000 });
-
-  // Cleanup.
-  await page.request.post(`${base}/api/flights/${flightId}/archive`, { headers: hdr });
+  await expect(configuration.getByText(/Local Squadron Flights/i)).toHaveCount(0);
+  await expect(configuration.getByText(/sub-squadron groupings/i)).toHaveCount(0);
+  await expect(configuration.getByRole("button", { name: /Manage Flights/i })).toHaveCount(0);
+  await expect(configuration.getByText(/Organise Cadets into Flights/i)).toHaveCount(0);
 });

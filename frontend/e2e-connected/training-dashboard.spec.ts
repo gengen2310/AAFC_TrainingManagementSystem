@@ -242,9 +242,11 @@ test("wing_admin sees T2-04 Cancellation Trend card in #wing-dash", async ({ pag
 test("wing_admin sees T2-05 Not-Delivered Sessions card in #wing-dash", async ({ page }) => {
   await loginWing(page, "ADMIN7WG");
   const wingDash = page.locator("#wing-dash");
-  await expect(wingDash.getByText("Not-Delivered Sessions", { exact: false })).toBeVisible({ timeout: 5000 });
+  // Use heading role to avoid matching the "Enter Proxy Mode" tip text inside the data table,
+  // which also contains "Not-Delivered Sessions" — exact: false would match both.
+  await expect(wingDash.getByRole("heading", { name: /not-delivered sessions/i })).toBeVisible({ timeout: 5000 });
   const hasTable = await wingDash.locator("table").count();
-  const hasNoDataMsg = await wingDash.getByText("No not-delivered sessions", { exact: false }).count();
+  const hasNoDataMsg = await wingDash.getByText("No not-delivered sessions recorded", { exact: false }).count();
   expect(hasTable + hasNoDataMsg, "T2-05 card must show a table or a no-data message").toBeGreaterThan(0);
 });
 
@@ -260,11 +262,13 @@ test("DASH-10: /api/dashboard/adoption returns correct shape for wing_admin", as
   });
   expect(resp.ok()).toBe(true);
   const body = await resp.json();
-  expect(Array.isArray(body.squadrons)).toBe(true);
+  // API response shape: { units: [...], period: "30d", ... }
+  // Each unit: { squadron_id, code, last_activity, ... }
+  expect(Array.isArray(body.units)).toBe(true);
   expect(typeof body.period).toBe("string");
-  if (body.squadrons.length > 0) {
-    const sq = body.squadrons[0];
-    for (const field of ["squadron_id", "squadron_code", "last_activity"]) {
+  if (body.units.length > 0) {
+    const sq = body.units[0];
+    for (const field of ["squadron_id", "code", "last_activity"]) {
       expect(sq).toHaveProperty(field);
     }
   }
@@ -272,8 +276,8 @@ test("DASH-10: /api/dashboard/adoption returns correct shape for wing_admin", as
 
 test("DASH-10: Section C appears in wing command dashboard", async ({ page }) => {
   await loginWing(page, "ADMIN7WG");
-  const wingDash = page.locator("#wing-dash");
-  // Section C — System Adoption heading should appear after the command dashboard loads
-  const sectionC = wingDash.getByText(/system adoption/i);
+  // Section C is rendered by loadCommandDashboard() into #cmd-dash-wing, not #wing-dash.
+  const cmdDash = page.locator("#cmd-dash-wing");
+  const sectionC = cmdDash.getByText(/system adoption/i);
   await expect(sectionC).toBeVisible({ timeout: 10000 });
 });

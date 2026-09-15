@@ -322,6 +322,7 @@ export interface AnnualProgram {
 export interface LongRangeRow {
   parade_date: ParadeDate; sessions: PlanningSession[];
   session_count: number; filled_slots: number; conflicts: PlanningConflict[];
+  instructional_periods: InstructionalPeriod[];
 }
 export interface LongRangeView {
   planning_year_id: string; from_date: string; to_date: string;

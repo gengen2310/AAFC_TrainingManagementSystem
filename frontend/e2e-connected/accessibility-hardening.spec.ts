@@ -10,7 +10,11 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
-test.beforeAll(async () => {
+// These specs intentionally authenticate repeatedly. Reset the development/test
+// limiter before each test so results do not depend on suite order or the number
+// of earlier logins. This endpoint is development-only and does not alter
+// production rate-limit policy.
+test.beforeEach(async () => {
   await resetBackendRateLimits(
     process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000"
   );

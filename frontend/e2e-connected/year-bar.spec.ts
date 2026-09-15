@@ -66,6 +66,8 @@ test("stepping reaches a future year that has no row at all", async ({ page }) =
   await openYearBar(page);
 
   const start = Number(await page.locator("#ynLabel").textContent());
+  // Guard: delete the next year if it was left materialised by a previous run.
+  await deleteYear(page, start + 1);
   await page.locator("#ynNext").click();
   const next = Number(await page.locator("#ynLabel").textContent());
   expect(next).toBe(start + 1);
@@ -154,25 +156,47 @@ async function apiToken(page: Page): Promise<string> {
 }
 
 /** Remove a year's row again so these tests do not poison the shared database
- *  for the "no row at all" test above, which needs 2027 unmaterialised. */
+ *  for the "no row at all" test above, which needs 2027 unmaterialised.
+ *
+ *  Strategy: archive (soft-delete) all non-archived parade nights first so that
+ *  the planning year's only dependent count drops to zero, then permanently
+ *  delete the year.  The backend's DELETE /years/{id} was updated to count only
+ *  non-archived parade nights as blockers (archived nights are already
+ *  soft-deleted so they must not prevent a year from being cleaned up). */
 async function deleteYear(page: Page, year: number) {
   const token = await apiToken(page);
   const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
   const rows = await (await page.request.get(
     `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const row = rows.find((r: any) => r.year === year);
-  if (row?.planning_year_id) {
-    await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
+  if (!row?.planning_year_id) return; // year not materialised, nothing to do
+
+  // Archive all parade nights for this year so they no longer block deletion.
+  const pns = await (await page.request.get(
+    `${base}/api/parade-nights?planning_year_id=${row.planning_year_id}`,
+    { headers: { Authorization: `Bearer ${token}` } })).json();
+  for (const pn of (pns || [])) {
+    await page.request.delete(`${base}/api/parade-nights/${pn.parade_night_id}`,
       { headers: { Authorization: `Bearer ${token}` } });
   }
+
+  // Now permanently delete the year (succeeds once no active parade nights remain).
+  await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
+    { headers: { Authorization: `Bearer ${token}` } });
+
+  // Re-fetch the year list so P.years reflects the delete; without this, the
+  // client-side year bar still shows the deleted year as materialised.
+  await page.evaluate("_loadPlanningYears()");
 }
 
 test("an empty future year offers exactly the two things that can be done", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  await page.locator("#ynNext").click();
   const target = current + 1;
+  // Guard: delete the target year if materialised from a prior run.
+  await deleteYear(page, target);
+  await page.locator("#ynNext").click();
 
   const notice = page.locator("#yn-year-notice .yn-notice");
   await expect(notice).toBeVisible();
@@ -192,6 +216,8 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
   const target = current + 1;
+  // Guard: delete the target year if materialised from a prior run.
+  await deleteYear(page, target);
   await page.locator("#ynNext").click();
   await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
 
@@ -210,6 +236,8 @@ test("Copy setup brings the class structure across and says how much it copied",
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
   const target = current + 1;
+  // Guard: delete the target year if materialised from a prior run.
+  await deleteYear(page, target);
   await page.locator("#ynNext").click();
 
   try {
@@ -329,8 +357,11 @@ test("the year menu is actually on screen, not clipped by its container", async 
   await openYearBar(page);
   await page.locator("#ynDisplay").click();
 
-  const first = page.locator("#ynMenu button").first();
-  const box = (await first.boundingBox())!;
+  // Use the aria-current (currently selected year) button, which ynToggleMenu()
+  // focuses and scrolls into view when the menu opens. The first DOM item may
+  // be above the visible scroll area if the DB has many future test-debris years.
+  const current = page.locator('#ynMenu button[aria-current="true"]');
+  const box = (await current.boundingBox())!;
   const vp = page.viewportSize()!;
   expect(box.x, "menu runs off the left edge").toBeGreaterThanOrEqual(0);
   expect(box.x + box.width, "menu runs off the right edge").toBeLessThanOrEqual(vp.width);

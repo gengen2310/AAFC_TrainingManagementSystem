@@ -82,7 +82,9 @@ test.describe("Wing HQ Calendar — national cross-wing rollup (REM-13 Phase A)"
     const title7 = `E2E Rollup 7WG ${suffix}`;
     const title9 = `E2E Rollup 9WG ${suffix}`;
     const day = 3 + (Date.now() % 24); // spread across the 2nd-25th of the month
-    const eventDate = `2026-08-${String(day).padStart(2, "0")}`;
+    // Use the current month so events land in the calendar grid that's visible by default.
+    const now = new Date();
+    const eventDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const r1 = await page.request.post(`${base}/api/wing-calendar/events?wing_id=${wing7Id}`, {
       data: { title: title7, event_type: "wing_event", start_date: eventDate, planning_importance: "key_event" },
       headers: hdr,
@@ -128,7 +130,9 @@ test.describe("Wing HQ Calendar — national cross-wing rollup (REM-13 Phase A)"
     const suffix = String(Date.now());
     const actTitle = `E2E Rollup Activity ${suffix}`;
     const day = 3 + (Date.now() % 24);
-    const eventDate = `2026-08-${String(day).padStart(2, "0")}`;
+    // Use the current month so the chip lands in the calendar grid shown by default.
+    const now = new Date();
+    const eventDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const actRes = await page.request.post(`${base}/api/activities/wing`, {
       data: { activity_name: actTitle, date_start: eventDate, activity_type: "training", wing_id: wing7Id },
       headers: wingHdr,

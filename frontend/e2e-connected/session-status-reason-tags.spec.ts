@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // REM-23 continuation: #or-reason (the "reason required" modal shown when a
 // session's status changes to cancelled/not_delivered/delivered_with_issue)
@@ -14,9 +15,28 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
+const _createdPnIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -36,7 +56,7 @@ async function loginSquadron(page: Page, code: string) {
 
 async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix: string) {
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
-  const testDate = new Date(2066, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  const testDate = new Date(2066, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -44,6 +64,7 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
+  _createdPnIds.push(pnId);
   await page.request.patch(`${base}/api/parade-nights/${pnId}`, { data: { notes: marker }, headers: hdr });
   const sessRes = await page.request.post(`${base}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1 }, headers: hdr,
@@ -54,7 +75,8 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 
 async function openQuickEditForFirstSession(page: Page, marker: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await selectConnectedPlanningYear(page, 2066);
+  await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -104,9 +126,16 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
 
+    // HARD-09 replaced native prompt() with the accessible promptText() modal.
+    // Exercise that real UI instead of accepting a native browser dialog that
+    // no longer exists.
     const reasonName = `E2E Custom Reason ${Date.now()}`;
-    page.once("dialog", (d) => d.accept(reasonName));
     await page.locator("#or-reason").selectOption("__add_new__");
+    const textModal = page.locator("#m-text-input");
+    await expect(textModal).toBeVisible({ timeout: 5000 });
+    await page.locator("#ti-input").fill(reasonName);
+    await page.locator("#ti-ok-btn").click();
+    await expect(textModal).toBeHidden({ timeout: 5000 });
     await expect(page.locator("#or-reason")).toHaveValue(reasonName, { timeout: 5000 });
 
     // Cleanup.

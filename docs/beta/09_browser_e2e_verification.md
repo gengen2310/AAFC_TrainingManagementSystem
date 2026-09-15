@@ -165,3 +165,41 @@ Planning Workspace behaviour should be treated as unverified, not assumed equiva
 `wing_admin`/`national_admin` just because the underlying `useScopedSquadron()` code path is
 shared — the fix in `PlanningWorkspace.tsx` was verified for the two roles that could actually be
 tested, not for all three roles `needsSelection` covers.
+
+## Planning Workspace `frontend/e2e/` full suite — 41/41 all browsers, 2026-09-14
+
+**Branch**: `fix/post-pr60-release-qualification` (commit `9e2664a`)
+
+**Command**: `cd frontend && npx playwright test` (runs all three projects: Chromium, Firefox, WebKit)
+
+| Browser  | Result       | Duration |
+|----------|--------------|----------|
+| Chromium | 41/41 passed | ~40s     |
+| Firefox  | 41/41 passed | 56.9s    |
+| WebKit   | 41/41 passed | 1.7m     |
+
+**Exit code 0 on all three browsers.** No skipped tests. No timeouts beyond expected per-browser variance.
+
+### Fixes applied to reach 41/41 on Firefox and WebKit
+
+**session-archive-restore.spec.ts** — Firefox post-restore banner/cell assertions increased from
+30 s to 50 s. Firefox's refetch after `Restore` is slower than Chromium/WebKit because it
+re-renders the full night list before the restored session appears; 30 s was reliably just short
+of the actual settle time.
+
+**session-drawer-move.spec.ts** — Year range widened to 3000–3999 (from 2620–2669, 50 values).
+With accumulated test runs all 50 prior values could be occupied by stale years; React
+`key={y.year}` deduplication drops the new year's chip and `years.find()` returns the old
+year's name instead. Firefox click pattern: `scrollIntoViewIfNeeded()` +
+`evaluate((el: HTMLElement) => el.click())` + banner confirmation.
+
+**parade-night-grid-classes.spec.ts** — Year range widened to 2700–2999 (from 2610–2659, 50
+values, which overlapped with `session-archive-restore`'s range). A stale REM-133 year with the
+same numeric value as the test year caused `years.find()` to select it instead of the new year.
+Same Firefox click pattern as above.
+
+**Year range map (no overlaps)**:
+- `session-archive-restore`: 2610–2659 (50 values, unchanged)
+- `parade-night-grid-classes`: 2700–2999 (300 values, changed)
+- `session-drawer-move`: 3000–3999 (1000 values, changed)
+- Other specs: 8800+, 9700+ (year-rollover, year-view-classes)

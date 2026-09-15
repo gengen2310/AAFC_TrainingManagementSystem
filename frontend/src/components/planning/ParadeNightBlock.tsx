@@ -426,11 +426,11 @@ export function ParadeNightBlock({
   return (
     <div className={blockCls}>
       {/* ── Header — dark blue bar ──────────────────────────────────────────── */}
-      {/* Two sibling buttons: header action + collapse toggle. No nesting of
-          interactive elements — avoids nested-interactive WCAG 4.1.2 violation. */}
       <div className="pw-block-hdr">
+        {/* Nav button: activates the night detail view (Enter/Space natively handled by <button>). */}
         <button
-          className="pw-block-hdr-action"
+          type="button"
+          className="pw-block-hdr-nav"
           onClick={onHeaderClick}
           aria-label={`Parade night ${date}`}
         >
@@ -446,11 +446,11 @@ export function ParadeNightBlock({
             </span>
           )}
         </button>
-        {/* CLASS-23: collapse toggle — sibling of the header button, never nested */}
+        {/* CLASS-23: collapse toggle — sibling, not child, of the nav button to avoid nested-interactive. */}
         <button
+          type="button"
           className="pw-block-collapse-btn"
           onClick={e => { e.stopPropagation(); setCollapsed(v => !v); }}
-          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setCollapsed(v => !v); } }}
           aria-label={collapsed ? "Expand parade night" : "Collapse parade night"}
           aria-expanded={!collapsed}
           title={collapsed ? "Expand" : "Collapse"}
