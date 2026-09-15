@@ -131,45 +131,52 @@ test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip 
 });
 
 test("HELP-04: Readiness checklist section is visible on the dashboard when a parade night has sessions", async ({ page }) => {
-  // HELP-04: _renderTonightReadiness() renders a "Readiness checklist" section
-  // beneath the session list when sessions_total > 0. Seed today's parade night
-  // (which is earlier than the seeded upcoming night), add one test-owned session,
-  // then clean up only the data this test created.
+  // HELP-04: exercise the exact parade night the dashboard will select rather
+  // than creating/reusing "today". A duplicate-date 409 can resolve to an
+  // archived soft-deleted night, while the dashboard intentionally ignores
+  // archived nights and chooses the next active one. That made this test seed
+  // one record and assert against another.
   await loginSquadron(page, "ADMIN703");
   const base = LOCAL_API_BASE || "http://localhost:8000";
   const token = await page.evaluate(() => sessionStorage.getItem("aafc_token") ?? "");
   const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const todayDate = new Date().toISOString().slice(0, 10);
-  const pnRes = await page.request.post(`${base}/api/parade-nights`, {
-    data: { date: todayDate, parade_type: "normal" },
-    headers: auth,
+  // loadData() populates the same S.pns collection used by the Main TMS. Pick
+  // the earliest active non-past night from that state so the fixture follows
+  // the product's actual selection contract and never relies on a polluted
+  // duplicate-date row from an earlier E2E run.
+  await page.evaluate(() => (window as any).loadData?.());
+  const targetPn = await page.evaluate(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const pns = Array.isArray((window as any).S?.pns) ? (window as any).S.pns : [];
+    const candidates = pns
+      .filter((pn: any) => !pn.is_archived && String(pn.date || "") >= today)
+      .sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || "")));
+    const pn = candidates[0];
+    if (!pn) return null;
+    return {
+      id: pn.parade_night_id || pn.id,
+      date: pn.date,
+    };
   });
-  const pnBody = await pnRes.json();
-  const createdPn = pnRes.ok();
-  const pnId: string | undefined = createdPn
-    ? pnBody.parade_night_id
-    : pnBody?.detail?.existing_id;
-  expect(pnId, `today's parade night must be created or resolved from duplicate_date: ${JSON.stringify(pnBody)}`).toBeTruthy();
+  expect(targetPn?.id, "seed data must expose at least one active upcoming parade night").toBeTruthy();
 
   const sessRes = await page.request.post(`${base}/api/sessions`, {
-    data: { parade_night_id: pnId, period_number: 99, custom_title: `HELP-04 ${Date.now()}` },
+    data: { parade_night_id: targetPn!.id, period_number: 99, custom_title: `HELP-04 ${Date.now()}` },
     headers: auth,
   });
   expect(sessRes.ok()).toBe(true);
   const sessionId = (await sessRes.json()).session_id as string;
 
-  await page.evaluate(() => (window as any).loadData?.());
-  await page.evaluate(() => (window as any).nav?.("dashboard"));
-  const tonight = page.locator("#dash-tonight-section");
-  await expect(tonight).toBeVisible({ timeout: 10000 });
-  await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
-
-  // Leave shared seed data unchanged. If this test created the parade night,
-  // deleting it archives its test session too; otherwise remove just the session.
-  if (createdPn) {
-    await page.request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
-  } else {
+  try {
+    await page.evaluate(() => (window as any).loadData?.());
+    await page.evaluate(() => (window as any).nav?.("dashboard"));
+    const tonight = page.locator("#dash-tonight-section");
+    await expect(tonight).toBeVisible({ timeout: 10000 });
+    await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
+  } finally {
+    // The parade night belongs to shared seed data; remove only the session this
+    // test created so the fixture is order-independent and repeatable.
     await page.request.delete(`${base}/api/sessions/${sessionId}`, { headers: auth });
   }
 });
