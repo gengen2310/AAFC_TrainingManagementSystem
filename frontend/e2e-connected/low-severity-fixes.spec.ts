@@ -159,8 +159,11 @@ test("HELP-04: Readiness checklist section is visible on the dashboard when a pa
   const sessionId = (await sessRes.json()).session_id as string;
 
   try {
-    await page.evaluate(() => (window as any).loadData?.());
-    await page.evaluate(() => (window as any).nav?.("dashboard"));
+    // loadData/nav are top-level lexical bindings in the classic script, not
+    // window properties. The old optional window calls silently no-op'd and
+    // left the Dashboard rendering its stale pre-seed state.
+    await page.evaluate("loadData()");
+    await page.evaluate("nav('dashboard')");
     const tonight = page.locator("#dash-tonight-section");
     await expect(tonight).toBeVisible({ timeout: 10000 });
     await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
