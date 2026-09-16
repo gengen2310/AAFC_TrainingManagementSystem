@@ -28,9 +28,7 @@ import { TermView } from "../components/planning/views/TermView";
 import { EightWeekView } from "../components/planning/views/EightWeekView";
 import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
-import { SetupPanel } from "../components/planning/SetupPanel";
 import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureParadeDayModal";
-import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModal";
 import { canWriteSquadron } from "../auth/permissions";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
 import { SquadronSelector } from "../layout/SquadronSelector";
@@ -156,7 +154,6 @@ export function PlanningWorkspace() {
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [updatingParadeDay, setUpdatingParadeDay] = useState(false);
-  const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
@@ -373,11 +370,11 @@ export function PlanningWorkspace() {
     }
     if (view === "setup") {
       return (
-        <SetupPanel
-          session={session}
-          squadronId={resolvedSquadronId}
-          onYearCreated={() => qc.invalidateQueries({ queryKey: ["planning-years"] })}
-        />
+        <div className="pw-empty" data-testid="tms-year-setup-handoff">
+          <strong>Set up this Training Year in TMS Unit Setup.</strong>
+          <span>Planning Year and Training Class records are managed in TMS and appear here automatically.</span>
+          <span style={{ fontSize: 'var(--fs-xs)' }}>After creating the year in TMS, reopen Planning Workspace using the TMS link to keep the selected year.</span>
+        </div>
       );
     }
     // Unreachable once view === "workspace" -- pwYearView returns "loading"
@@ -610,21 +607,6 @@ export function PlanningWorkspace() {
           >
             + Anchor event
           </button>
-          {/* Reported 2026-08-25: "the guided mode is very useful - but very hard
-              to find it". It sat second in this row as a 12px outline button,
-              indistinguishable from the maintenance action beside it. It is the
-              primary way to set a year up, so it now leads the row, carries the
-              primary style, and says what it does rather than naming itself. */}
-          {canWriteSquadron(session) && (
-            <button
-              className="btn sm"
-              style={{ fontSize: 'var(--fs-xs)', padding: "4px 12px", fontWeight: 600 }}
-              onClick={() => setGuidedSetupOpen(true)}
-              title="Generate this year's parade nights, terms and holidays step by step"
-            >
-              Set up this year — guided
-            </button>
-          )}
           {canWriteSquadron(session) && (
             <button
               className="btn sm out"
@@ -641,18 +623,6 @@ export function PlanningWorkspace() {
           yearId={selectedYearId}
           onClose={() => setUpdatingParadeDay(false)}
           onDone={() => qc.invalidateQueries({ queryKey: ["planning-cc"] })}
-        />
-      )}
-      {guidedSetupOpen && (
-        <GuidedYearSetupModal
-          years={years ?? []}
-          squadronId={resolvedSquadronId ?? undefined}
-          onClose={() => setGuidedSetupOpen(false)}
-          onDone={() => {
-            qc.invalidateQueries({ queryKey: ["planning-years"] });
-            qc.invalidateQueries({ queryKey: ["planning-cc"] });
-            qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
-          }}
         />
       )}
 

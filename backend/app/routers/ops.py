@@ -687,74 +687,41 @@ class CeaMemberImportIn(BaseModel):
 
 def _parse_cea_csv(csv_text: str):
     """Parse CEA member CSV. Returns (headers, rows_as_dicts, errors)."""
-    text = (csv_text or "").replace("﻿", "")
-    if not text.strip():
-        return [], [], ["no_rows"]
-    sample = text.lstrip("\r\n")
+    # Excel's UTF-8 CSV export commonly prefixes the first heading with a BOM.
+    # csv.reader correctly parses the file but deliberately leaves that marker
+    # intact, turning ``Id`` into ``\ufeffid`` and making every member look as if
+    # their identifier were missing.  CEA exports are also seen with either a
+    # comma or semicolon separator depending on the operator's regional Excel
+    # settings, so detect the dialect from the header rather than assuming one.
+    text = (csv_text or "").lstrip("\ufeff")
     try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=";,\t|")
-        delimiter = dialect.delimiter
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t")
     except csv.Error:
-        delimiter = ";" if ";" in sample else "," if "," in sample else "\t"
-
-    reader = csv.reader(io.StringIO(sample), delimiter=delimiter)
+        dialect = csv.excel
+    reader = csv.reader(io.StringIO(text), dialect)
     raw = [r for r in reader if any(c.strip() for c in r)]
     if not raw:
         return [], [], ["no_rows"]
-
     aliases = {
-        "id": {
-            "id", "cea id", "cea_id", "service number", "service no",
-            "service no.", "service #", "service_number",
-        },
-        "rank": {"rank"},
-        "name": {"first name", "first_name", "firstname", "given name", "given names", "name"},
-        "family name": {"family name", "family_name", "surname", "last name", "last_name", "lastname"},
-        "position": {"position"},
-        "unit": {"unit"},
-        "scope": {"scope"},
-        "gender": {"gender"},
-        "access": {"access"},
+        "cea id": "id", "member id": "id", "service number": "id",
+        "service no": "id", "service no.": "id",
+        "first name": "name", "given name": "name",
+        "surname": "family name", "last name": "family name",
     }
-
-    def norm(h: str) -> str:
-        import re
-        return re.sub(r"[^a-z0-9]+", " ", (h or "").strip().lower()).strip()
-
-    aliases = {
-        canonical: {norm(alias) for alias in variants | {canonical}}
-        for canonical, variants in aliases.items()
-    }
-    rows = []
-    required = ["id", "rank", "name", "family name"]
-    seen = set()
-    for header in raw[0]:
-        key = None
-        n = norm(header)
-        for canonical, variants in aliases.items():
-            if n in variants:
-                key = canonical
-                break
-        if key is not None:
-            seen.add(key)
-
-    if not all(req in seen for req in required):
-        return [], [], ["missing_required_columns"]
-
-    for r in raw[1:]:
-        row = {}
-        for idx, header in enumerate(raw[0]):
-            key = None
-            n = norm(header)
-            for canonical, variants in aliases.items():
-                if n in variants:
-                    key = canonical
-                    break
-            if key is None:
-                continue
-            row[key] = (r[idx].strip() if idx < len(r) else "")
-        rows.append(row)
-    return raw[0], rows, []
+    headers = []
+    for value in raw[0]:
+        normal = " ".join(value.strip().lower().replace("_", " ").split())
+        headers.append(aliases.get(normal, normal))
+    missing = [label for key, label in (("id", "Id / Service Number"),
+                                        ("family name", "Family name / Surname"))
+               if key not in headers]
+    if missing:
+        return headers, [], [{
+            "error": "missing_required_columns",
+            "message": "The CEA export is missing required column(s): " + ", ".join(missing) + ".",
+            "missing_columns": missing,
+            "received_columns": [h for h in headers if h],
+        }]
 
 
 def _cea_field(row, *names):
@@ -778,10 +745,8 @@ def cea_member_preview(
 
     _, rows, errors = _parse_cea_csv(body.csv_text)
     if errors:
-        if errors[0] == "missing_required_columns":
-            raise HTTPException(400, detail={"error": "missing_required_columns",
-                                              "message": "Missing required columns: Service Number, Rank, First Name, Surname"})
-        raise HTTPException(400, detail={"error": errors[0]})
+        detail = errors[0] if isinstance(errors[0], dict) else {"error": errors[0]}
+        raise HTTPException(400, detail=detail)
     if not rows:
         raise HTTPException(400, detail={"error": "no_data_rows"})
 
@@ -794,14 +759,17 @@ def cea_member_preview(
     for i, row in enumerate(rows):
         sn = _cea_field(row, "id")
         if not sn:
-            result.append({"row": i + 2, "action": "ERROR", "error": "missing_id"})
+            result.append({"row": i + 2, "action": "ERROR", "error": "missing_id",
+                           "detail": "CEA Id / Service Number is blank on this row."})
             continue
         if sn in duplicate_sns:
-            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id"})
+            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id",
+                           "detail": "This CEA Id / Service Number appears more than once in the file."})
             seen_ids.add(sn)
             continue
         if sn in seen_ids:
-            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id"})
+            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id",
+                           "detail": "This CEA Id / Service Number appears more than once in the file."})
             continue
         seen_ids.add(sn)
         rank = _cea_field(row, "rank")
@@ -809,7 +777,8 @@ def cea_member_preview(
         last_name = _cea_field(row, "family name")
         # Missing family name is a malformed row
         if not last_name:
-            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "missing_family_name"})
+            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "missing_family_name",
+                           "detail": "Family name / Surname is blank on this row."})
             continue
         existing = db.query(Cadet).filter(
             Cadet.squadron_id == sq_id,
@@ -860,10 +829,8 @@ def cea_member_commit(
 
     _, rows, errors = _parse_cea_csv(body.csv_text)
     if errors:
-        if errors[0] == "missing_required_columns":
-            raise HTTPException(400, detail={"error": "missing_required_columns",
-                                              "message": "Missing required columns: Service Number, Rank, First Name, Surname"})
-        raise HTTPException(400, detail={"error": errors[0]})
+        detail = errors[0] if isinstance(errors[0], dict) else {"error": errors[0]}
+        raise HTTPException(400, detail=detail)
 
     new_count = update_count = unchanged_count = error_count = 0
     delta = []
