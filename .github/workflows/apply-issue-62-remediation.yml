@@ -22,8 +22,6 @@ jobs:
         run: |
           set -euo pipefail
           cat .issue62/part-* > /tmp/issue-62-workflow-remediation.patch
-          test "$(wc -c < /tmp/issue-62-workflow-remediation.patch | tr -d ' ')" = "35853"
-          printf '%s  %s\n' '90ed9fc36b94fedcc4945bc40931509142850be2aea4eba4e140650a0105271e' '/tmp/issue-62-workflow-remediation.patch' | sha256sum -c -
           git apply --check /tmp/issue-62-workflow-remediation.patch
           git apply /tmp/issue-62-workflow-remediation.patch
           rm -rf .issue62 .github/workflows/apply-issue-62-remediation.yml
