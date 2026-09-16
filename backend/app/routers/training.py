@@ -1903,6 +1903,60 @@ def resource_clashes(date: str, db: DBSession = Depends(get_db), p: Principal = 
 
 
 # ── CADETS (sensitive; sqn_general blocked) ──
+class CadetCreateIn(BaseModel):
+    service_number: str
+    rank: str | None = None
+    first_name: str | None = None
+    last_name: str
+    phase: str | None = None
+    flight: str | None = None
+
+
+@router.post("/cadets", status_code=201)
+def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    """Create a cadet in the caller's active squadron.
+
+    This is the write half of the long-standing ``GET /cadets`` contract.  CEA
+    import remains the bulk/upsert path; this endpoint is intentionally a
+    single-record create and refuses an existing active service number.
+    """
+    sq_id = _active_squadron(p)
+    squadron = db.get(Squadron, sq_id)
+    if not squadron:
+        raise HTTPException(404, detail={"error": "squadron_not_found"})
+    require_can_write_squadron(p, squadron.id, squadron.wing_id)
+    service_number = body.service_number.strip()
+    last_name = body.last_name.strip()
+    if not service_number or not last_name:
+        raise HTTPException(400, detail={
+            "error": "missing_required_fields",
+            "message": "Service number and family name are required.",
+        })
+    existing = db.query(Cadet).filter(
+        Cadet.squadron_id == sq_id,
+        Cadet.service_number == service_number,
+        Cadet.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        raise HTTPException(409, detail={
+            "error": "duplicate_service_number",
+            "message": "An active cadet with that service number already exists in this squadron.",
+        })
+    cadet = Cadet(
+        squadron_id=sq_id, service_number=service_number,
+        rank=body.rank.strip() if body.rank else None,
+        first_name=body.first_name.strip() if body.first_name else None,
+        last_name=last_name, phase=body.phase.strip() if body.phase else None,
+        flight=body.flight.strip() if body.flight else None,
+    )
+    db.add(cadet)
+    db.commit()
+    audit(db, p, object_type="cadet", object_id=cadet.id, action="create",
+          new={"service_number": service_number})
+    return {"ok": True, "cadet_id": cadet.id}
+
+
 @router.get("/cadets")
 def list_cadets(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     if p.role == "sqn_general":
@@ -2130,6 +2184,7 @@ def parade_night_builder(pnid: str, db: DBSession = Depends(get_db), p: Principa
         ).order_by(TimingBlock.display_order).all()
         timing_blocks = [
             {
+                "timing_block_id": b.id,
                 "display_order": b.display_order, "block_name": b.block_name,
                 "block_type": b.block_type, "start_time": b.start_time, "end_time": b.end_time,
                 "duration_minutes": b.duration_minutes,

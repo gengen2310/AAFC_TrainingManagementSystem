@@ -1971,6 +1971,7 @@ def get_builder(
         ).order_by(TimingBlock.display_order).all()
         timing_blocks = [
             {
+                "timing_block_id": b.id,
                 "display_order": b.display_order, "block_name": b.block_name,
                 "block_type": b.block_type, "start_time": b.start_time, "end_time": b.end_time,
                 "duration_minutes": b.duration_minutes,
@@ -2118,6 +2119,21 @@ def create_session(
         custom_title=body.activity_title, status=body.status,
         delivery_notes=body.notes, created_by=p.user_id,
     )
+    # A planner slot is a position in the parade night's timing template, not
+    # merely a display ordinal.  Persist the block identity at creation so the
+    # canonical schedule/print endpoint can place the session on its real row.
+    placement_template_id = pn.timing_template_id
+    if not placement_template_id:
+        effective_template = _effective_template(db, pn.squadron_id, pn.date)
+        placement_template_id = effective_template.id if effective_template else None
+    if placement_template_id:
+        period_block = db.query(TimingBlock).filter(
+            TimingBlock.timing_template_id == placement_template_id,
+            TimingBlock.is_instructional_period == True,  # noqa: E712
+            TimingBlock.period_number == body.session_number,
+        ).first()
+        if period_block:
+            s.timing_block_id = period_block.id
     # Denormalize curriculum and facilitator
     if body.curriculum_id:
         ci = visible_curriculum_item(db, p, body.curriculum_id)

@@ -83,11 +83,9 @@ const TASKS: { title: string; steps: string[] }[] = [
   {
     title: "Set up a Training Year",
     steps: [
-      "Open Planning Workspace.",
-      "If no Training Year exists, the setup panel appears automatically. Fill in the year number and name, then select 'Create planning year'.",
-      "On the next step, choose your parade weekday, start date, end date, and frequency.",
-      "Select 'Generate parade dates'. Your parade nights appear on the calendar.",
-      "If a year already exists, select 'Guided year setup…' in the toolbar to add another year or roll over from the previous year.",
+      "In TMS, open Unit Setup.",
+      "Create or roll over the Training Year and manage its Training Classes there.",
+      "Open Planning Workspace using the TMS link. The selected year and shared records appear automatically.",
     ],
   },
   {
@@ -159,8 +157,8 @@ const TASKS: { title: string; steps: string[] }[] = [
   {
     title: "Generate Parade Nights for a new training year",
     steps: [
-      "Open Planning Workspace and select 'Guided year setup…' in the toolbar.",
-      "Choose 'Roll over from previous year' to copy settings, or 'Create new year' to start fresh.",
+      "In TMS Unit Setup, create or roll over the Training Year.",
+      "Open Planning Workspace using the TMS link for that year.",
       "Set the parade weekday, start date, end date, and frequency.",
       "Select 'Generate'. Review the date preview before confirming.",
     ],
@@ -253,16 +251,15 @@ export function HelpDrawer({ onClose }: Props) {
               <li>Training Classes for each active Training Stage</li>
             </ol>
             <p>
-              Once those are in place, return to Planning Workspace to create a Training Year, generate parade nights, and start scheduling.
+              Once those are in place, use the TMS link to open that same Training Year in Planning Workspace and start scheduling.
             </p>
 
             <h3>First time in Planning Workspace?</h3>
             <p>
-              If no Training Year exists yet, the setup panel opens automatically. It guides you through creating a year and generating your parade night dates.
+              If no Training Year exists yet, Planning Workspace directs you to TMS Unit Setup, the authoritative place to create the year and its Training Classes.
             </p>
             <p>
-              Once you have a Training Year, use{" "}
-              <strong>Guided year setup…</strong> in the toolbar at any time to add another year, roll over to a new year, or adjust your parade settings.
+              Once you have a Training Year, reopen Planning Workspace from TMS to preserve the selected-year handoff.
             </p>
           </div>
         )}
