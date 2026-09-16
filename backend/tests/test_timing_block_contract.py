@@ -32,7 +32,7 @@ PW_BLOCK_KEYS = {
 # The connected-frontend reads these off both /builder endpoints.
 TMS_BLOCK_KEYS = {
     "display_order", "block_name", "block_type", "start_time", "end_time",
-    "duration_minutes", "is_instructional_period", "period_number",
+    "duration_minutes", "is_instructional_period", "period_number", "timing_block_id",
 }
 
 
@@ -126,3 +126,24 @@ def test_the_two_shapes_carry_the_same_blocks(client):
     assert [b["sequence"] for b in wp] == [b["display_order"] for b in bl]
     assert ([b["is_instructional"] for b in wp]
             == [b["is_instructional_period"] for b in bl])
+
+
+def test_planner_create_is_placed_in_canonical_print_block(client):
+    """Planner slot -> persisted block id -> print schedule is one contract."""
+    hdr, _, pd_id = _setup(client)
+    builder = client.get(f"/api/planning/parade-dates/{pd_id}/builder", headers=hdr).json()
+    block = next(b for b in builder["timing_blocks"] if b["is_instructional_period"])
+    response = client.post(f"/api/planning/parade-dates/{pd_id}/sessions", json={
+        "cadet_group": "senior",
+        "session_number": block["period_number"],
+        "activity_title": "Issue 62 placement",
+        "status": "planned",
+    }, headers=hdr)
+    assert response.status_code == 200, response.text
+    session_id = response.json()["session_id"]
+
+    schedule = client.get(f"/api/parade-nights/{pd_id}/schedule", headers=hdr)
+    assert schedule.status_code == 200, schedule.text
+    assert any(s["session_id"] == session_id
+               for s in schedule.json()["sessions_by_block"][block["timing_block_id"]])
+    assert all(s["session_id"] != session_id for s in schedule.json()["unlinked_sessions"])

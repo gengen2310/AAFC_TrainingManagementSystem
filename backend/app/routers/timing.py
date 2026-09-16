@@ -736,7 +736,11 @@ def get_parade_night_schedule(
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
 
-    blocks = _resolved_template_blocks(db, pn.timing_template_id)
+    template_id = pn.timing_template_id
+    if not template_id:
+        effective = _effective_template(db, pn.squadron_id, pn.date)
+        template_id = effective.id if effective else None
+    blocks = _resolved_template_blocks(db, template_id)
     sessions = (
         db.query(Session)
         .filter(
@@ -745,7 +749,7 @@ def get_parade_night_schedule(
         )
         .all()
     )
-    return _shape_schedule(pn_id, pn.timing_template_id, blocks, sessions)
+    return _shape_schedule(pn_id, template_id, blocks, sessions)
 
 
 # ── GET /api/parade-night-schedules ───────────────────────────────────────────
@@ -795,8 +799,23 @@ def list_parade_night_schedules(
 
     pn_ids = [pn.id for pn in pns]
 
-    # Blocks: resolve every referenced template in two queries, not one per night.
-    tpl_ids = {pn.timing_template_id for pn in pns if pn.timing_template_id}
+    # Resolve explicit templates and the same date-effective fallback used by
+    # the single endpoint.  Keeping this in memory preserves the bulk
+    # endpoint's no-N+1 contract while making its payload byte-for-byte equal.
+    effective_candidates = db.query(TimingTemplate).filter(
+        TimingTemplate.squadron_id == sq_id,
+        TimingTemplate.is_archived == False,  # noqa: E712
+    ).order_by(TimingTemplate.effective_from.desc()).all()
+    resolved_tpl_by_pn: dict[str, str | None] = {}
+    for pn in pns:
+        resolved = pn.timing_template_id
+        if not resolved:
+            match = next((t for t in effective_candidates
+                          if t.effective_from <= pn.date
+                          and (not t.effective_to or t.effective_to >= pn.date)), None)
+            resolved = match.id if match else None
+        resolved_tpl_by_pn[pn.id] = resolved
+    tpl_ids = {tid for tid in resolved_tpl_by_pn.values() if tid}
     live_tpl_ids: set[str] = set()
     if tpl_ids:
         live_tpl_ids = {
@@ -823,11 +842,10 @@ def list_parade_night_schedules(
     return {"schedules": [
         _shape_schedule(
             pn.id,
-            pn.timing_template_id,
-            blocks_by_tpl.get(pn.timing_template_id, [])
-            if pn.timing_template_id in live_tpl_ids else [],
+            resolved_tpl_by_pn[pn.id],
+            blocks_by_tpl.get(resolved_tpl_by_pn[pn.id], [])
+            if resolved_tpl_by_pn[pn.id] in live_tpl_ids else [],
             sessions_by_pn.get(pn.id, []),
         )
         for pn in pns
     ]}
-
