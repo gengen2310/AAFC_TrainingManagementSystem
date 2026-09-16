@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   apply-patch:
-    if: github.event.head_commit.message == 'chore(issue-62): stage verified remediation patch'
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
