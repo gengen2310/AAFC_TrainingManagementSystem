@@ -1,0 +1,107 @@
+     const byGroupSession = {};
+     P.builderSessions.forEach(s=>{
+       const k=`${s.cadet_group}:${s.session_number}`;
+@@ -17619,8 +17611,9 @@ async function loadBuilderFromPn(pnId){
+         const s=byGroupSession[`${grp}:${sn}`];
+         if(s){
+           const title=esc(s.activity_title||s.curriculum_title||'—');
+-          const fac=s.facilitator_name?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>`:'';
+-          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${stBadge(s.status)}</td>`;
++          const fac=`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name||'No facilitator')}</div>`;
++          const room=`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.location_name||'No room')}</div>`;
++          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${room}</td>`;
+         } else {
+           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCellPn('${esc(grp)}',${sn},'${esc(pnId)}')">+ Add</td>`;
+         }
+@@ -17664,6 +17657,8 @@ async function openNewSessionCellPn(grp, sn, pnId){
+   document.getElementById('sess-msg').textContent='';
+   document.getElementById('sess-edit-id').dataset.cadetGroup=grp;
+   document.getElementById('sess-edit-id').dataset.sessionNumber=sn;
++  const block=(P.builderTimingBlocks||[]).find(b=>b.is_instructional_period&&Number(b.period_number)===Number(sn));
++  document.getElementById('sess-edit-id').dataset.timingBlockId=(block&&block.timing_block_id)||'';
+   await _populateSessionSelectsReal(null, null);
+   openModal('m-edit-session');
+ }
+@@ -17699,6 +17694,7 @@ async function loadBuilderGrid(dateId){
+     } else { conflBanner.style.display='none'; }
+ 
+     P.builderSessions = d.sessions||[];
++    P.builderTimingBlocks = d.timing_blocks||[];
+     const byGroupSession = {};
+     P.builderSessions.forEach(s=>{
+       const k = `${s.cadet_group}:${s.session_number}`;
+@@ -17717,8 +17713,9 @@ async function loadBuilderGrid(dateId){
+         const s = byGroupSession[`${grp}:${sn}`];
+         if(s){
+           const title = esc(s.activity_title||s.curriculum_title||'—');
+-          const fac = s.facilitator_name ? `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>` : '';
+-          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${stBadge(s.status)}</td>`;
++          const fac = `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name||'No facilitator')}</div>`;
++          const room = `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.location_name||'No room')}</div>`;
++          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${room}</td>`;
+         } else {
+           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCell('${esc(grp)}',${sn},'${esc(dateId)}')">+ Add</td>`;
+         }
+@@ -17865,6 +17862,7 @@ async function doSaveSession(){
+           custom_title:body.activity_title,
+           training_area_id:body.location_id,
+           curriculum_item_id:body.curriculum_id||null,
++          timing_block_id:document.getElementById('sess-edit-id').dataset.timingBlockId||null,
+         }});
+         // notes has no creation-time field on this endpoint -- follow up with
+         // the same PATCH the edit path already uses (it does support notes),
+diff --git a/frontend/src/components/HelpDrawer.tsx b/frontend/src/components/HelpDrawer.tsx
+index a59f040..7abeea7 100644
+--- a/frontend/src/components/HelpDrawer.tsx
++++ b/frontend/src/components/HelpDrawer.tsx
+@@ -83,11 +83,9 @@ const TASKS: { title: string; steps: string[] }[] = [
+   {
+     title: "Set up a Training Year",
+     steps: [
+-      "Open Planning Workspace.",
+-      "If no Training Year exists, the setup panel appears automatically. Fill in the year number and name, then select 'Create planning year'.",
+-      "On the next step, choose your parade weekday, start date, end date, and frequency.",
+-      "Select 'Generate parade dates'. Your parade nights appear on the calendar.",
+-      "If a year already exists, select 'Guided year setup…' in the toolbar to add another year or roll over from the previous year.",
++      "In TMS, open Unit Setup.",
++      "Create or roll over the Training Year and manage its Training Classes there.",
++      "Open Planning Workspace using the TMS link. The selected year and shared records appear automatically.",
+     ],
+   },
+   {
+@@ -159,8 +157,8 @@ const TASKS: { title: string; steps: string[] }[] = [
+   {
+     title: "Generate Parade Nights for a new training year",
+     steps: [
+-      "Open Planning Workspace and select 'Guided year setup…' in the toolbar.",
+-      "Choose 'Roll over from previous year' to copy settings, or 'Create new year' to start fresh.",
++      "In TMS Unit Setup, create or roll over the Training Year.",
++      "Open Planning Workspace using the TMS link for that year.",
+       "Set the parade weekday, start date, end date, and frequency.",
+       "Select 'Generate'. Review the date preview before confirming.",
+     ],
+@@ -253,16 +251,15 @@ export function HelpDrawer({ onClose }: Props) {
+               <li>Training Classes for each active Training Stage</li>
+             </ol>
+             <p>
+-              Once those are in place, return to Planning Workspace to create a Training Year, generate parade nights, and start scheduling.
++              Once those are in place, use the TMS link to open that same Training Year in Planning Workspace and start scheduling.
+             </p>
+ 
+             <h3>First time in Planning Workspace?</h3>
+             <p>
+-              If no Training Year exists yet, the setup panel opens automatically. It guides you through creating a year and generating your parade night dates.
++              If no Training Year exists yet, Planning Workspace directs you to TMS Unit Setup, the authoritative place to create the year and its Training Classes.
+             </p>
+             <p>
+-              Once you have a Training Year, use{" "}
+-              <strong>Guided year setup…</strong> in the toolbar at any time to add another year, roll over to a new year, or adjust your parade settings.
++              Once you have a Training Year, reopen Planning Workspace from TMS to preserve the selected-year handoff.
+             </p>
+           </div>
+         )}
+diff --git a/frontend/src/components/planning/ParadeNightBlock.tsx b/frontend/src/components/planning/ParadeNightBlock.tsx
+index 3156034..8d2824c 100644
+--- a/frontend/src/components/planning/ParadeNightBlock.tsx
++++ b/frontend/src/components/planning/ParadeNightBlock.tsx
+@@ -672,16 +672,11 @@ export function ParadeNightBlock({
