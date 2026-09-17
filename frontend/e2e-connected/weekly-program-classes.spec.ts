@@ -140,9 +140,10 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   expect(audRes.ok()).toBe(true);
 
   await page.evaluate(() => (window as any).reloadAndRender());
-  // The test parade night is deliberately outside the active planning year to
-  // avoid collisions, so clear the current-year filter before opening Weekly Program.
-  await page.evaluate(() => { (window as any).P.currentYearId = null; });
+  // Set currentYearId to the 2065 fixture year so renderWP() fetches both the
+  // parade nights AND the training classes for that year. Clearing to null would
+  // suppress the class fetch (renderWP only fetches classes when yearId is set).
+  await page.evaluate((yId) => { (window as any).P.currentYearId = yId; }, yearId);
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
