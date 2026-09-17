@@ -1,6 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
-import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // REM-23 continuation: #or-reason (the "reason required" modal shown when a
 // session's status changes to cancelled/not_delivered/delivered_with_issue)
@@ -75,7 +74,9 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 
 async function openQuickEditForFirstSession(page: Page, marker: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, 2066);
+  // Clear the year filter so all parade nights are visible regardless of
+  // which planning year the test date falls under.
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });

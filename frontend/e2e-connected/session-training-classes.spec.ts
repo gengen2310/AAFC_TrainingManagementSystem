@@ -1,6 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
-import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // ── Session <-> Training Class audience UI (CLASS-03's first frontend
 // consumer), wired into the real, live "Quick Edit" session flow
@@ -148,9 +147,12 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   return { className, marker, fixtureYear };
 }
 
-async function openQuickEditForFirstSession(page: Page, marker: string, fixtureYear: number) {
+async function openQuickEditForFirstSession(page: Page, marker: string, _fixtureYear?: number) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, fixtureYear);
+  // Clear the year filter so all parade nights are visible regardless of
+  // which planning year the test date falls under. The unique marker string
+  // guarantees the correct card is found even when other test data exists.
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
@@ -244,7 +246,7 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
-    await selectConnectedPlanningYear(page, fixtureYear);
+    await page.evaluate(() => { (window as any).P.currentYearId = null; });
     await page.evaluate("nav('parade-nights')");
     const card = page.locator(".pn-card").filter({ hasText: marker });
     await expect(card).toBeVisible({ timeout: 8000 });
@@ -252,9 +254,9 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
   });
 });
 
-async function openPNDetailForMarker(page: Page, marker: string, fixtureYear: number) {
+async function openPNDetailForMarker(page: Page, marker: string, _fixtureYear?: number) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, fixtureYear);
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
@@ -326,7 +328,7 @@ test.describe("Training Class name in compact session card (CLASS-18)", () => {
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
     await page.evaluate(() => (window as any).reloadAndRender());
-    await selectConnectedPlanningYear(page, fixtureYear);
+    await page.evaluate(() => { (window as any).P.currentYearId = null; });
     await page.evaluate("nav('parade-nights')");
     const card = page.locator(".pn-card").filter({ hasText: marker });
     const sessInfo = card.locator(".sess-info").first();

@@ -672,16 +672,16 @@ export function ParadeNightBlock({
                               {cell.conflict === "load" && <span className="pn-conflict-dot load" title="Facilitator overloaded" />}
                             </div>
                           )}
-                          {cell.code && <div className="pw-nc-code">{cell.code}</div>}
-                          <div className="pw-nc-title">{trunc(cell.title, 40)}</div>
+                          {/* The operational scan order is deliberately fixed at
+                              exactly three rows: curriculum, facilitator, room. */}
+                          <div className="pw-nc-title">{trunc([cell.code, cell.title].filter(Boolean).join(" — "), 40)}</div>
+                          <div className="pw-nc-detail">{cell.facilitator ?? "No facilitator"}</div>
+                          <div className="pw-nc-detail">{cell.location ?? "No room"}</div>
                           {!!cell.training_classes?.length && (
-                            <div className="pw-nc-detail pw-nc-classes">
+                            <div className="pw-nc-classes">
                               {cell.training_classes.map(c => c.display_name).join(", ")}
                             </div>
                           )}
-                          {cell.location && <div className="pw-nc-detail">{cell.location}</div>}
-                          <div className="pw-nc-detail">{cell.facilitator ?? "No facilitator"}</div>
-                          <div className="pw-nc-equip">Equip: not set</div>
                         </div>
                       </td>
                     );

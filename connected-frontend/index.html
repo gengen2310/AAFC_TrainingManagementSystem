@@ -1910,7 +1910,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <button class="tab-btn" onclick="setCurrTab('I. Bronze',this)">Bronze CLP</button>
           <button class="tab-btn" onclick="setCurrTab('J. Silver',this)">Silver CLP</button>
           <button class="tab-btn" onclick="setCurrTab('K. Gold',this)">Gold CLP</button>
-          <button class="tab-btn sqn-el" id="tab-matrix" onclick="openCurrMatrix(this)" style="display:none">Matrix ↗</button>
         </div>
         <!-- CLASS-MATRIX-01: matrix view container (toggled by Matrix tab) -->
         <div id="curr-matrix-view" style="display:none">
@@ -14777,17 +14776,9 @@ function renderActions(){
     });
   });
 
-  // Priority 2: Past sessions with outcome not recorded (still "planned")
-  allSess().filter(s=>s.date<today&&s.status==='planned').forEach(s=>{
-    items.push({
-      pri: 2, cat: 'Outcome',
-      title: s.exp?`Outcome needed — ${s.exp}`:
-                   `Outcome needed — ${fmtD(s.date,{day:'numeric',month:'short'})} S${s.si+1}`,
-      detail: `${fmtD(s.date,{day:'numeric',month:'short'})} — record delivered, cancelled or not delivered.`,
-      due: s.date, issue: 'Outcome not recorded',
-      type: 'sess', date: s.date, si: s.si
-    });
-  });
+  // Past planned sessions are intentionally not duplicated in this general
+  // table.  The single authoritative workflow is the actionable
+  // "Sessions Needing Outcome Entry" table immediately below it.
 
   // Priority 3: Cancelled/ND sessions with no reason
   allSess().filter(s=>s.date<today&&(s.status==='cancelled'||s.status==='not_delivered')&&
@@ -17608,6 +17599,7 @@ async function loadBuilderFromPn(pnId){
     if(conflBanner) conflBanner.style.display='none';
 
     P.builderSessions = d.sessions||[];
+    P.builderTimingBlocks = d.timing_blocks||[];
     const byGroupSession = {};
     P.builderSessions.forEach(s=>{
       const k=`${s.cadet_group}:${s.session_number}`;
@@ -17626,8 +17618,9 @@ async function loadBuilderFromPn(pnId){
         const s=byGroupSession[`${grp}:${sn}`];
         if(s){
           const title=esc(s.activity_title||s.curriculum_title||'—');
-          const fac=s.facilitator_name?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>`:'';
-          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${stBadge(s.status)}</td>`;
+          const fac=`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name||'No facilitator')}</div>`;
+          const room=`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.location_name||'No room')}</div>`;
+          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${room}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCellPn('${esc(grp)}',${sn},'${esc(pnId)}')">+ Add</td>`;
         }
@@ -17671,6 +17664,8 @@ async function openNewSessionCellPn(grp, sn, pnId){
   document.getElementById('sess-msg').textContent='';
   document.getElementById('sess-edit-id').dataset.cadetGroup=grp;
   document.getElementById('sess-edit-id').dataset.sessionNumber=sn;
+  const block=(P.builderTimingBlocks||[]).find(b=>b.is_instructional_period&&Number(b.period_number)===Number(sn));
+  document.getElementById('sess-edit-id').dataset.timingBlockId=(block&&block.timing_block_id)||'';
   await _populateSessionSelectsReal(null, null);
   openModal('m-edit-session');
 }
@@ -17706,6 +17701,7 @@ async function loadBuilderGrid(dateId){
     } else { conflBanner.style.display='none'; }
 
     P.builderSessions = d.sessions||[];
+    P.builderTimingBlocks = d.timing_blocks||[];
     const byGroupSession = {};
     P.builderSessions.forEach(s=>{
       const k = `${s.cadet_group}:${s.session_number}`;
@@ -17724,8 +17720,9 @@ async function loadBuilderGrid(dateId){
         const s = byGroupSession[`${grp}:${sn}`];
         if(s){
           const title = esc(s.activity_title||s.curriculum_title||'—');
-          const fac = s.facilitator_name ? `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>` : '';
-          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${stBadge(s.status)}</td>`;
+          const fac = `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name||'No facilitator')}</div>`;
+          const room = `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.location_name||'No room')}</div>`;
+          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${room}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCell('${esc(grp)}',${sn},'${esc(dateId)}')">+ Add</td>`;
         }
@@ -17872,6 +17869,7 @@ async function doSaveSession(){
           custom_title:body.activity_title,
           training_area_id:body.location_id,
           curriculum_item_id:body.curriculum_id||null,
+          timing_block_id:document.getElementById('sess-edit-id').dataset.timingBlockId||null,
         }});
         // notes has no creation-time field on this endpoint -- follow up with
         // the same PATCH the edit path already uses (it does support notes),
