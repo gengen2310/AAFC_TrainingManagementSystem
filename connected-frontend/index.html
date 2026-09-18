@@ -1152,7 +1152,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   /* Compact topbar: hide redundant unit name (shown in scope-banner below) and print-only action */
   .tb-sep,.tb-unit{display:none;}
   #btn-print-program{display:none!important;}
-  .main{padding:14px;}
+  .main{padding:14px;overflow-x:hidden;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
 }
@@ -6399,7 +6399,7 @@ function nav(id){
   if(id==='curriculum'){
     _loadCurriculumClassBreakdown();
   }
-  if(id==='parade-nights'){reloadAndRender();}
+  if(id==='parade-nights'){return reloadAndRender();}
   if(id==='dashboard')renderDash();
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
