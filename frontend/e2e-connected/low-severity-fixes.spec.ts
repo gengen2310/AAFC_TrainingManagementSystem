@@ -7,7 +7,7 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
@@ -159,14 +159,24 @@ test("HELP-04: Readiness checklist section is visible on the dashboard when a pa
   const sessionId = (await sessRes.json()).session_id as string;
 
   try {
-    // loadData/nav are top-level lexical bindings in the classic script, not
-    // window properties. The old optional window calls silently no-op'd and
-    // left the Dashboard rendering its stale pre-seed state.
+    // Reload S state with the newly created session, then navigate to dashboard.
+    // loadDashCharts() is async and fire-and-forget inside nav(), so we set up a
+    // waitForResponse BEFORE triggering nav() so we can confirm the server
+    // actually returned tonight chart data before asserting the DOM.
     await page.evaluate("loadData()");
+    const chartsResponsePromise = page.waitForResponse(
+      (resp) => resp.url().includes("/api/dashboard/charts") && resp.request().method() === "GET",
+      { timeout: 12000 }
+    );
     await page.evaluate("nav('dashboard')");
+    const chartsResp = await chartsResponsePromise;
+    expect(chartsResp.status(), "dashboard charts request must succeed (got rate-limited?)").toBe(200);
+    const chartsBody = await chartsResp.json();
+    expect(chartsBody.charts?.tonight, "backend must return tonight chart for this squadron").toBeTruthy();
+
     const tonight = page.locator("#dash-tonight-section");
-    await expect(tonight).toBeVisible({ timeout: 10000 });
-    await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
+    await expect(tonight).toBeVisible({ timeout: 5000 });
+    await expect(tonight).toContainText("Readiness checklist", { timeout: 5000 });
   } finally {
     // The parade night belongs to shared seed data; remove only the session this
     // test created so the fixture is order-independent and repeatable.
