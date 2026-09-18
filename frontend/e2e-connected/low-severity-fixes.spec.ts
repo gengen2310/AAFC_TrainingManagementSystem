@@ -31,6 +31,15 @@ async function loginSquadron(page: Page, code: string, role: "sqn_admin" | "sqn_
 test("REM-92: Weekly Program shows guidance instead of a bare blank area before a parade night is chosen", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await page.evaluate(() => (window as any).nav("weekly-program"));
+  // Ensure the select is in the unselected (placeholder) state before asserting.
+  // nav() may auto-select today's date when it is a seeded parade night (date-
+  // sensitive); explicitly resetting to the placeholder exercises the exact
+  // state the test is meant to cover -- "choose one" guidance -- without relying
+  // on today's date falling outside the seeded nights.
+  await page.evaluate(() => {
+    const sel = document.getElementById("wp-sel") as HTMLSelectElement | null;
+    if (sel) { sel.value = ""; (window as any)._wpPaint(); }
+  });
   // Squadron 703 has seeded parade nights, so this exercises the "choose one"
   // branch specifically (the "no parade nights exist yet" branch is a
   // simple, low-risk conditional on the same data already used elsewhere on
@@ -113,7 +122,7 @@ test("MBACK-06: Per-Class CSV export button is visible in Mission Backlog for sq
   // Wait for the missions filters card to appear — this requires loadMissions()
   // to complete, which in turn requires _loadPlanningYears() to return a year ID.
   await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
-  await expect(page.locator("button", { hasText: "Per-Class CSV" })).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("#missions-filters-card button", { hasText: "Per-Class CSV" })).toBeVisible({ timeout: 5000 });
 });
 
 test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip text", async ({ page }) => {
