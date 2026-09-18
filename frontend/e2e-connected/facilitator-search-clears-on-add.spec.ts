@@ -32,7 +32,12 @@ async function loginSquadron(page: Page, code: string) {
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
+  // Wait for the Training Dashboard title, not just #app — the dashboard title
+  // only appears after renderAll() and applyNavScope() have both run. Waiting
+  // for #app alone leaves a window where admin-el buttons are still display:none
+  // (applyNavScope() hasn't fired yet), causing the "+ Add Facilitator" click to
+  // time out on slower browsers (Firefox).
+  await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
 test("a facilitator created while an unrelated search term is still in #fac-search is immediately visible", async ({ page }) => {

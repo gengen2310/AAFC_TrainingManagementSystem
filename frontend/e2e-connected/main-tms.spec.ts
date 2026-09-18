@@ -387,15 +387,16 @@ test.describe("Facilitator statistics", () => {
 
     // ── MERGE: a dedicated, genuinely-safe pair (no real session/assignment
     // history on either side — both created fresh by this test seconds ago) ──
-    // Derive the pre-merge status total arithmetically: each create adds exactly
-    // 1, so beforeMergeStatusTotal = afterArchive + 2.  This avoids a
-    // fetchCharts() call at a point where the backend may be under load from 5
-    // prior reloadAndRender cycles; the waitForFreshCharts wrapper on the merge
-    // action below still proves the charts API fires on mutation (the test's
-    // actual purpose), and the assertion remains as tight as before.
-    await addFacilitatorViaForm(charlieName, "Staff");
-    await addFacilitatorViaForm(deltaName, "Staff");
-    const beforeMergeStatusTotal = statusTotal(afterArchive) + 2;
+    // Use waitForFreshCharts for both additions so their fire-and-forget
+    // loadFacilitatorStats() responses are drained before we set up the merge
+    // listener. Without this drain, the merge's waitForFreshCharts can capture
+    // a charts GET from a Charlie/Delta addition that is still in-flight,
+    // returning a stale pre-merge total ("Expected: 7, Received: 8").
+    await waitForFreshCharts(() => addFacilitatorViaForm(charlieName, "Staff"));
+    const afterDeltaAdd = await waitForFreshCharts(() => addFacilitatorViaForm(deltaName, "Staff"));
+    // Use the real chart value rather than arithmetic so any CI-fixture debris
+    // doesn't silently shift the baseline.
+    const beforeMergeStatusTotal = statusTotal(afterDeltaAdd);
     const charlieId = await facIdByName(charlieName);
     const deltaId = await facIdByName(deltaName);
     const afterMerge = await waitForFreshCharts(async () => {
