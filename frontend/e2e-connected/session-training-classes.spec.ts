@@ -252,6 +252,7 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
 
     await page.evaluate(() => { (window as any).P.currentYearId = null; });
     await page.evaluate("nav('parade-nights')");
+    await page.locator("#pn-f-term").selectOption("all");
     const card = page.locator(".pn-card").filter({ hasText: marker });
     await expect(card).toBeVisible({ timeout: 8000 });
     await expect(card.getByRole("button", { name: "Edit Session 1" })).toHaveCount(0);
@@ -273,51 +274,47 @@ async function openPNDetailForMarker(page: Page, marker: string, _fixtureYear?: 
   await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 6000 });
 }
 
-test.describe("Session <-> Training Class assignment via Parade Night detail modal (CLASS-17)", () => {
-  test("Training Class checkboxes appear in the detail modal and saving persists the selection", async ({ page }) => {
+test.describe("Parade Night detail modal opens and renders (CLASS-17)", () => {
+  // The PN detail modal was redesigned from a checkbox-based class-assignment
+  // picker (_populatePnDetailClasses, never wired) to a timetable matrix
+  // driven by a Timing Template.  These tests verify the modal opens correctly
+  // and renders the expected shell structure.  Session/class assignment via the
+  // matrix is covered by the Quick Edit tests above.
+
+  test("detail modal opens, shows notes input, and closes cleanly", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "pnd1";
-    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
+    const { marker } = await seedClassAndSession(page, token, suffix);
 
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const group = page.locator("#pnd-classes-group");
-    await expect(group).toBeVisible({ timeout: 8000 });
-    const checkbox = page.locator("#pnd-classes-list label").filter({ hasText: className });
-    await expect(checkbox).toBeVisible();
-    await checkbox.locator("input.pnd-class-chk").check();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).toBeChecked();
+    await openPNDetailForMarker(page, marker);
+    const modal = page.locator("#m-pn-detail");
+    await expect(modal).toBeVisible({ timeout: 6000 });
+    // Notes input is always rendered regardless of timing template.
+    await expect(page.locator("#pnd-notes")).toBeVisible({ timeout: 5000 });
+    // Close via the modal's × button.
+    await modal.locator("button.modal-x").click();
+    await expect(modal).toBeHidden({ timeout: 5000 });
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 
-  test("unchecking in the detail modal clears the assignment", async ({ page }) => {
+  test("detail modal shows legacy-timing notice when no Timing Template is assigned", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const suffix = String(Date.now()) + "pnd2";
-    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
+    const { marker } = await seedClassAndSession(page, token, suffix);
 
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const chk = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
-    await expect(chk).toBeVisible({ timeout: 8000 });
-    await chk.check();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const reopened = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
-    await expect(reopened).toBeChecked();
-    await reopened.uncheck();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).not.toBeChecked();
+    await openPNDetailForMarker(page, marker);
+    await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 6000 });
+    // Fixture parade nights have no Timing Template, so the legacy banner must
+    // appear (it is the product's clear signal that the timetable matrix
+    // requires configuration before it activates).
+    await expect(page.locator("#m-pn-detail")).toContainText("Legacy timing", { timeout: 5000 });
+    expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 });
 

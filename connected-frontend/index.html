@@ -614,7 +614,7 @@ a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-ra
 .st-not_delivered{background:#eef0f2;color:var(--steel);}
 
 /* ── TABLE ── */
-.tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+.tw{overflow-x:auto;max-width:100%;border-radius:8px;border:1px solid var(--border);}
 table,.data-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
 table td{font-family:system-ui,Arial,sans-serif;} /* T-01: prose reading clarity */
 thead{background:var(--surface-2);}
@@ -11078,6 +11078,10 @@ async function _populateQuickEditClasses(sessionId){
   const group=document.getElementById('qe-classes-group');
   const list=document.getElementById('qe-classes-list');
   if(!group||!list) return;
+  // Early guard: bail before any network calls if the modal is already closed.
+  // nav('parade-nights') fires reloadAndRender() fire-and-forget, so by the
+  // time both awaits below resolve the modal may have been superseded.
+  if(!document.getElementById('m-sess-edit').classList.contains('active')) return;
   let classes=[];
   try{ classes=await api('/api/training-classes'); }
   catch(_){ group.style.display='none'; return; }
@@ -11091,10 +11095,8 @@ async function _populateQuickEditClasses(sessionId){
     }catch(_){ /* no existing audience -- leave unchecked */ }
   }
 
-  // quickEdit() may have already been superseded by a later call (double-click,
-  // or the user closed the modal before this async fetch resolved) -- editSessRef
-  // is cleared by saveSessEdit()/closeModal-adjacent flows, so bail rather than
-  // populate a checklist for a session the modal is no longer showing.
+  // Late guard: re-check after both awaits complete -- the background
+  // reloadAndRender() triggered by nav() could have interfered meanwhile.
   if(!document.getElementById('m-sess-edit').classList.contains('active')) return;
 
   group.style.display='';
