@@ -79,8 +79,9 @@ test("HARD-05: opening a modal moves focus inside it", async ({ page }) => {
   await expect(modal).toHaveClass(/active/, { timeout: 5000 });
 
   // Focus should now be inside the modal — the first focusable element
-  // (50ms delay in openModal; allow generous timeout)
-  await page.waitForTimeout(100);
+  // (200ms delay in openModal to prevent focus-steal during Firefox fills;
+  // wait longer than the delay to allow it to fire)
+  await page.waitForTimeout(300);
   const focused = await page.evaluate(() => document.activeElement?.closest(".modal-bg")?.id ?? null);
   expect(focused).toBe("m-add-pn");
 });

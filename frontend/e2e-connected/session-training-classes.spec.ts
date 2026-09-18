@@ -161,7 +161,9 @@ async function openQuickEditForFirstSession(page: Page, marker: string, _fixture
   // which planning year the test date falls under. The unique marker string
   // guarantees the correct card is found even when other test data exists.
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
-  await page.evaluate("nav('parade-nights')");
+  // Use function form so Firefox reliably awaits the nav() Promise (string
+  // form eval does not consistently await Promises returned from eval'd code).
+  await page.evaluate(() => (window as any).nav('parade-nights'));
   // Test parade nights are created in 2065+ and have pn.term=null.
   // _restorePNFilters() defaults to the current term (e.g. T3), which
   // excludes null-term cards. Force "all" so those cards render.

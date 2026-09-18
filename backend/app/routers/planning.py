@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow, iso_z
 from ..models import (
     Wing, Squadron, CurriculumItem, Facilitator, AuditLog, ParadeNight, TrainingArea,
-    TrainingClass, SessionAudience, CurriculumPhase,
+    TrainingClass, SessionAudience, SessionStatusHistory, CadetSessionOutcome,
+    CurriculumPhase,
 )
 from ..models import Session as TrainingSession
 from ..models.planning import (
@@ -943,9 +944,12 @@ def delete_planning_year(
 
     # Physically remove archived (soft-deleted) parade nights for this year so
     # the ORM does not try to NULL out their NOT NULL planning_year_id FK.
-    # Their sessions must be deleted first; in PostgreSQL the session_audience
-    # ON DELETE CASCADE handles grandchildren automatically; in SQLite (FK
-    # enforcement off) orphaned grandchild rows cause no integrity error.
+    # Delete in FK dependency order: session children first, then sessions,
+    # then parade nights.  SessionAudience, SessionStatusHistory, and
+    # CadetSessionOutcome have no ondelete="CASCADE" on their session_id FK —
+    # PostgreSQL will raise ForeignKeyViolation if sessions are deleted while
+    # these rows still exist.  SessionCustomPhaseAudience and
+    # SessionAssistantFacilitator do have CASCADE and are handled automatically.
     archived_pn_ids = [
         pn.id for pn in db.query(ParadeNight).filter(
             ParadeNight.planning_year_id == year_id,
@@ -953,6 +957,21 @@ def delete_planning_year(
         )
     ]
     if archived_pn_ids:
+        archived_session_ids = [
+            row.id for row in db.query(TrainingSession.id).filter(
+                TrainingSession.parade_night_id.in_(archived_pn_ids)
+            )
+        ]
+        if archived_session_ids:
+            db.query(SessionAudience).filter(
+                SessionAudience.session_id.in_(archived_session_ids)
+            ).delete(synchronize_session="fetch")
+            db.query(SessionStatusHistory).filter(
+                SessionStatusHistory.session_id.in_(archived_session_ids)
+            ).delete(synchronize_session="fetch")
+            db.query(CadetSessionOutcome).filter(
+                CadetSessionOutcome.session_id.in_(archived_session_ids)
+            ).delete(synchronize_session="fetch")
         db.query(TrainingSession).filter(
             TrainingSession.parade_night_id.in_(archived_pn_ids)
         ).delete(synchronize_session="fetch")
