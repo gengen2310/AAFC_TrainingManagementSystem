@@ -137,10 +137,11 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   // nights behave as "legacy timing" (no template) — required for the
   // CLASS-17 "Legacy timing" assertion and consistent with the original test
   // intent of testing untemplateed nights.
-  await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
+  const tplPatch = await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
     data: { timing_template_id: null },
     headers: auth,
   });
+  expect(tplPatch.ok()).toBe(true);
   const noteRes = await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
     data: { notes: marker }, headers: auth,
   });
@@ -182,6 +183,10 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     const suffix = String(Date.now());
     const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
 
+    // Firefox does not reliably await the nav() Promise when evaluated as a
+    // string expression; a pre-flight reloadAndRender() (function form) ensures
+    // S.pns is current before the helper's nav call runs renderPN().
+    await page.evaluate(() => (window as any).reloadAndRender());
     await openQuickEditForFirstSession(page, marker, fixtureYear);
     const classesGroup = page.locator("#qe-classes-group");
     await expect(classesGroup).toBeVisible({ timeout: 8000 });
@@ -267,7 +272,6 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
 });
 
 async function openPNDetailForMarker(page: Page, marker: string, _fixtureYear?: number) {
-  await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
   // Same as openQuickEditForFirstSession: force term="all" so 2065+ parade

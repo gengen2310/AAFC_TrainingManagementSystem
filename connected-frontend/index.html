@@ -1162,6 +1162,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   .main{padding:14px;overflow-x:hidden;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
+  .cls-table{table-layout:fixed;width:100%;}
 }
 @media(min-width:769px){
   .btn-hamburger{display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:10px 8px;margin-right:4px;color:white;min-height:44px;min-width:44px;gap:4px;}
@@ -15916,7 +15917,7 @@ function openModal(id){
   bg.classList.add('active');
   // Move focus to first focusable element inside the modal for keyboard/AT users
   const first=bg.querySelector('input:not([type="hidden"]),select,textarea')||bg.querySelector('button,[tabindex]:not([tabindex="-1"]),[href]');
-  if(first)setTimeout(()=>first.focus(),40);
+  if(first)setTimeout(()=>first.focus(),200);
 }
 function closeModal(id){
   document.getElementById(id).classList.remove('active');
