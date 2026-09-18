@@ -14349,9 +14349,15 @@ function saveFac(confirmDuplicate){
       .then(()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
+        // Synchronously update S.facs so renderFacs() reflects the edit immediately
+        // without a background reloadAndRender() that would race with the next
+        // waitForFreshCharts() listener in tests (REM-111 root-cause fix).
+        const idx=(S.facs||[]).findIndex(function(f){return f.id===fid;});
+        if(idx>=0) S.facs[idx]=Object.assign({},S.facs[idx],{rank:rank,first:first,last:last,type:type});
+        renderFacs();
         closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved.', false);
-        reloadAndRender().catch(()=>{}); loadFacilitatorStats().catch(()=>{});
+        loadFacilitatorStats().catch(()=>{});
       })
       .catch(e=>{
         _setFacSaveState('Failed to save — Retry','var(--red)');
@@ -14365,9 +14371,16 @@ function saveFac(confirmDuplicate){
   // facilitator — reuse the same key until this attempt actually succeeds.
   if(!_facIdemKey){ _facIdemKey=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('fac-'+Date.now()+'-'+Math.random().toString(36).slice(2)); }
   api('/api/facilitators',{method:'POST',headers:{'Idempotency-Key':_facIdemKey},body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas,confirm_duplicate:!!confirmDuplicate})})
-    .then(()=>{
+    .then(function(res){
       const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
       _setFacSaveState('Saved at '+savedAt,'var(--ok)');
+      // Synchronously add the new facilitator to S.facs so renderFacs() reflects
+      // it immediately without a background reloadAndRender() race (REM-111 fix).
+      _facIdemKey=null;
+      if(res&&res.facilitator_id){
+        if(!S.facs) S.facs=[];
+        S.facs.push({id:res.facilitator_id,rank:rank,first:first,last:last,type:type,areas:areas,leave:[]});
+      }
       // REM-99: a leftover search term in #fac-search (e.g. typed while checking
       // for an existing duplicate before adding) silently filtered the just-
       // created facilitator out of the re-rendered list -- renderFacs() applies
@@ -14376,9 +14389,10 @@ function saveFac(confirmDuplicate){
       // persists indefinitely, since nothing else ever resets it). Clear it so
       // the new facilitator is guaranteed visible immediately.
       const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
+      renderFacs();
       closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
       showToast('Facilitator added at '+savedAt+'.', false);
-      reloadAndRender().catch(()=>{}); loadFacilitatorStats().catch(()=>{});
+      loadFacilitatorStats().catch(()=>{});
     })
     .catch(e=>{
       if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){

@@ -78,6 +78,9 @@ async function openQuickEditForFirstSession(page: Page, marker: string) {
   // which planning year the test date falls under.
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
+  // Test parade nights are created in 2066+ and have pn.term=null.
+  // Force term="all" so those cards are not filtered by the default term.
+  await page.locator("#pn-f-term").selectOption("all");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });

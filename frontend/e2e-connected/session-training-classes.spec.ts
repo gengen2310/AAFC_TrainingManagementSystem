@@ -154,6 +154,10 @@ async function openQuickEditForFirstSession(page: Page, marker: string, _fixture
   // guarantees the correct card is found even when other test data exists.
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
+  // Test parade nights are created in 2065+ and have pn.term=null.
+  // _restorePNFilters() defaults to the current term (e.g. T3), which
+  // excludes null-term cards. Force "all" so those cards render.
+  await page.locator("#pn-f-term").selectOption("all");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -258,6 +262,9 @@ async function openPNDetailForMarker(page: Page, marker: string, _fixtureYear?: 
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate("nav('parade-nights')");
+  // Same as openQuickEditForFirstSession: force term="all" so 2065+ parade
+  // nights with pn.term=null are not filtered out by the default term.
+  await page.locator("#pn-f-term").selectOption("all");
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   // The rendered Parade Night card exposes this action as "Open / edit".
