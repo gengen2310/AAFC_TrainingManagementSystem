@@ -156,7 +156,6 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
 }
 
 async function openQuickEditForFirstSession(page: Page, marker: string, _fixtureYear?: number) {
-  await page.evaluate(() => (window as any).reloadAndRender());
   // Clear the year filter so all parade nights are visible regardless of
   // which planning year the test date falls under. The unique marker string
   // guarantees the correct card is found even when other test data exists.
