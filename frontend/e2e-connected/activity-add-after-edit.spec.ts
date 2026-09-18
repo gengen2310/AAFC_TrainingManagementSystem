@@ -87,12 +87,10 @@ test("ACT-EDIT-01: + Add Activity after cancelling an Edit creates a new activit
 
   await page.locator("#act-name").fill("Brand New Activity");
   await page.locator("#act-date").fill("2031-05-05");
+  // saveAct() awaits reloadAndRender() which awaits loadData(), so S.acts is
+  // current by the time the evaluate resolves — no extra wait needed.
   await page.evaluate(async () => { await saveAct(); });
-
-  const after = await page.evaluate(async () => {
-    await reloadAndRender();
-    return S.acts.map((a: any) => ({ id: a.id, name: a.name }));
-  });
+  const after = await page.evaluate(() => S.acts.map((a: any) => ({ id: a.id, name: a.name })));
 
   // A new activity exists...
   expect(after.length).toBe(countBefore + 1);
@@ -111,12 +109,10 @@ test("ACT-EDIT-02: editing still updates in place and does not create a stray ac
   await page.evaluate((i) => editAct(i), id);
   await expect(page.locator("#act-name")).toHaveValue(name);
   await page.locator("#act-name").fill(`${name} (renamed)`);
+  // saveAct() awaits reloadAndRender() which awaits loadData(), so S.acts is
+  // current by the time the evaluate resolves — no extra wait needed.
   await page.evaluate(async () => { await saveAct(); });
-
-  const after = await page.evaluate(async () => {
-    await reloadAndRender();
-    return S.acts.map((a: any) => ({ id: a.id, name: a.name }));
-  });
+  const after = await page.evaluate(() => S.acts.map((a: any) => ({ id: a.id, name: a.name })));
 
   expect(after.length).toBe(countBefore);
   expect(after.find((a: any) => a.id === id)?.name).toBe(`${name} (renamed)`);
