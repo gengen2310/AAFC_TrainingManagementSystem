@@ -385,6 +385,13 @@ test.describe("Facilitator statistics", () => {
     expect(statusTotal(afterArchive), "total must decrement on archive").toBe(statusTotal(beforeArchive) - 1);
     await expect(page.locator("#fac-chart-status")).toContainText(String(statusTotal(beforeArchive) - 1));
     await expect(page.locator("#fac-tbody")).not.toContainText(bravoName);
+    // delFac() fires two chart GETs: one from loadDashCharts() inside
+    // reloadAndRender() and one from loadFacilitatorStats(). waitForFreshCharts
+    // captures the first; drain the second before arming the merge listener.
+    await page.waitForResponse(
+      (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
+      { timeout: 5000 }
+    ).catch(() => {});
 
     // ── MERGE: a dedicated, genuinely-safe pair (no real session/assignment
     // history on either side — both created fresh by this test seconds ago) ──
@@ -426,6 +433,13 @@ test.describe("Facilitator statistics", () => {
     expect(statusTotal(afterMerge), "total must decrement by 1 — Delta absorbed into Charlie").toBe(beforeMergeStatusTotal - 1);
     await expect(page.locator("#fac-tbody")).toContainText(charlieName);
     await expect(page.locator("#fac-tbody")).not.toContainText(deltaName);
+    // doMergeFac() also fires two chart GETs (loadDashCharts fire-and-forget
+    // inside reloadAndRender + loadFacilitatorStats fire-and-forget). Drain
+    // the second before the cleanup section arms its own waitForFreshCharts.
+    await page.waitForResponse(
+      (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
+      { timeout: 5000 }
+    ).catch(() => {});
 
     // ── Cleanup: archive the two survivors so staging returns to baseline ──
     // Serialize via waitForFreshCharts so each archive callback's loadFacilitatorStats
@@ -434,6 +448,11 @@ test.describe("Facilitator statistics", () => {
       await page.evaluate((id) => (window as any).delFac(id), alphaId);
       await page.locator("#confirm-yes-btn").click();
     });
+    // delFac() fires two chart GETs — drain the second before arming Charlie's listener.
+    await page.waitForResponse(
+      (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
+      { timeout: 5000 }
+    ).catch(() => {});
     const final = await waitForFreshCharts(async () => {
       await page.evaluate((id) => (window as any).delFac(id), charlieId);
       await page.locator("#confirm-yes-btn").click();

@@ -133,6 +133,14 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
   _createdPnIds.push(pnId);
+  // The backend auto-assigns a timing template. Strip it so fixture parade
+  // nights behave as "legacy timing" (no template) — required for the
+  // CLASS-17 "Legacy timing" assertion and consistent with the original test
+  // intent of testing untemplateed nights.
+  await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
+    data: { timing_template_id: null },
+    headers: auth,
+  });
   const noteRes = await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
     data: { notes: marker }, headers: auth,
   });
