@@ -1152,6 +1152,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   /* Compact topbar: hide redundant unit name (shown in scope-banner below) and print-only action */
   .tb-sep,.tb-unit{display:none;}
   #btn-print-program{display:none!important;}
+  html,body{overflow-x:hidden;}
   .main{padding:14px;overflow-x:hidden;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
@@ -15868,7 +15869,7 @@ function openModal(id){
   const bg=document.getElementById(id);
   bg.classList.add('active');
   // Move focus to first focusable element inside the modal for keyboard/AT users
-  const first=bg.querySelector('button,input,select,textarea,[tabindex]:not([tabindex="-1"]),[href]');
+  const first=bg.querySelector('input:not([type="hidden"]),select,textarea')||bg.querySelector('button,[tabindex]:not([tabindex="-1"]),[href]');
   if(first)setTimeout(()=>first.focus(),40);
 }
 function closeModal(id){
