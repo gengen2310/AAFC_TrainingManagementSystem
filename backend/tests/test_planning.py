@@ -3184,3 +3184,95 @@ def test_add_parade_night_flow_creates_session_audience(client):
         assert tc.stage_code == "JNR"
     finally:
         db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# Issue #62 item 3 — Planner endpoint must supply timing_block_id
+# so sessions created from planner cells land in the correct
+# Weekly Program period instead of "Unlinked periods".
+# ─────────────────────────────────────────────────────────────
+
+def test_planner_instructional_periods_include_timing_block_id(client):
+    """GET /api/parade-nights/{id}/planner instructional_periods must carry
+    timing_block_id when the night has a timing template (no snapshot yet).
+
+    Regression guard for Issue #62 item 3: previously the planner endpoint
+    omitted timing_block_id from template-derived blocks, causing _pnCellSave
+    to always persist timing_block_id=null and sessions to fall in
+    'Unlinked periods' in the Weekly Program.
+    """
+    hdr = _sqn_admin_hdr(client)
+    # 703 SQN always gets a default timing template via seed_all; use a date
+    # that avoids collisions with other tests.
+    pn_r = client.post("/api/parade-nights",
+                       json={"date": "2027-09-03", "term": "T1"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+
+    r = client.get(f"/api/parade-nights/{pnid}/planner", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "timing" in d, "Planner response must include 'timing' key"
+    ips = d["timing"].get("instructional_periods", [])
+    assert len(ips) > 0, "Must have at least one instructional period"
+    for ip in ips:
+        assert "timing_block_id" in ip, (
+            f"Instructional period with period_number={ip.get('period_number')} "
+            f"is missing timing_block_id — sessions saved from this period will "
+            f"fall in 'Unlinked periods' in the Weekly Program"
+        )
+        assert ip["timing_block_id"] is not None, (
+            f"timing_block_id must not be null for period_number={ip.get('period_number')}"
+        )
+
+
+def test_session_created_from_planner_has_timing_block_id(client):
+    """A session created via PUT /api/sessions/{id} with timing_block_id from
+    the planner payload must persist that timing_block_id on the row.
+
+    This verifies the full path: planner supplies the FK, frontend resolves and
+    sends it, backend persists it, session detail reflects it.
+    """
+    from app.models import Session as TrainingSession
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights",
+                       json={"date": "2027-09-10", "term": "T1"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+
+    # Fetch planner payload to resolve timing_block_id for period 1
+    planner = client.get(f"/api/parade-nights/{pnid}/planner", headers=hdr).json()
+    ips = planner["timing"]["instructional_periods"]
+    ip1 = next((ip for ip in ips if ip["period_number"] == 1), None)
+    assert ip1 is not None, "Period 1 must be present in instructional_periods"
+    tb_id = ip1.get("timing_block_id")
+    assert tb_id, "Period 1 must have a non-null timing_block_id"
+
+    # Create a session then PUT it with timing_block_id (as _pnCellSave does)
+    sess_r = client.post("/api/sessions", json={
+        "parade_night_id": pnid,
+        "period_number": 1,
+        "cadet_group": "senior",
+    }, headers=hdr)
+    assert sess_r.status_code == 200, sess_r.text
+    sid = sess_r.json()["session_id"]
+
+    put_r = client.put(f"/api/sessions/{sid}", json={
+        "parade_night_id": pnid,
+        "period_number": 1,
+        "cadet_group": "senior",
+        "status": "planned",
+        "timing_block_id": tb_id,
+    }, headers=hdr)
+    assert put_r.status_code == 200, put_r.text
+
+    db = SessionLocal()
+    try:
+        s = db.get(TrainingSession, sid)
+        assert s is not None
+        assert s.timing_block_id == tb_id, (
+            f"Session timing_block_id should be {tb_id!r}, got {s.timing_block_id!r} — "
+            f"session will appear in 'Unlinked periods' in the Weekly Program"
+        )
+    finally:
+        db.close()
