@@ -123,8 +123,13 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   _createdClassIds.push(classId);
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
-  const testDate = new Date(2065, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
-  const fixtureYear = Number(testDate.slice(0, 4));
+  // Derive the parade-night date from the unique suffix, not from Date.now() % 300.
+  // Date.now() % 300 cycles every 300ms, causing 409 Conflict when two seeds
+  // run at timestamps that are multiples of 300ms apart (common in a 9-minute
+  // CI run where the same modulo repeats ~1800 times).
+  const dateHash = uniqueSuffix.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) >>> 0, 0);
+  const testDate = new Date(2065, 0, 1 + (dateHash % 364)).toISOString().slice(0, 10);
+  const fixtureYear = 2065;
   const marker = `E2E-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },

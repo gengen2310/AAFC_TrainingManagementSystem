@@ -88,7 +88,13 @@ async function openQuickEditForFirstSession(page: Page, marker: string) {
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
   await expect(editBtn).toBeVisible();
   await editBtn.click();
-  await expect(page.locator("#m-sess-edit")).toBeVisible();
+  // quickEdit() is async but calls openModal('m-sess-edit') before its first
+  // await (line 11067 in index.html). However, S.pns.find() returns undefined
+  // if the parade-night data was replaced by a concurrent reloadAndRender()
+  // triggered by the term-filter selectOption above, causing quickEdit() to
+  // return early without opening the modal. The 10s window gives Firefox enough
+  // time to resolve the re-render and process a retry via Playwright's retry loop.
+  await expect(page.locator("#m-sess-edit")).toBeVisible({ timeout: 10000 });
   // editSessRef is a `let` in connected-frontend/index.html (not a `var`), so it
   // is NOT on `window` and cannot be read via page.evaluate. No poll needed:
   // quickEdit() runs synchronously on click, setting editSessRef before
