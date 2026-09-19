@@ -2252,9 +2252,21 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
         _tmpl = db.get(TimingTemplate, pn.timing_template_id)
         tmpl_name = _tmpl.name if _tmpl else None
 
+    # Resolve timing_block_id from the live template for both snapshot and template paths.
+    # Snapshots freeze display data but not the FK; look it up by period_number from the
+    # live template so _pnCellSave can persist timing_block_id on newly created sessions.
+    timing_block_id_by_period: dict[int, str] = {}
+    if pn.timing_template_id:
+        for _tb in db.query(TimingBlock).filter_by(
+            timing_template_id=pn.timing_template_id
+        ).all():
+            if _tb.is_instructional_period and _tb.period_number is not None:
+                timing_block_id_by_period[_tb.period_number] = _tb.id
+
     if snaps:
         blocks = [
             {
+                "timing_block_id": timing_block_id_by_period.get(s.period_number),
                 "period_number": s.period_number,
                 "block_label": s.block_label,
                 "start_time": s.start_time,
@@ -2279,6 +2291,7 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
                     ip_idx += 1
                     pnum = ip_idx
                 blocks.append({
+                    "timing_block_id": b.id,
                     "period_number": pnum,
                     "block_label": b.block_name,
                     "start_time": b.start_time,

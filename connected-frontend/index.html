@@ -10564,7 +10564,9 @@ async function _pnCellSave(pnId,ds,period,classId,customPhaseId,sessionId){
     }
     const statusOverrides={status:newSt};
     if(reason)statusOverrides.reason=reason;
-    const body=_sessBuildBody({__pnId:pnId,period_number:period,phase,exp:expTitle,facId,room:roomName,timingBlockId:null},statusOverrides);
+    const _ips=(window._pnPlan&&window._pnPlan.timing&&window._pnPlan.timing.instructional_periods)||[];
+    const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;
+    const body=_sessBuildBody({__pnId:pnId,period_number:period,phase,exp:expTitle,facId,room:roomName,timingBlockId:_tbId},statusOverrides);
     await api('/api/sessions/'+sessId,{method:'PUT',body:JSON.stringify(body)});
     if(classId) await _saveSessionAudience(sessId,[classId],false);
     else if(customPhaseId){
