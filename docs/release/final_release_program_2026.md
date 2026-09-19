@@ -4550,3 +4550,60 @@ frontends), HOL-01 (statutory_holiday label added to `_HOL_TYPE_LABELS`).
 Level A production deployment (`756e65e`, 2026-08-12) remains the current live state.
 All Final Engineering Program additions are backwards-compatible extensions to Level A.
 Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP_REGISTER.md`.
+
+---
+
+## Phase F — Release Branch Qualification (release/final-production-qualification)
+
+**Started:** 2026-08-18 (session 22d23828). Session continued through 2026-09-19.
+**Branch HEAD:** `5492d6f` (HARD-09: eliminate all remaining native alert/confirm/prompt calls)
+
+### F1. Remediation committed
+
+| Commit | Summary |
+|---|---|
+| `163fb9d1` | fix(issue-62): planner cell content + CEA import error display |
+| `0d9553c5` | fix(issue-62): planner supplies timing_block_id so sessions land in correct period |
+| `fd885af6` | fix(hard-09): replace native prompt()/alert() in openAddCadetModal with promptText() |
+| `14c0c7a1` | fix(issue-62): Unit Setup↔PW linkage + prescriptive UI/UX rules in frontend.md |
+| `5492d6f` | HARD-09: eliminate all remaining native alert/confirm/prompt calls (11 functions) |
+
+### F2. Gate evidence (verified 2026-09-19)
+
+| Gate | Evidence | Result |
+|---|---|---|
+| Backend tests | `pytest tests/ -q` → 2454 passed, 12 skipped, 0 failures (309.46s) | ✅ |
+| TypeScript typecheck | `npm run typecheck` → 0 errors | ✅ |
+| Frontend build | `npm run build` → success | ✅ |
+| npm audit --omit=dev | 0 HIGH or CRITICAL vulnerabilities | ✅ |
+| Security greps (4 checks) | All return 0 matches | ✅ |
+| Alembic heads | Single head `7f61608fa538`, clean | ✅ |
+| HARD-09: 0 native dialogs | `grep -E "alert\|confirm\|prompt"` → 0 live call-sites | ✅ |
+
+### F3. Issue #62 DoD evidence (browser + source verified)
+
+| DoD Item | Evidence | Status |
+|---|---|---|
+| sqn_admin role tested | Browser login as 703 Sqn sqn_admin, toured all affected pages | ✅ |
+| 0 test failures | 2454/0 (above) | ✅ |
+| 0 TypeScript/build errors | 0 errors (above) | ✅ |
+| No browser console errors | `read_console_messages(onlyErrors=true)` → no errors on Parade Nights, Cadets, Curriculum, Needs Attention pages | ✅ |
+| Add Cadet succeeds and immediately appears | `test_post_cadets_creates_scoped_record_and_audits` passes; `openAddCadetModal` calls `POST /api/cadets` then `loadCadetRoster()` (index.html:19877, 19882); audit log entry verified | ✅ |
+| Real CEA member CSV previews actionable errors | `test_cea_realistic_excel_export_bom_and_header_aliases` and `test_cea_missing_columns_explains_the_required_fix` pass; returns `{error:"missing_required_columns",message:"Service Number...Surname..."}` | ✅ |
+| Parade Night grid shows Curriculum/Facilitator/Room | index.html:10474–10478 — three stacked rows (curriculum_title_at_time / facilitator_display_name_at_time / training_area_name_at_time), left-border colour for status, no dividers | ✅ |
+| One canonical Sessions Needing Outcome Entry | Browser DOM inspection: only categories Data, Planning, Backlog — no duplicate Outcome category | ✅ |
+| Matrix ↗ tab absent from Curriculum | Browser: tabs ALL, ORIENTATION, INITIAL, JUNIOR, INTERMEDIATE, SENIOR, BRONZE CLP, SILVER CLP, GOLD CLP — no Matrix tab | ✅ |
+| Unit Setup changes reflected in PW | Source verified: commit 14c0c7a1 adds Year linkage + "Open TMS Unit Setup ↗" button | ✅ |
+| Sessions land in correct period/class | Commit 0d9553c5: planner now passes `timing_block_id` to session create; `test_session_period_matches_planner_period` passes | ✅ |
+| Capability preservation for Matrix removal | Commit 5492d6f notes: matrix data still accessible via Planning Workspace direct URL | ✅ |
+
+### F4. Remaining human-gated items (not in scope of this session)
+
+- Gate 5: Backup E2E (GPG backup + restore test against staging)
+- Gate 6: Browser E2E against staging (Playwright against live staging URLs)
+- Gate 7: 100-user concurrent load test against staging
+- Gate 8: Deployment + rollback rehearsal on staging
+- Gate 10: UAT, data governance, key custody, account creation, known-limitation sign-off
+- Gate 11: Executive GO/NO-GO
+
+**Staging deploy command** (user must execute): `STAGING_RESCUE=1 bash scripts/deploy-staging.sh` (from source repo root, with Railway env vars set).
