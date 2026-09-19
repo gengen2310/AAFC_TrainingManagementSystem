@@ -5961,7 +5961,12 @@ function _populateReasonSelect(){
 async function _onReasonChange(sel){
   if(sel.value!=='__add_new__')return;
   const name=await promptText('New reason','Reason name',{okLabel:'Create'});
-  if(!name){ sel.value=''; return; }
+  // Clear '__add_new__' before the API await so that when closeModal's deferred
+  // el.focus() fires (setTimeout(0), after this microtask yields), sel.value is
+  // already '' and any WebKit spurious 'change' event returns early here instead
+  // of reopening #m-text-input.
+  sel.value='';
+  if(!name){ return; }
   try{
     const t=await api('/api/session-status-reason-tags',{method:'POST',body:JSON.stringify({display_name:name})});
     S.sessionStatusReasonTags=[...(S.sessionStatusReasonTags||[]),t];
