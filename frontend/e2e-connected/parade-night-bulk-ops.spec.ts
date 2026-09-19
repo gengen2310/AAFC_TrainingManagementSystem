@@ -148,7 +148,9 @@ test("WORK-12: cancel-all API returns sessions_updated count", async ({ page }) 
   const token = await getAdminToken(page);
   const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const date = `2099-08-${String(5 + (Date.now() % 23)).padStart(2, "0")}`;
+  // Use July (month 07) so this test's date range (2099-07-05..27) cannot
+  // collide with the WORK-12 button test above which uses August (2099-08-04..26).
+  const date = `2099-07-${String(5 + (Date.now() % 23)).padStart(2, "0")}`;
   const pnR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date }, headers: hdr });
   const pnId = (await pnR.json()).parade_night_id;
   _createdPnIds.push(pnId);
