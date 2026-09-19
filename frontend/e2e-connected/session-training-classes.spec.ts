@@ -128,8 +128,10 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   // run at timestamps that are multiples of 300ms apart (common in a 9-minute
   // CI run where the same modulo repeats ~1800 times).
   const dateHash = uniqueSuffix.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) >>> 0, 0);
-  const testDate = new Date(2065, 0, 1 + (dateHash % 364)).toISOString().slice(0, 10);
-  const fixtureYear = 2065;
+  // Use % 3650 (10-year range, 2065–2074) for ~0.04% collision probability
+  // among 6 seeds, down from ~4% with % 364 (1-year range).
+  const testDate = new Date(2065, 0, 1 + (dateHash % 3650)).toISOString().slice(0, 10);
+  const fixtureYear = Number(testDate.slice(0, 4));
   const marker = `E2E-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
