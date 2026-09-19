@@ -10476,8 +10476,20 @@ function _pnMatrixCell(pnId,ds,period,classId,customPhaseId,sess){
     const sc={planned:'var(--blue)',delivered:'var(--ok)',cancelled:'var(--red)',not_delivered:'var(--red)',delivered_with_issue:'var(--warn)',cancelled_late:'var(--red)',rescheduled:'var(--warn)'};
     const col=sc[sess.status]||'var(--muted)';
     const lb={planned:'Planned',delivered:'✓',cancelled:'✗',not_delivered:'✗',delivered_with_issue:'!',cancelled_late:'✗',rescheduled:'↻'}[sess.status]||sess.status;
-    if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},'${esc(sess.session_id)}')"><div style="font-size:9px;font-weight:700;color:${col}">${lb}</div></td>`;
-    return `<td style="border:1px solid var(--border);padding:4px;text-align:center"><div style="font-size:9px;font-weight:700;color:${col}">${lb}</div></td>`;
+    // Three content rows: Curriculum / Facilitator / Room. Status is secondary:
+    // left-border colour encodes state; icon badge shown only for non-planned states.
+    const curr=sess.curriculum_title_at_time||sess.custom_title||'';
+    const fac=sess.facilitator_display_name_at_time||'';
+    const room=sess.training_area_name_at_time||'';
+    const hover=esc([curr,fac,room].filter(Boolean).join(' · ')||lb);
+    const badge=sess.status!=='planned'?`<div style="font-size:8px;font-weight:700;color:${col};margin-top:1px">${lb}</div>`:'';
+    const inner=`<div style="border-left:3px solid ${col};padding-left:3px" title="${hover}" aria-label="${hover}">
+<div style="font-size:8px;font-weight:600;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${curr?esc(curr):'<span style="color:var(--muted)">—</span>'}</div>
+<div style="font-size:7px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${fac?esc(fac):'—'}</div>
+<div style="font-size:7px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${room?esc(room):'—'}</div>
+${badge}</div>`;
+    if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top;cursor:pointer" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},'${esc(sess.session_id)}')">${inner}</td>`;
+    return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top">${inner}</td>`;
   }
   if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer;opacity:.4" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},null)"><div style="font-size:11px;color:var(--blue)">+</div></td>`;
   return `<td style="border:1px solid var(--border);padding:4px;text-align:center"><div style="font-size:10px;color:var(--lgrey)">—</div></td>`;
@@ -19946,14 +19958,22 @@ function initCeaImportPage(){
 
 async function ceaPreview(){
   const csvText=(document.getElementById('cea-csv-input').value||'').trim();
-  if(!csvText){alert('Paste a CSV first.');return;}
   const statusEl=document.getElementById('cea-preview-status');
-  statusEl.textContent='Previewing…';
+  if(!csvText){statusEl.style.color='var(--red)';statusEl.textContent='Paste a CEA export CSV first.';return;}
+  statusEl.style.color='var(--muted)';statusEl.textContent='Previewing…';
   try{
     const data=await api('/api/import/cea-members/preview',{method:'POST',body:{csv_text:csvText,file_name:'manual-paste.csv'}});
-    statusEl.textContent=`${data.row_count} rows parsed.`;
+    statusEl.style.color='var(--muted)';statusEl.textContent=`${data.row_count} rows parsed.`;
     _renderCeaPreview(data);
-  }catch(e){statusEl.textContent='';alert(apiErr(e));}
+  }catch(e){
+    let msg=apiErr(e);
+    // Append received columns to missing-columns errors so the operator can see what the parser found
+    if(e&&e.code==='missing_required_columns'&&e.body&&e.body.detail&&e.body.detail.received_columns){
+      const got=(e.body.detail.received_columns||[]).join(', ')||'(none detected)';
+      msg+=' Columns found: '+got+'.';
+    }
+    statusEl.style.color='var(--red)';statusEl.textContent=msg;
+  }
 }
 
 function _renderCeaPreview(data){
