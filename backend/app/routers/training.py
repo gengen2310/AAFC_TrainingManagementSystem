@@ -1943,12 +1943,26 @@ def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
             "error": "duplicate_service_number",
             "message": "An active cadet with that service number already exists in this squadron.",
         })
+    # B-21: mirror the cross-squadron identity fence already present in the
+    # CEA batch import path (ops.py:864-873). A service number must be globally
+    # unique across all active cadets, not just within the caller's squadron.
+    foreign = db.query(Cadet).filter(
+        Cadet.service_number == service_number,
+        Cadet.squadron_id != sq_id,
+        Cadet.is_archived == False,  # noqa: E712
+    ).first()
+    if foreign:
+        raise HTTPException(409, detail={
+            "error": "cross_squadron_identity_conflict",
+            "message": "That service number is already active in another squadron.",
+        })
     cadet = Cadet(
         squadron_id=sq_id, service_number=service_number,
         rank=body.rank.strip() if body.rank else None,
         first_name=body.first_name.strip() if body.first_name else None,
         last_name=last_name, phase=body.phase.strip() if body.phase else None,
         flight=body.flight.strip() if body.flight else None,
+        created_by=p.user_id,  # B-22: audit correlation field
     )
     db.add(cadet)
     db.commit()
