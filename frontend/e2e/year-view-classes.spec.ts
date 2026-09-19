@@ -98,8 +98,13 @@ test("Year view shows a session's real Training Class assignment without opening
     // both the annual-program and trainingClasses queries have resolved),
     // then check the class name is visible inline in the block.
     await expect(page.locator('.pw-night-grid').first()).toBeVisible({ timeout: 15000 });
-    const classLine = page.locator(".pw-nc-classes", { hasText: className });
-    await expect(classLine).toBeVisible({ timeout: 10000 });
+    // USER-AUTHORISED REMOVAL (2026-09-19): .pw-nc-classes inside-cell indicator
+    // descoped. CLASS-06 pt.3 is satisfied by the grid-per-class architecture:
+    // each training class is its own row in pw-night-grid; the row <th> contains
+    // the class name, visible at a glance without any click.
+    await expect(
+      page.locator(".pw-night-grid th", { hasText: className })
+    ).toBeVisible({ timeout: 10000 });
   } finally {
     await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
     await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
