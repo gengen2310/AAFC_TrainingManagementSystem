@@ -77,7 +77,9 @@ async function openQuickEditForFirstSession(page: Page, marker: string) {
   // Clear the year filter so all parade nights are visible regardless of
   // which planning year the test date falls under.
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
-  await page.evaluate("nav('parade-nights')");
+  // Use function form (not string) to ensure Firefox/WebKit properly await
+  // the Promise returned by nav() → reloadAndRender().
+  await page.evaluate(() => (window as any).nav('parade-nights'));
   // Test parade nights are created in 2066+ and have pn.term=null.
   // Force term="all" so those cards are not filtered by the default term.
   await page.locator("#pn-f-term").selectOption("all");
@@ -87,6 +89,12 @@ async function openQuickEditForFirstSession(page: Page, marker: string) {
   await expect(editBtn).toBeVisible();
   await editBtn.click();
   await expect(page.locator("#m-sess-edit")).toBeVisible();
+  // Confirm editSessRef is populated (quickEdit ran its synchronous setup)
+  // before the test proceeds to interact with the modal.
+  await expect.poll(
+    () => page.evaluate(() => !!(window as any).editSessRef),
+    { timeout: 5000 }
+  ).toBe(true);
 }
 
 test.describe("Session Status Reason tags (REM-23 continuation)", () => {

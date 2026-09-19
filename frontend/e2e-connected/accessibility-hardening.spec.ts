@@ -113,8 +113,10 @@ test("HARD-04: .btn:focus-visible outline rule is present in the stylesheet", as
         for (const rule of Array.from(sheet.cssRules || [])) {
           if (rule instanceof CSSStyleRule) {
             if (rule.selectorText?.includes("btn") && rule.selectorText?.includes("focus-visible")) {
-              const style = rule.style;
-              if (style.outline || style.getPropertyValue("outline")) return true;
+              // getPropertyValue("outline") returns "" when the value is var(--focus-ring)
+              // because CSSOM can't resolve the custom property without a context element.
+              // cssText contains the raw declaration and reliably includes "outline".
+              if (rule.style.cssText.includes("outline")) return true;
             }
           }
         }
@@ -230,6 +232,14 @@ test("VIS-04: visible nav items have tabindex=0 after login", async ({ page }) =
   // VIS-04 fix: applyNavScope() sets shown nav items to tabindex="0" and hidden
   // items to tabindex="-1". This prevents keyboard users reaching hidden items.
   await loginSquadron(page);
+  // applyNavScope() is called synchronously inside bootApp(), but Playwright's CDP
+  // observer can fire toBeVisible for #app before the synchronous bootApp() call
+  // fully returns. Poll until at least one nav item has tabindex="0" to ensure
+  // we see the post-applyNavScope() DOM state before iterating.
+  await expect.poll(
+    () => page.locator('.nav-item[tabindex="0"]:visible').count(),
+    { timeout: 5000 }
+  ).toBeGreaterThan(0);
   const visibleNavItems = page.locator(".nav-item:visible");
   const count = await visibleNavItems.count();
   expect(count).toBeGreaterThan(0);

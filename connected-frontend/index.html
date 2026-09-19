@@ -15936,8 +15936,15 @@ function openModal(id){
 }
 function closeModal(id){
   document.getElementById(id).classList.remove('active');
-  if(_modalReturnFocus&&_modalReturnFocus.focus)try{_modalReturnFocus.focus();}catch(_){}
-  _modalReturnFocus=null;
+  // Defer focus restoration via setTimeout(0) to prevent WebKit from firing
+  // a spurious 'change' event on the previously-focused element (e.g. #or-reason)
+  // before the current call stack unwinds, which would re-open a promptText() modal.
+  if(_modalReturnFocus&&_modalReturnFocus.focus){
+    const el=_modalReturnFocus; _modalReturnFocus=null;
+    setTimeout(()=>{try{el.focus();}catch(_){}},0);
+  }else{
+    _modalReturnFocus=null;
+  }
 }
 // REM-106: confirmAction() replaces native confirm() for critical SA/org-
 // management operations (archive Wing/Squadron, maintenance mode, account

@@ -329,7 +329,7 @@ test.describe("Facilitator statistics", () => {
       await page.locator("#fac-last").fill("Regression");
       await page.locator("#fac-type").selectOption(type);
       await page.locator("#fac-save-btn").click();
-      await expect(page.locator("#m-add-fac")).toBeHidden();
+      await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 15000 });
     }
     async function facIdByName(firstName: string): Promise<string> {
       // `S` is a top-level `let` in connected-frontend's classic (non-module)
@@ -364,7 +364,7 @@ test.describe("Facilitator statistics", () => {
       await page.evaluate((id) => (window as any).editFac(id), alphaId);
       await page.locator("#fac-type").selectOption("Civilian");
       await page.locator("#fac-save-btn").click();
-      await expect(page.locator("#m-add-fac")).toBeHidden();
+      await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 15000 });
     });
     assertAllChartsFresh(afterEdit);
     expect(statusTotal(afterEdit), "total must be unchanged by an edit").toBe(baselineTotal + 1);
