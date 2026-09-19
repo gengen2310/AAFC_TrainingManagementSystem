@@ -2243,17 +2243,23 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- Planning Checks: conflict detection and decision guide.
              checks-empty is shown when no year is selected; checks-card when data loads.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed planning checks on Needs Attention. -->
-        <div id="checks-empty" style="margin-top:18px">
-          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to run planning checks.</p>
-        </div>
-        <div class="card" id="checks-card" style="display:none;margin-top:18px">
+             USER-AUTHORISED CHANGE (2026-08-27): exposed planning checks on Needs Attention.
+             P11-01: checks-year-sel added so users can select a year without leaving this page. -->
+        <div class="card" style="margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
             <h2 class="ctitle" style="margin:0">Planning Checks</h2>
-            <button class="btn btn-out btn-sm plan-write-el" style="display:none" onclick="runAllChecks()" title="Detect scheduling conflicts for the active training year">Run All Checks</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <select id="checks-year-sel" aria-label="Select training year" onchange="loadPlanningChecks(this.value)" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)"><option value="">— select year —</option></select>
+              <button class="btn btn-out btn-sm plan-write-el" style="display:none" onclick="runAllChecks()" title="Detect scheduling conflicts for the active training year">Run All Checks</button>
+            </div>
           </div>
-          <div id="checks-guide-body"></div>
-          <div id="checks-conflicts-body" style="margin-top:14px"></div>
+          <div id="checks-empty">
+            <p class="muted" style="font-size:var(--fs-xs)">Select a training year above to run planning checks.</p>
+          </div>
+          <div id="checks-card" style="display:none">
+            <div id="checks-guide-body"></div>
+            <div id="checks-conflicts-body" style="margin-top:14px"></div>
+          </div>
         </div>
 
         <!-- HELP-05: What Changed? activity feed -->
@@ -18092,6 +18098,8 @@ async function loadPlanningChecks(yearId){
   P.currentYearId=yearId;
   const card=document.getElementById('checks-card');
   const empty=document.getElementById('checks-empty');
+  const sel=document.getElementById('checks-year-sel');
+  if(sel&&yearId)sel.value=yearId;
   if(!yearId){ card.style.display='none'; empty.style.display=''; return; }
   try {
     const [guide, conflicts] = await Promise.all([
