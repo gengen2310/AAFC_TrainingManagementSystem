@@ -33,6 +33,7 @@ import { canWriteSquadron } from "../auth/permissions";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
 import { SquadronSelector } from "../layout/SquadronSelector";
 import { HelpDrawer } from "../components/HelpDrawer";
+import { TMS_BASE } from "../components/ui";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
@@ -374,6 +375,9 @@ export function PlanningWorkspace() {
           <strong>Set up this Training Year in TMS Unit Setup.</strong>
           <span>Planning Year and Training Class records are managed in TMS and appear here automatically.</span>
           <span style={{ fontSize: 'var(--fs-xs)' }}>After creating the year in TMS, reopen Planning Workspace using the TMS link to keep the selected year.</span>
+          <a href={TMS_BASE} className="btn btn-primary btn-sm" style={{ marginTop: 8 }} rel="noopener noreferrer">
+            Open TMS Unit Setup ↗
+          </a>
         </div>
       );
     }

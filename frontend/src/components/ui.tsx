@@ -65,7 +65,7 @@ export function Bar({ pct, label }: { pct: number; label?: string }) {
 // reason, matching the form's own still-visible Save/Cancel buttons as the
 // implicit next step.
 // Same resolution as App.tsx / AppShell.tsx: the PW has no sign-in of its own.
-const TMS_BASE =
+export const TMS_BASE =
   (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
     ?.content || "https://aafc-tms-frontend-production.up.railway.app";
 // SESSION-04: the one place that decides what to tell the user to DO about an
