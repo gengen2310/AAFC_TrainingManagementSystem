@@ -89,12 +89,10 @@ async function openQuickEditForFirstSession(page: Page, marker: string) {
   await expect(editBtn).toBeVisible();
   await editBtn.click();
   await expect(page.locator("#m-sess-edit")).toBeVisible();
-  // Confirm editSessRef is populated (quickEdit ran its synchronous setup)
-  // before the test proceeds to interact with the modal.
-  await expect.poll(
-    () => page.evaluate(() => !!(window as any).editSessRef),
-    { timeout: 5000 }
-  ).toBe(true);
+  // editSessRef is a `let` in connected-frontend/index.html (not a `var`), so it
+  // is NOT on `window` and cannot be read via page.evaluate. No poll needed:
+  // quickEdit() runs synchronously on click, setting editSessRef before
+  // openModal() — so #m-sess-edit being visible guarantees editSessRef is set.
 }
 
 test.describe("Session Status Reason tags (REM-23 continuation)", () => {
