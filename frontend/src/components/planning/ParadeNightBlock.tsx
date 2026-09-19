@@ -677,11 +677,6 @@ export function ParadeNightBlock({
                           <div className="pw-nc-title">{trunc([cell.code, cell.title].filter(Boolean).join(" — "), 40)}</div>
                           <div className="pw-nc-detail">{cell.facilitator ?? "No facilitator"}</div>
                           <div className="pw-nc-detail">{cell.location ?? "No room"}</div>
-                          {!!cell.training_classes?.length && (
-                            <div className="pw-nc-classes">
-                              {cell.training_classes.map(c => c.display_name).join(", ")}
-                            </div>
-                          )}
                         </div>
                       </td>
                     );
