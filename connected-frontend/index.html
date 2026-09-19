@@ -10600,14 +10600,15 @@ async function _pnCellSave(pnId,ds,period,classId,customPhaseId,sessionId){
 }
 
 // ── Cell delete: archive a session (reversible via Planning Workspace) ────────
-async function _pnCellDelete(sessionId,ds){
-  if(!confirm('Delete this session? It can be restored from the Planning Workspace.'))return;
-  try{
-    await api('/api/planning/sessions/'+sessionId,{method:'DELETE'});
-    document.getElementById('pn-cell-editor').style.display='none';
-    await reloadAndRender();
-    showPNDetail(ds);
-  }catch(e){showToast(apiErr(e),true);}
+function _pnCellDelete(sessionId,ds){
+  confirmAction('Delete this session? It can be restored from the Planning Workspace.',async()=>{
+    try{
+      await api('/api/planning/sessions/'+sessionId,{method:'DELETE'});
+      document.getElementById('pn-cell-editor').style.display='none';
+      await reloadAndRender();
+      showPNDetail(ds);
+    }catch(e){showToast(apiErr(e),true);}
+  },true);
 }
 
 // ── (Legacy stubs — kept so old call-sites remain safe) ───────────────────────
@@ -19646,23 +19647,23 @@ async function loadNeedsAttentionSessions(){
 }
 
 async function sessionDeliver(sessionId,btn){
-  const note=prompt('Enter delivery note (required):');
+  const note=await promptText('Mark Delivered','Delivery note (required)',{okLabel:'Confirm Delivery'});
   if(!note||!note.trim())return;
   btn.disabled=true;
   try{
     await api(`/api/sessions/${sessionId}/deliver`,{method:'POST',body:JSON.stringify({delivery_note:note.trim()})});
     loadNeedsAttentionSessions();
-  }catch(e){alert(apiErr(e));btn.disabled=false;}
+  }catch(e){showToast(apiErr(e),true);btn.disabled=false;}
 }
 
 async function sessionCancel(sessionId,btn){
-  const reason=prompt('Enter cancellation reason (required):');
+  const reason=await promptText('Cancel Session','Cancellation reason (required)',{okLabel:'Confirm Cancellation',danger:true});
   if(!reason||!reason.trim())return;
   btn.disabled=true;
   try{
     await api(`/api/sessions/${sessionId}/cancel`,{method:'POST',body:JSON.stringify({cancellation_reason:reason.trim()})});
     loadNeedsAttentionSessions();
-  }catch(e){alert(apiErr(e));btn.disabled=false;}
+  }catch(e){showToast(apiErr(e),true);btn.disabled=false;}
 }
 
 async function sessionReschedule(sessionId,btn){
@@ -19671,20 +19672,21 @@ async function sessionReschedule(sessionId,btn){
   try{
     const data=await api('/api/parade-nights');
     nights=(data.parade_nights||data||[]).filter(pn=>!pn.is_archived&&pn.date>=(new Date().toISOString().slice(0,10)));
-  }catch(e){alert(apiErr(e));return;}
-  if(nights.length===0){alert('No upcoming Parade Nights found. Please create a Parade Night first.');return;}
+  }catch(e){showToast(apiErr(e),true);return;}
+  if(nights.length===0){showToast('No upcoming Parade Nights found. Please create a Parade Night first.',true);return;}
   const opts=nights.map((pn,i)=>`${i+1}: ${pn.date}${pn.term?' ('+pn.term+')':''}`).join('\n');
-  const choice=prompt(`Select a Parade Night for the rescheduled session:\n${opts}`);
+  const choice=await promptText('Reschedule Session',`Select a Parade Night (enter number):\n${opts}`);
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
-  if(isNaN(idx)||idx<0||idx>=nights.length){alert('Invalid selection.');return;}
+  if(isNaN(idx)||idx<0||idx>=nights.length){showToast('Invalid selection.',true);return;}
   const pnid=nights[idx].id||nights[idx].parade_night_id;
-  const period=prompt('Period number:','1');
+  const period=await promptText('Reschedule Session','Period number',{defaultValue:'1'});
+  if(period===null)return;
   btn.disabled=true;
   try{
     await api(`/api/sessions/${sessionId}/reschedule`,{method:'POST',body:JSON.stringify({parade_night_id:pnid,period_number:parseInt(period)||1})});
     loadNeedsAttentionSessions();
-  }catch(e){alert(apiErr(e));btn.disabled=false;}
+  }catch(e){showToast(apiErr(e),true);btn.disabled=false;}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -19752,17 +19754,18 @@ async function loadCadetRoster(){
   }catch(e){wrap.innerHTML=`<p class="warn">${esc(apiErr(e))}</p>`;}
 }
 
-async function removeCadetFromClass(classId,cadetId,btn){
-  if(!confirm('Remove this cadet from the class? The cadet record is not deleted.'))return;
-  btn.disabled=true;
-  try{
-    await api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'remove',cadet_ids:[cadetId]})});
-    loadCadetRoster();
-  }catch(e){alert(apiErr(e));btn.disabled=false;}
+function removeCadetFromClass(classId,cadetId,btn){
+  confirmAction('Remove this cadet from the class? The cadet record is not deleted.',async()=>{
+    btn.disabled=true;
+    try{
+      await api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'remove',cadet_ids:[cadetId]})});
+      loadCadetRoster();
+    }catch(e){showToast(apiErr(e),true);btn.disabled=false;}
+  });
 }
 
 async function bulkAddCadetsToClass(classId){
-  const ids=prompt('Enter Service Number(s) to add, comma-separated:');
+  const ids=await promptText('Add Cadets to Class','Service numbers (comma-separated)',{okLabel:'Add'});
   if(!ids||!ids.trim())return;
   const snList=ids.split(',').map(s=>s.trim()).filter(Boolean);
   // Resolve service numbers to cadet IDs
@@ -19772,17 +19775,17 @@ async function bulkAddCadetsToClass(classId){
       const found=allCadets.find(c=>c.service_number===sn);
       return found?(found.cadet_id||found.id):null;
     }).filter(Boolean);
-    if(cadetIds.length===0){alert('No matching cadets found for the entered service numbers.');return;}
+    if(cadetIds.length===0){showToast('No matching cadets found for the entered service numbers.',true);return;}
     await api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'add',cadet_ids:cadetIds})});
     loadCadetRoster();
-  }catch(e){alert(apiErr(e));}
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 async function moveCadetsToClass(fromClassId){
   // Get cadets selected via checkboxes
   const checked=Array.from(document.querySelectorAll('#cadets-roster-wrap .roster-row-check:checked'));
   const cadetIds=checked.map(cb=>cb.dataset.cadetId).filter(Boolean);
-  if(cadetIds.length===0){alert('Select cadets to move using the row checkboxes first.');return;}
+  if(cadetIds.length===0){showToast('Select cadets to move using the row checkboxes first.',true);return;}
 
   // Load available classes for this squadron so the officer can pick by name
   let classes=[];
@@ -19794,20 +19797,20 @@ async function moveCadetsToClass(fromClassId){
       const cl=Array.isArray(cls)?cls:(cls.training_classes||[]);
       classes.push(...cl.filter(c=>(c.training_class_id||c.id)!==fromClassId));
     }
-  }catch(e){alert(apiErr(e));return;}
-  if(classes.length===0){alert('No other Training Classes available to move to.');return;}
+  }catch(e){showToast(apiErr(e),true);return;}
+  if(classes.length===0){showToast('No other Training Classes available to move to.',true);return;}
 
   const opts=classes.map((c,i)=>`${i+1}: ${c.display_name}`).join('\n');
-  const choice=prompt(`Select a target Training Class by number:\n${opts}`);
+  const choice=await promptText('Move Cadets',`Select a target Training Class (enter number):\n${opts}`);
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
-  if(isNaN(idx)||idx<0||idx>=classes.length){alert('Invalid selection.');return;}
+  if(isNaN(idx)||idx<0||idx>=classes.length){showToast('Invalid selection.',true);return;}
   const target_class_id=classes[idx].training_class_id||classes[idx].id;
 
   try{
     await api(`/api/training-classes/${fromClassId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'move',cadet_ids:cadetIds,target_class_id})});
     loadCadetRoster();
-  }catch(e){alert(apiErr(e));}
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 async function openAddCadetModal(){
@@ -19941,8 +19944,8 @@ async function showCadetTrainingRecord(cadetId){
     const overlay=document.getElementById('modal-overlay');
     const body=document.getElementById('modal-body');
     if(overlay&&body){body.innerHTML=html;overlay.style.display='flex';}
-    else{alert(name+'\n\n(Open browser console for full record)');}
-  }catch(e){alert(apiErr(e));}
+    else{showToast(name+' — see browser console for full record.',false);}
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -20019,19 +20022,20 @@ function _renderCeaPreview(data){
   _ceaBatchId=null;
 }
 
-async function ceaCommit(){
+function ceaCommit(){
   const csvText=(document.getElementById('cea-csv-input').value||'').trim();
-  if(!csvText){alert('No CSV data to commit.');return;}
-  if(!confirm('Commit this import? Cadets will be created or updated in the database. You can rollback afterwards if needed.'))return;
   const statusEl=document.getElementById('cea-commit-status');
-  statusEl.textContent='Committing…';
-  document.getElementById('cea-commit-btn').disabled=true;
-  try{
-    const data=await api('/api/import/cea-members/commit',{method:'POST',body:{csv_text:csvText,file_name:'manual-paste.csv'}});
-    _ceaBatchId=data.batch_id||null;
-    statusEl.textContent='';
-    _renderCeaResult(data);
-  }catch(e){statusEl.textContent='';document.getElementById('cea-commit-btn').disabled=false;alert(apiErr(e));}
+  if(!csvText){statusEl.style.color='var(--red)';statusEl.textContent='No CSV data to commit.';return;}
+  confirmAction('Commit this import? Cadets will be created or updated in the database. You can rollback afterwards if needed.',async()=>{
+    statusEl.style.color='var(--muted)';statusEl.textContent='Committing…';
+    document.getElementById('cea-commit-btn').disabled=true;
+    try{
+      const data=await api('/api/import/cea-members/commit',{method:'POST',body:{csv_text:csvText,file_name:'manual-paste.csv'}});
+      _ceaBatchId=data.batch_id||null;
+      statusEl.textContent='';
+      _renderCeaResult(data);
+    }catch(e){statusEl.textContent='';document.getElementById('cea-commit-btn').disabled=false;statusEl.style.color='var(--red)';statusEl.textContent=apiErr(e);}
+  });
 }
 
 function _renderCeaResult(data){
@@ -20051,22 +20055,23 @@ function _renderCeaResult(data){
   wrap.style.display='';
 }
 
-async function ceaRollback(){
-  if(!_ceaBatchId){alert('No batch ID — cannot rollback.');return;}
-  if(!confirm('Rollback this import? Newly created cadets will be archived and updated cadets will have their previous rank/name restored.'))return;
+function ceaRollback(){
   const statusEl=document.getElementById('cea-rollback-status');
-  statusEl.textContent='Rolling back…';
-  document.getElementById('cea-rollback-btn').disabled=true;
-  try{
-    const data=await api(`/api/import/cea-members/rollback?batch_id=${encodeURIComponent(_ceaBatchId)}`,{method:'POST'});
-    statusEl.textContent='';
-    const body=document.getElementById('cea-result-body');
-    body.innerHTML+=`<p style="font-size:var(--fs-base);color:var(--ok-text)">
-      Rollback complete: <strong>${data.new_archived||0}</strong> archived, <strong>${data.updated_restored||0}</strong> restored.
-    </p>`;
-    document.getElementById('cea-rollback-btn').style.display='none';
-    _ceaBatchId=null;
-  }catch(e){statusEl.textContent='';document.getElementById('cea-rollback-btn').disabled=false;alert(apiErr(e));}
+  if(!_ceaBatchId){statusEl.style.color='var(--red)';statusEl.textContent='No batch ID — cannot rollback.';return;}
+  confirmAction('Rollback this import? Newly created cadets will be archived and updated cadets will have their previous rank/name restored.',async()=>{
+    statusEl.style.color='var(--muted)';statusEl.textContent='Rolling back…';
+    document.getElementById('cea-rollback-btn').disabled=true;
+    try{
+      const data=await api(`/api/import/cea-members/rollback?batch_id=${encodeURIComponent(_ceaBatchId)}`,{method:'POST'});
+      statusEl.textContent='';
+      const body=document.getElementById('cea-result-body');
+      body.innerHTML+=`<p style="font-size:var(--fs-base);color:var(--ok-text)">
+        Rollback complete: <strong>${data.new_archived||0}</strong> archived, <strong>${data.updated_restored||0}</strong> restored.
+      </p>`;
+      document.getElementById('cea-rollback-btn').style.display='none';
+      _ceaBatchId=null;
+    }catch(e){statusEl.textContent='';document.getElementById('cea-rollback-btn').disabled=false;statusEl.style.color='var(--red)';statusEl.textContent=apiErr(e);}
+  },true);
 }
 
 function ceaReset(){
@@ -20082,18 +20087,18 @@ function ceaReset(){
 async function exportTrainingRecords(){
   const sel=document.getElementById('tr-class-select');
   const classId=sel?sel.value:'';
-  if(!classId){alert('Select a Training Class first.');return;}
+  if(!classId){showToast('Select a Training Class first.',true);return;}
   const headers={'Content-Type':'application/json'};
   const t=tokenGet(); if(t)headers['Authorization']='Bearer '+t;
   try{
     const res=await fetch(API_BASE+'/api/training-records/export?class_id='+encodeURIComponent(classId),{headers,credentials:'include'});
-    if(!res.ok){alert('Export failed: '+(res.status));return;}
+    if(!res.ok){showToast('Export failed: '+(res.status),true);return;}
     const blob=await res.blob();
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url; a.download='training-records.csv'; a.click();
     setTimeout(()=>URL.revokeObjectURL(url),10000);
-  }catch(e){alert(apiErr(e));}
+  }catch(e){showToast(apiErr(e),true);}
 }
 </script>
 
