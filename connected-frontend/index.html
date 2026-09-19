@@ -19810,26 +19810,28 @@ async function moveCadetsToClass(fromClassId){
   }catch(e){alert(apiErr(e));}
 }
 
-function openAddCadetModal(){
-  // Open a form to create a new Cadet record (not to add an existing one to a class)
+async function openAddCadetModal(){
+  // Open a form to create a new Cadet record (not to add an existing one to a class).
+  // Uses promptText() in place of native prompt() so the flow is keyboard-accessible
+  // and compatible with browser automation (HARD-09).
   const sel=document.getElementById('cadets-class-select');
   const classId=sel?sel.value:'';
-  const sn=prompt('New cadet CEA number (service number):');
+  const sn=await promptText('Add Cadet','CEA number (service number)',{okLabel:'Next'});
   if(!sn||!sn.trim())return;
-  const rank=prompt('Rank (e.g. Cdt):','Cdt')||'Cdt';
-  const firstName=prompt('First name:');
+  const rank=await promptText('Add Cadet','Rank (e.g. Cdt)',{defaultValue:'Cdt',okLabel:'Next'});
+  if(rank===null)return;
+  const firstName=await promptText('Add Cadet','First name',{okLabel:'Next'});
   if(!firstName||!firstName.trim())return;
-  const lastName=prompt('Last name:');
+  const lastName=await promptText('Add Cadet','Last name',{okLabel:'Create Cadet'});
   if(!lastName||!lastName.trim())return;
-  api('/api/cadets',{method:'POST',body:JSON.stringify({service_number:sn.trim(),rank,first_name:firstName.trim(),last_name:lastName.trim()})})
-    .then(cadet=>{
-      const cadetId=cadet.cadet_id||cadet.id;
-      if(classId&&cadetId){
-        return api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'add',cadet_ids:[cadetId]})});
-      }
-    })
-    .then(()=>loadCadetRoster())
-    .catch(e=>alert(apiErr(e)));
+  try{
+    const cadet=await api('/api/cadets',{method:'POST',body:JSON.stringify({service_number:sn.trim(),rank:rank||'Cdt',first_name:firstName.trim(),last_name:lastName.trim()})});
+    const cadetId=cadet.cadet_id||cadet.id;
+    if(classId&&cadetId){
+      await api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'add',cadet_ids:[cadetId]})});
+    }
+    await loadCadetRoster();
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 // ═══════════════════════════════════════════════════════════
