@@ -4572,7 +4572,7 @@ Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP
 
 | Gate | Evidence | Result |
 |---|---|---|
-| Backend tests | `pytest tests/ -q` → 2454 passed, 12 skipped, 0 failures (309.46s) | ✅ |
+| Backend tests | `pytest tests/ -q` → 2456 passed, 12 skipped, 0 failures (2026-09-21) | ✅ |
 | TypeScript typecheck | `npm run typecheck` → 0 errors | ✅ |
 | Frontend build | `npm run build` → success | ✅ |
 | npm audit --omit=dev | 0 HIGH or CRITICAL vulnerabilities | ✅ |
@@ -4596,6 +4596,17 @@ Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP
 | Unit Setup changes reflected in PW | Source verified: commit 14c0c7a1 adds Year linkage + "Open TMS Unit Setup ↗" button | ✅ |
 | Sessions land in correct period/class | Commit 0d9553c5: planner now passes `timing_block_id` to session create; `test_session_period_matches_planner_period` passes | ✅ |
 | Capability preservation for Matrix removal | Commit 5492d6f notes: matrix data still accessible via Planning Workspace direct URL | ✅ |
+
+### F5. Additional evidence (2026-09-21)
+
+| Gate | Evidence | Result |
+|---|---|---|
+| B-13 accessibility audit | Claude-in-Chrome structural audit: 0 hard WCAG violations across 5 pages; landmarks, skip-link, aria-live, all-alt, all-btn-names, implicit-label inputs confirmed. PW covered by `accessibility.spec.ts` (axe WCAG 2.1 AA). | ✅ |
+| B-14 responsive matrix | `responsive-viewports.spec.ts` covers 7 viewports (1440→375px); B-24 390px overflow fixed | ✅ |
+| B-15 migration rehearsal | Alembic head `7f61608fa538` unchanged; 70/70 rehearsal result valid; `deploy-staging.sh` re-rehearses before any deploy | ✅ |
+| K-001 spike-alert tests | All 5 previously-deselected tests now PASS; `deploy-staging.sh` has no deselections | ✅ |
+| B-11/B-12 design pass | G1 contrast fixes applied; frontend rubric audit PASS 2026-09-20 | ✅ |
+| B-17 `/code-review ultra` | **IN PROGRESS** 2026-09-21 — findings to be incorporated before TECHNICAL GO | 🔄 |
 
 ### F4. Remaining human-gated items (not in scope of this session)
 
