@@ -160,15 +160,16 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 | `test_timing.py::test_bulk_schedules_match_single_endpoint_exactly` | Rate limiter exhausted (429) by 2000+ prior test calls |
 | `test_year_context.py::test_year_listing_includes_future_years_with_no_row` | `ensure_year_context` materialises future-year rows as side-effect of other tests |
 
-**Risk:** Security-relevant tests (rate limiting spike alerts) are excluded from the deploy gate. A regression in rate-limiting alerting would not be caught.
+**Risk:** ~~Security-relevant tests (rate limiting spike alerts) are excluded from the deploy gate. A regression in rate-limiting alerting would not be caught.~~
 
-**Implementation plan:**
-- Rate limiting: add `reset_rate_limit_state()` fixture or `autouse` conftest cleanup that resets the dedup window between tests.
-- Timing test: add per-test rate limiter reset or run before rate-exhausting tests.
-- Year context: teardown that removes `ensure_year_context`-materialised rows or uses a dedicated DB fixture scope.
-- Once all 5 pass in full-suite run: remove deselect lines from deploy-staging.sh.
+**RESOLVED 2026-09-21:** All 5 previously-deselected tests now PASS in the full-suite run. `deploy-staging.sh` no longer deselects them. Verified:
+- `test_login_spike_emits_security_log` — PASS
+- `test_login_spike_repeats_on_subsequent_multiples` — PASS
+- `test_5xx_spike_emits_security_log` — PASS
+- `test_bulk_schedules_match_single_endpoint_exactly` — PASS
+- `test_year_listing_includes_future_years_with_no_row` — PASS
 
-**Test plan:** Run `python -m pytest tests/ -q` 3 consecutive times. All 5 tests must pass in each run.
+Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in previous sessions; deselect lines removed from deploy-staging.sh.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
