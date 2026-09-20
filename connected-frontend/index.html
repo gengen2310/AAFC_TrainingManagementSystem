@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
-<meta name="aafc-api-base" content="https://aafc-tms-backend-production.up.railway.app">
+<meta name="aafc-api-base" content="http://localhost:8200">
 <meta name="aafc-pw-base" content="">
 <meta name="app-build" content="__APP_BUILD__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1122,7 +1122,7 @@ tr.tc-archived{opacity:.6;}
 .qe-form{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
 .maint-banner{display:none;align-items:center;gap:10px;padding:7px var(--sp-lg);font-size:var(--fs-sm);font-weight:700;background:#c8102e;color:#fff;border-bottom:2px solid #9a0b22;}
 .maint-banner.show{display:flex;}
-.maint-banner.pending{background:#c97a00;border-bottom-color:#a06200;}
+.maint-banner.pending{background:#c97a00;border-bottom-color:#a06200;color:#111111;}  /* G1: white on #c97a00 = 3.29:1 (fail) -> #111111 = 6.02:1 (pass) */
 .maint-banner .maint-icon{font-size:var(--fs-lg);flex-shrink:0;}
 .maint-banner .maint-msg{flex:1;}
 
@@ -16319,7 +16319,7 @@ function renderMissions() {
           :classStatus==='scheduled'
           ?'<span class="badge badge-green">Scheduled</span>'
           :classStatus==='cancelled'
-          ?'<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Cancelled</span>'
+          ?'<span class="badge" style="background:var(--warn-bg);color:var(--warn-text)">Cancelled</span>'  /* G1: --warn on --warn-bg=2.98:1(fail); --warn-text=5.4:1(pass) */
           :classStatus==='not_delivered'
           ?'<span class="badge" style="background:#fee2e2;color:var(--red)">Not Delivered</span>'
           :'<span class="badge badge-grey">Unscheduled</span>';
@@ -19653,7 +19653,7 @@ async function loadNeedsAttentionSessions(){
       const deliverBtn=canWrite?`<button class="btn btn-primary btn-sm" onclick="sessionDeliver('${esc(r.session_id)}',this)">Deliver</button>`:'';
       const cancelBtn=canWrite?`<button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="sessionCancel('${esc(r.session_id)}',this)">Cancel</button>`:'';
       const rescheduleBtn=(status==='cancelled'&&canWrite)?`<button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="sessionReschedule('${esc(r.session_id)}',this)">Reschedule</button>`:'';
-      const statusBadge=status==='cancelled'?`<span style="color:var(--warn);font-size:var(--fs-xs)">(cancelled)</span>`:'';
+      const statusBadge=status==='cancelled'?`<span style="color:var(--warn-text);font-size:var(--fs-xs)">(cancelled)</span>`:'';  /* G1: --warn on white=3.29:1(fail); --warn-text=7.0:1(pass) */
       return `<tr>
         <td>${esc(date)}</td>
         <td>${esc(r.curriculum_code||'')} ${esc(r.curriculum_title||'')}</td>
@@ -19907,7 +19907,7 @@ async function loadTrainingRecords(){
           const fmt=_fmtDate(date);
           return `<td style="background:var(--ok-bg);color:var(--ok-text);text-align:center;font-size:var(--fs-2xs);font-weight:600" title="Completed ${esc(date)}" aria-label="Completed ${esc(fmt)}">${esc(fmt)}</td>`;
         }else if(status==='absent'){
-          return `<td style="background:var(--warn-bg);color:var(--warn);text-align:center;font-size:var(--fs-2xs)">Absent</td>`;
+          return `<td style="background:var(--warn-bg);color:var(--warn-text);text-align:center;font-size:var(--fs-2xs)">Absent</td>`;  /* G1: --warn on --warn-bg=2.98:1(fail); --warn-text=5.4:1(pass) */
         }else if(status==='not_completed'){
           return `<td style="text-align:center;color:var(--muted);font-size:var(--fs-2xs)">Not done</td>`;
         }else{
@@ -20011,7 +20011,7 @@ function _renderCeaPreview(data){
   // Summary badges
   const badgeMap=[
     {key:'new_count',label:'NEW',color:'var(--ok-text)',bg:'var(--ok-bg)'},
-    {key:'update_count',label:'UPDATE',color:'var(--warn)',bg:'var(--warn-bg)'},
+    {key:'update_count',label:'UPDATE',color:'var(--warn-text)',bg:'var(--warn-bg)'},  /* G1: --warn on --warn-bg=2.98:1(fail); --warn-text=5.4:1(pass); mirrors ok_text/ok_bg pattern */
     {key:'unchanged_count',label:'UNCHANGED',color:'var(--muted)',bg:'var(--surface-2)'},
     {key:'error_count',label:'ERROR',color:'var(--red)',bg:'#fde8ec'},
   ];
