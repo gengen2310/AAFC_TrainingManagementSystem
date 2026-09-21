@@ -78,6 +78,12 @@ These were verified CLOSED at programme baseline (HEAD 7c342f9) and are not trac
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (B-20):** Railway staging env var `COOKIE_SAMESITE=none` confirmed set.
+`Set-Cookie` header verified via curl against staging login endpoint: `SameSite=none; Secure`.
+`COOKIE_SECURE=true` confirmed set. No code change required — env var was the fix.
+E2E: `session-status-reason-tags.spec.ts` and `main-tms.spec.ts` pass in all 3 browsers including Safari (WebKit).
+**Status: CLOSED**
+
 ---
 
 ### K-004 — `capabilities` missing from PW location serialiser
@@ -104,6 +110,9 @@ Add `"capabilities": loc.capabilities` to the dict returned by `_location_out()`
 **Test plan:** Create `TrainingArea` with `capabilities=["projector","wheelchair"]`. Call `GET /api/planning/{year}/sessions`. Assert `location.capabilities == ["projector", "wheelchair"]`.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED (prior to 2026-09-21):** `planning.py:459` — `"capabilities": loc.capabilities` is present in `_location_out()`. Verified by code inspection: `grep -n "capabilities" backend/app/routers/planning.py` returns line 459.
+**Status: CLOSED**
 
 ---
 
@@ -135,6 +144,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Test plan:** Session with 1 audience → `is_combined` False. Session with 2 audiences → `is_combined` True. Session with 2 where one is archived → `is_combined` False.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED (prior to 2026-09-21):** `planning.py:525` — `"is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1` replaces the hardcoded `False`. Verified by code inspection.
+**Status: CLOSED**
 
 ---
 
@@ -205,6 +217,14 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** Grep of all `color:var(--blue)`, `color:var(--accent)`, `color:#51b0e3` usages confirms:
+- 14 matches total; only 2 are actual text-color rules (not border/background/accent-color/shadow).
+- `.tb-wm .r` (line 298): on `--dark` background → 5.56:1 ✓ (known-passing, documented).
+- `color:var(--blue)` on "+" cell placeholder (line 10461): `opacity:.4` on the parent `<td>` — decorative non-informational affordance, exempt under WCAG 1.4.3 decorative exception.
+- All other `--blue` usages are borders, backgrounds, checkbox accent-color, spinner top-border — NOT text color.
+- G1 contrast fixes (commit `74410440`) already addressed amber text violations. No blue-text-on-light-bg violations remain.
+**Status: CLOSED**
+
 ---
 
 ### DES-H03 — Touch target sizes
@@ -254,6 +274,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 **Test plan:** After change: no readable text element uses `--fs-4xs`. Visual check at 100% zoom.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** `grep -n "var(--fs-4xs)" connected-frontend/index.html` returns 0 matches. Token is defined at line 89 with the comment `/* 8px — decorative only */` but is never applied to any element. Canonical minimum (9px `--fs-3xs`) is the effective floor in practice.
+**Status: CLOSED**
 
 ---
 
@@ -311,6 +334,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `grep "test_isolation_known_issues" scripts/deploy-staging.sh` returns 0 matches. The stale reference was already removed from deploy-staging.sh. K-001 is also resolved (all 5 tests pass; no deselections in current HEAD).
+**Status: CLOSED**
+
 ---
 
 ### K-003 — Stale Planning Workspace documentation
@@ -321,6 +347,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21:** Added `> HISTORICAL SNAPSHOT — pre-Phase-B (2026-08-28)` banners to both files with pointer to `docs/final/00-baseline.md`. Full regeneration deferred to post-v17.1.
+**Status: CLOSED**
+
 ---
 
 ### K-006 — `cadet_group` legacy consumers audit
@@ -330,6 +359,14 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 **Implementation plan:** Grep `cadet_group` across all backend routers. Map each usage as: (a) read-only compatibility, (b) active write path. Replace write paths with `SessionAudience` writes. Consider data backfill for sessions that have `cadet_group` but no `SessionAudience` rows.
 
 **Migration needed:** N (audit first; migration decision may follow) | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** Grep of `cadet_group` across all routers:
+- `planning.py:2161` (create_session) — writes `cadet_group` AND immediately calls `_upsert_session_audience()` at line 2207. Dual-write: both fields kept in sync on create.
+- `planning.py:2325` (update_session) — writes `cadet_group` field on update.
+- `timing.py:666` — read-only serialisation (compatibility output).
+- `setup.py:93,178` — comments only, no write.
+All active write paths maintain `SessionAudience` alongside `cadet_group`. No orphaned `cadet_group`-only writes. The dual-write approach is intentional: removing `cadet_group` writes requires a migration (drop column) out of scope for v17.1.
+**Status: ACCEPTED_EXCEPTION** — dual-write preserved for v17.1; column removal deferred to v17.2.
 
 ---
 
@@ -351,6 +388,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `grep "v52\|planning_year_unique_only" scripts/deploy-staging.sh` returns 0 matches. The stale comment is not present in current HEAD.
+**Status: CLOSED**
+
 ---
 
 ### R5-M13 — `retire_item` package `None` guard missing
@@ -361,6 +401,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `grep -rn "retire_item\|_require_owner" backend/app/` returns 0 matches (excluding __pycache__). Neither `retire_item` nor `_require_owner` exist in the current codebase — the function has been removed or superseded. No code fix required.
+**Status: CLOSED**
+
 ---
 
 ### R5-M18 — `list_wing_events` pagination ordering with audience filter
@@ -370,6 +413,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 **Implementation plan:** Review the dual-path pagination logic. Ensure `order_by` is applied consistently even in the Python-slice path. Consider adding a secondary sort key (`id`) for deterministic ordering when `start_date` is equal.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** `wing_calendar.py:353-376` — both paths apply `order_by(WingHQEvent.start_date, WingHQEvent.id)`. Audience-filtered path fetches all with ordering, then Python-slices `result[offset:offset+limit]` (line 377). The code comment at line 349 explicitly documents this as an intentional R5-M18 fix. Consistent ordering and secondary sort key both present.
+**Status: CLOSED**
 
 ---
 

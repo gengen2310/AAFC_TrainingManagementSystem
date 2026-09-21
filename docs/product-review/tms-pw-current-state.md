@@ -1,5 +1,11 @@
 # TMS ↔ Planning Workspace — Current State Snapshot
 
+> **HISTORICAL SNAPSHOT — pre-Phase-B (2026-08-28)**
+> This document was recorded at HEAD `6d45e22` before Phase B work (planning phases,
+> parade night restructure, 24 React routes). It does not reflect the current Planning
+> Workspace. For the current state, see `docs/final/00-baseline.md` and
+> `frontend/src/` directly.
+
 **Branch:** main
 **HEAD SHA:** 6d45e22
 **Date recorded:** 2026-08-28
