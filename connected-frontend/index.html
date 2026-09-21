@@ -10493,11 +10493,11 @@ function _pnMatrixCell(pnId,ds,period,classId,customPhaseId,sess){
     const fac=sess.facilitator_display_name_at_time||'';
     const room=sess.training_area_name_at_time||'';
     const hover=esc([curr,fac,room].filter(Boolean).join(' · ')||lb);
-    const badge=sess.status!=='planned'?`<div style="font-size:8px;font-weight:700;color:${col};margin-top:1px">${lb}</div>`:'';
+    const badge=sess.status!=='planned'?`<div style="font-size:9px;font-weight:700;color:${col};margin-top:1px">${lb}</div>`:'';
     const inner=`<div style="border-left:3px solid ${col};padding-left:3px" title="${hover}" aria-label="${hover}">
-<div style="font-size:8px;font-weight:600;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${curr?esc(curr):'<span style="color:var(--muted)">—</span>'}</div>
-<div style="font-size:7px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${fac?esc(fac):'—'}</div>
-<div style="font-size:7px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${room?esc(room):'—'}</div>
+<div style="font-size:9px;font-weight:600;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${curr?esc(curr):'<span style="color:var(--muted)">—</span>'}</div>
+<div style="font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${fac?esc(fac):'—'}</div>
+<div style="font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${room?esc(room):'—'}</div>
 ${badge}</div>`;
     if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top;cursor:pointer" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},'${esc(sess.session_id)}')">${inner}</td>`;
     return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top">${inner}</td>`;
