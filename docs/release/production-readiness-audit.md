@@ -1,7 +1,7 @@
 # Production Readiness Audit — AAFC TMS v17.1
 
 **Branch:** `release/final-production-qualification`  
-**HEAD:** `7f66e812`  
+**HEAD:** `bedb6b65`  
 **Date:** 2026-09-21  
 **Alembic head:** `7f61608fa538` (single head, confirmed)
 
@@ -64,6 +64,11 @@ TECHNICAL GO can be declared (B-17 in progress, B-18 and B-19 pending operator a
 | B-24 | 390px CSS overflow (411 > 390) | Padding/width fix in connected-frontend CSS | commit `93558780` |
 | B-25 / K-001 | 5 spike-alert tests deselected in deploy-staging.sh | All 5 tests now PASS; `deploy-staging.sh` has no deselections | confirmed 2026-09-21 |
 | B-26 | Year selector inconsistent across surfaces | Planning Checks year selector wired to consistent state | commit `5370e2d3` |
+| DES-M01 | Planner cell type below 9px minimum (7px/8px) | Raised 4 inline styles to 9px in planner cell renderer | commit `c22b90c9` |
+| DES-M02 | Focus ring consistency (outline:none without replacement) | All 5 outline:none overrides verified to have box-shadow replacements | code audit `bedb6b65` |
+| DES-M06 | :focus-visible coverage completeness | Catch-all + per-component rules comprehensive; PASS | code audit `bedb6b65` |
+| DES-H03 | Touch target sizes | --ctl-min:44px token enforced on all button variants via min-height/min-width | code audit `bedb6b65` |
+| K-008 | Nullable stage_id on sessions | Stale column reference; session_audience.training_class_id = 0 NULL rows; dev orphans are seed artifact | code audit `bedb6b65` |
 
 ### P2 Blockers (resolved)
 
