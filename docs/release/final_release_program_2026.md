@@ -4630,4 +4630,4 @@ Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP
 | K-008: Nullable `training_class_id` (stale gap register entry) | Stale column reference corrected: `session_audience.training_class_id` = 0 NULL rows; dev orphans are seed artifact | code audit `bedb6b65` |
 | P57-01: Dead code proven and removed | `#builder-card`/`#builder-grid` never exist in DOM; 10 JS functions + `#m-edit-session` modal (345 lines) removed; 0 orphan references remain | `1fcf71f` |
 
-**Branch HEAD after F6:** `1fcf71f`
+**Branch HEAD after F6 (traceability CSV audit commit):** `83349d62`

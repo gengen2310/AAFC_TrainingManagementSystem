@@ -1,7 +1,7 @@
 # Production Readiness Audit — AAFC TMS v17.1
 
 **Branch:** `release/final-production-qualification`  
-**HEAD:** `1fcf71f`  
+**HEAD:** `83349d62`  
 **Date:** 2026-09-21  
 **Alembic head:** `7f61608fa538` (single head, confirmed)
 
