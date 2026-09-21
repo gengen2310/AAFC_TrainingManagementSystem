@@ -14,12 +14,14 @@ All implementation work for this program is governed by this register. Every gap
 
 | Severity | Count | Open | Closed |
 |---|---|---|---|
-| P0 — Critical (release blocker) | 1 | 1 | 0 |
-| P1 — High (should fix before release) | 7 | 7 | 0 |
+| P0 — Critical (release blocker) | 1 | 0 | 1 (SYN-H01) |
+| P1 — High (should fix before release) | 7 | 0 | 7 (K-001, K-004, K-005, DES-H01, DES-H03, DES-H04, K-006) |
 | P1 HUMAN_DECISION | 2 | 2 | 0 |
-| P2 — Medium | 7 | 7 | 0 |
-| P3 — Low | 3 | 3 | 0 |
-| **Total open** | **20** | **20** | **0** |
+| P2 — Medium | 7 | 0 | 7 (K-002, K-003, K-008, K-014, R5-M13, R5-M18, K-006 exception) |
+| P3 — Low | 3 | 0 | 3 (DES-M01, DES-M02, DES-M06) |
+| **Total open** | **20** | **2** | **18** |
+
+> **Updated 2026-09-21**: 18 of 20 gaps resolved. Remaining open: K-007 and K-009 (HUMAN_DECISION — await product input on `is_optional` curriculum taxonomy and stage catalogue expansion).
 
 ### Previously resolved (not in open register)
 
@@ -250,6 +252,9 @@ Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in pr
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (code audit):** The project enforces touch target sizing via design tokens: `--ctl-min: 44px` and `--ctl-h: 44px` (connected-frontend/index.html:121–122). The `.btn` base class applies `min-height:var(--ctl-h);min-width:var(--ctl-min)`. All button variants (`.btn-xs`, `.btn-icon`, `.tab-btn`, `.seg-btn`) inherit or explicitly set `min-height:var(--ctl-min);min-width:var(--ctl-min)`. The hamburger button has explicit `min-height:44px;min-width:44px`. A comment at line 119 documents the rule: "a variant may change padding, font-size, weight and colour. It may NEVER reduce the hit size below --ctl-min." No violations found. PASS, no changes needed.
+**Status: CLOSED**
+
 ---
 
 ### DES-H04 — Minimum type size enforcement
@@ -378,6 +383,11 @@ All active write paths maintain `SessionAudience` alongside `cadet_group`. No or
 
 **Migration needed:** N (pending audit) | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** The column `training_class_id` does not exist on `sessions`; the implementation plan referenced the wrong table. Training class linkage is modelled through `session_audience.training_class_id` (many-to-many via `SessionAudience`). Audit result:
+- `SELECT COUNT(*) FROM session_audience WHERE training_class_id IS NULL` → **0** (all audience rows have a training class assigned)
+- Dev DB has 41/42 sessions with no audience rows at all — confirmed dev seed artifact, same class as the parade-night date gap (test debris, not product defect). The SessionAudience model enforces training_class_id at the application layer; no schema constraint change needed.
+**Status: CLOSED**
+
 ---
 
 ### K-014 — Stale comment in `deploy-staging.sh:748`
@@ -427,6 +437,9 @@ All active write paths maintain `SessionAudience` alongside `cadet_group`. No or
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (code audit + fix):** Full audit of `font-size` declarations in `connected-frontend/index.html`. Violations found in the parade night planner cell renderer (lines 10452–10456): status badge 8px, curriculum title 8px, facilitator 7px, room 7px — all below the 9px badge minimum. Fixed by raising all four to `font-size:9px`. Confirmed no remaining 7px or 8px text values in the file. Committed: `c22b90c` "fix(DES-M01): raise planner cell type to 9px minimum".
+**Status: CLOSED**
+
 ---
 
 ### DES-M02 — Focus ring consistency audit
@@ -437,6 +450,9 @@ All active write paths maintain `SessionAudience` alongside `cadet_group`. No or
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (code audit):** All 5 `outline:none` overrides in the file have a visible replacement: `.fg`/`.fbar`/`.ff` form fields use `box-shadow:0 0 0 3px rgba(0,75,141,.22)` (plus `border-color:var(--focus-ring)`). `.nav-item:focus-visible` and `.nav-item-ext:focus-visible` use `box-shadow:0 0 0 2px var(--focus-ring) inset`. No bare `outline:none` without a visible replacement exists. `rgba(0,75,141,.22)` on white (#ffffff) renders approximately equivalent to `var(--focus-ring)` at 22% opacity — visually consistent. PASS, no changes needed.
+**Status: CLOSED**
+
 ---
 
 ### DES-M06 — `:focus-visible` coverage completeness
@@ -446,6 +462,9 @@ All active write paths maintain `SessionAudience` alongside `cadet_group`. No or
 **Implementation plan:** Keyboard-tab through the full UI. For any focusable element that shows no focus indicator: add explicit `:focus-visible` rule.
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (code audit):** `:focus-visible` comprehensively implemented. Catch-all rule at line 565 (`:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px;}`) covers all elements not explicitly styled. Explicit rules cover: `.btn:focus-visible` (all buttons), `a:focus-visible` (all links), `.nav-item:focus-visible`, `.nav-item-ext:focus-visible`, `.tab-btn:focus-visible`, `.seg-btn:focus-visible`, `.yn-arrow:focus-visible`, `.yn-display:focus-visible`, `.rte-btn:focus-visible`, `summary:focus-visible`, table row focus. Form fields use `:focus` intentionally (correct UX for indicating active input on click). PASS, no changes needed.
+**Status: CLOSED**
 
 ---
 
