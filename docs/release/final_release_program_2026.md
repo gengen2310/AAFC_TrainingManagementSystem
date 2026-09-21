@@ -4618,3 +4618,16 @@ Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP
 - Gate 11: Executive GO/NO-GO
 
 **Staging deploy command** (user must execute): `STAGING_RESCUE=1 bash scripts/deploy-staging.sh` (from source repo root, with Railway env vars set).
+
+### F6. Additional remediation — design, K-008, P57-01 (2026-09-21)
+
+| Item | Evidence | Commit |
+|---|---|---|
+| DES-M01: Planner cell type below 9px minimum | 4 inline styles raised to 9px in planner cell renderer (curriculum_title, facilitator, training_area, badge) | `c22b90c9` |
+| DES-M02: Focus ring consistency | All 5 `outline:none` overrides verified to have `box-shadow` replacements; no fix needed | code audit `bedb6b65` |
+| DES-M06: `:focus-visible` coverage | Catch-all rule + per-component rules confirmed comprehensive; form fields use `:focus` intentionally | code audit `bedb6b65` |
+| DES-H03: Touch target sizes | `--ctl-min:44px`/`--ctl-h:44px` tokens enforced on all button variants via `min-height`/`min-width` | code audit `bedb6b65` |
+| K-008: Nullable `training_class_id` (stale gap register entry) | Stale column reference corrected: `session_audience.training_class_id` = 0 NULL rows; dev orphans are seed artifact | code audit `bedb6b65` |
+| P57-01: Dead code proven and removed | `#builder-card`/`#builder-grid` never exist in DOM; 10 JS functions + `#m-edit-session` modal (345 lines) removed; 0 orphan references remain | `1fcf71f` |
+
+**Branch HEAD after F6:** `1fcf71f`

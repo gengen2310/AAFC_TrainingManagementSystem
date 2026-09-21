@@ -1,7 +1,7 @@
 # Production Readiness Audit — AAFC TMS v17.1
 
 **Branch:** `release/final-production-qualification`  
-**HEAD:** `bedb6b65`  
+**HEAD:** `1fcf71f`  
 **Date:** 2026-09-21  
 **Alembic head:** `7f61608fa538` (single head, confirmed)
 
@@ -75,6 +75,7 @@ TECHNICAL GO can be declared (B-17 in progress, B-18 and B-19 pending operator a
 | ID | Description | Fix |
 |---|---|---|
 | B-10 | Matrix dead DOM/JS/CSS not removed | Dead code removed (`#curr-matrix-view`, `openCurrMatrix()`, CLASS-MATRIX-01 CSS) | commit `93558780` |
+| P57-01 | Builder-card/builder-grid dead code cluster (10 JS fns + modal) | Cluster proven unreachable (#builder-card/#builder-grid never exist in DOM); removed 345 lines | commit `1fcf71f` |
 
 ### Human Gates (pending)
 
