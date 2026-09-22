@@ -1,8 +1,8 @@
 # Production Readiness Audit — AAFC TMS v17.1
 
 **Branch:** `release/final-production-qualification`  
-**HEAD:** `83349d62`  
-**Date:** 2026-09-21  
+**HEAD:** `be0744eb`  
+**Date:** 2026-09-22  
 **Alembic head:** `7f61608fa538` (single head, confirmed)
 
 ---
@@ -14,7 +14,7 @@ TECHNICAL GO can be declared (B-17 in progress, B-18 and B-19 pending operator a
 
 | Category | Result |
 |---|---|
-| Backend tests | ✅ 2456 pass, 12 skip, 0 fail (re-run 2026-09-22 on HEAD 70798e8a) |
+| Backend tests | ✅ 2456 pass, 12 skip, 0 fail (re-run 2026-09-22 on HEAD 70798e8a); +2 new cross-surface tests on `be0744eb` |
 | TypeScript typecheck | ✅ 0 errors |
 | Frontend build | ✅ clean |
 | npm audit (prod deps) | ✅ 0 HIGH/CRITICAL |
@@ -96,6 +96,7 @@ TECHNICAL GO can be declared (B-17 in progress, B-18 and B-19 pending operator a
 | vitest (frontend unit) | 144 pass, 21 files | ✅ |
 | E2E connected (45 specs) | All passing, 3 browsers | ✅ |
 | E2E PW (14 specs incl. axe + responsive) | All passing | ✅ |
+| Cross-surface round-trip (P55-01) | 8 tests / 9 of 24 entities | PARTIAL |
 
 ---
 
