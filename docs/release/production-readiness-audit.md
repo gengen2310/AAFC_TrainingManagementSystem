@@ -14,7 +14,7 @@ TECHNICAL GO can be declared (B-17 in progress, B-18 and B-19 pending operator a
 
 | Category | Result |
 |---|---|
-| Backend tests | ✅ 2456 pass, 12 skip, 0 fail |
+| Backend tests | ✅ 2456 pass, 12 skip, 0 fail (re-run 2026-09-22 on HEAD 70798e8a) |
 | TypeScript typecheck | ✅ 0 errors |
 | Frontend build | ✅ clean |
 | npm audit (prod deps) | ✅ 0 HIGH/CRITICAL |
