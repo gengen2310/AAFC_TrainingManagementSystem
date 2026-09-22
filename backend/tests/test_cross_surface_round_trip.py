@@ -1,5 +1,10 @@
 """Part 55 — TMS -> PW -> TMS round trips for the entities both surfaces write.
 
+Entities covered:
+  Session (4 scenarios) — lines 84-203
+  Notice  (2 scenarios) — lines 211-255
+  TrainingClass + SessionAudience (2 scenarios) — lines 258+
+
 test_cross_frontend_visibility.py already proves one direction for six entities:
 something created in TMS is READABLE from the Planning Workspace's endpoints.
 That catches "it never arrived". It does not catch the harder case, which is
@@ -17,6 +22,7 @@ same data -- which is the distinction that matters when a user reports "I
 changed it there and it didn't change here".
 """
 import itertools
+import uuid
 
 from conftest import login
 
@@ -252,4 +258,97 @@ def test_a_notice_added_in_pw_appears_on_the_tms_parade_night(client):
     assert "Notice written in PW" in texts, (
         f"a notice added in the Planning Workspace is not on the TMS parade "
         f"night: {texts}"
+    )
+
+
+# ── TrainingClass + SessionAudience: cross-surface ───────────────────────────
+# Both surfaces write session audience: PW via POST .../sessions with
+# training_class_ids, TMS via PUT /sessions/{sid}/audience. The canonical
+# audience record is SessionAudience rows read by GET /sessions/{sid}/audience.
+# If either path ever diverges from that shared table the two surfaces will
+# silently show different classes for the same session.
+
+def _training_class(client, hdr, year_id, sqn_id):
+    """Create a curriculum phase + training class for squadron 705, return class id."""
+    tag = uuid.uuid4().hex[:8]
+    phase_r = client.post("/api/curriculum/phases", headers=hdr, json={
+        "name": f"CS-PHASE-{tag}", "display_name": f"CS Phase {tag}",
+        "scope_level": "squadron", "squadron_id": sqn_id,
+    })
+    assert phase_r.status_code == 200, phase_r.text
+    stage_id = phase_r.json()["phase_id"]
+    class_r = client.post("/api/training-classes", headers=hdr, json={
+        "training_year_id": year_id,
+        "training_stage_id": stage_id,
+        "display_name": f"CS Class {tag}",
+    })
+    assert class_r.status_code == 200, class_r.text
+    return class_r.json()["training_class_id"]
+
+
+def test_training_class_assigned_via_pw_is_visible_in_tms_audience(client):
+    """PW -> TMS.  A class passed to PW session creation lands in the TMS
+    session audience, i.e. both surfaces share the same SessionAudience rows."""
+    hdr, sqn_id = _admin(client)
+    yr_id, date_id, _ = _year_with_date(client, hdr)
+
+    class_id = _training_class(client, hdr, yr_id, sqn_id)
+
+    # Planning Workspace creates the session with an explicit training class.
+    made = client.post(f"/api/planning/parade-dates/{date_id}/sessions",
+                       json={"training_class_ids": [class_id],
+                             "session_number": 1,
+                             "activity_title": "CS PW Audience"}, headers=hdr)
+    assert made.status_code == 200, made.text
+    sess_id = made.json()["session_id"]
+
+    # TMS audience endpoint must see exactly that class.
+    aud = client.get(f"/api/sessions/{sess_id}/audience", headers=hdr)
+    assert aud.status_code == 200, aud.text
+    class_ids = [r.get("training_class_id") for r in aud.json()]
+    assert class_id in class_ids, (
+        f"a TrainingClass assigned through the Planning Workspace is not in the "
+        f"TMS session audience: {class_ids}"
+    )
+
+
+def test_tms_audience_replace_is_visible_after_pw_session_creation(client):
+    """PW -> TMS -> TMS.  PW creates the session with class A.  TMS replaces the
+    audience with class B via PUT /sessions/{sid}/audience.  The GET must now
+    return only B, proving the idempotent-replace contract holds across surfaces."""
+    hdr, sqn_id = _admin(client)
+    yr_id, date_id, _ = _year_with_date(client, hdr)
+
+    class_a = _training_class(client, hdr, yr_id, sqn_id)
+    class_b = _training_class(client, hdr, yr_id, sqn_id)
+
+    # PW creates session with class A.
+    made = client.post(f"/api/planning/parade-dates/{date_id}/sessions",
+                       json={"training_class_ids": [class_a],
+                             "session_number": 1,
+                             "activity_title": "CS Audience Replace"}, headers=hdr)
+    assert made.status_code == 200, made.text
+    sess_id = made.json()["session_id"]
+
+    aud_before = client.get(f"/api/sessions/{sess_id}/audience", headers=hdr)
+    assert aud_before.status_code == 200, aud_before.text
+    assert class_a in [r.get("training_class_id") for r in aud_before.json()], (
+        "class A not in audience after PW session creation"
+    )
+
+    # TMS replaces the audience with class B only.
+    put_r = client.put(f"/api/sessions/{sess_id}/audience",
+                       json={"training_class_ids": [class_b]}, headers=hdr)
+    assert put_r.status_code == 200, put_r.text
+
+    aud_after = client.get(f"/api/sessions/{sess_id}/audience", headers=hdr)
+    assert aud_after.status_code == 200, aud_after.text
+    class_ids_after = [r.get("training_class_id") for r in aud_after.json()]
+    assert class_b in class_ids_after, (
+        f"class B not visible after TMS PUT /audience replace: {class_ids_after}"
+    )
+    assert class_a not in class_ids_after, (
+        f"class A still present after TMS replaced the audience with B — "
+        f"the two surfaces now disagree about the session's training class: "
+        f"{class_ids_after}"
     )
