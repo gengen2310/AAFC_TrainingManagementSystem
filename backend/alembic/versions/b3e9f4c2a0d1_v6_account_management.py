@@ -35,8 +35,9 @@ def upgrade():
 
     # ── New columns: users ─────────────────────────────────────────────────
     # flight_id: nullable FK — squadron-scoped users only; does not change permissions
-    op.add_column('users', sa.Column('flight_id', sa.String(length=36), nullable=True))
-    op.create_foreign_key('fk_users_flight_id', 'users', 'flights', ['flight_id'], ['id'])
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.add_column(sa.Column('flight_id', sa.String(length=36), nullable=True))
+        batch_op.create_foreign_key('fk_users_flight_id', 'flights', ['flight_id'], ['id'])
     op.create_index('ix_users_flight_id', 'users', ['flight_id'])
 
     # last_login_at: set by auth/login; never exposes codes
@@ -46,8 +47,9 @@ def upgrade():
 def downgrade():
     op.drop_column('users', 'last_login_at')
     op.drop_index('ix_users_flight_id', table_name='users')
-    op.drop_constraint('fk_users_flight_id', 'users', type_='foreignkey')
-    op.drop_column('users', 'flight_id')
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.drop_constraint('fk_users_flight_id', type_='foreignkey')
+        batch_op.drop_column('flight_id')
     op.drop_index('ix_flights_is_archived', table_name='flights')
     op.drop_index('ix_flights_squadron_id', table_name='flights')
     op.drop_table('flights')

@@ -222,7 +222,10 @@ def upgrade():
         )
         WHERE parade_date_id IS NOT NULL
     """))
-    with op.batch_alter_table("planning_conflicts") as batch:
+    with op.batch_alter_table(
+        "planning_conflicts",
+        reflect_kwargs={"resolve_fks": False},
+    ) as batch:
         batch.alter_column("parade_date_id", new_column_name="parade_night_id")
         batch.create_foreign_key(
             "fk_planning_conflicts_parade_night_id",
@@ -261,7 +264,10 @@ def downgrade():
         batch.alter_column("planned_parade_night_id", new_column_name="planned_parade_date_id")
 
     # Restore planning_conflicts (drop new FK, rename column back)
-    with op.batch_alter_table("planning_conflicts") as batch:
+    with op.batch_alter_table(
+        "planning_conflicts",
+        reflect_kwargs={"resolve_fks": False},
+    ) as batch:
         batch.drop_constraint("fk_planning_conflicts_parade_night_id", type_="foreignkey")
         batch.alter_column("parade_night_id", new_column_name="parade_date_id")
 

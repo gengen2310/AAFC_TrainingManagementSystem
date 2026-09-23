@@ -18,6 +18,7 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name  # "sqlite" or "postgresql"
+    has_scheduled_sessions = sa.inspect(bind).has_table("scheduled_sessions")
 
     # ── R5-M14: parade_night_timing_overrides ───────────────────────────────
     # The column had unique=True which blocks creating a replacement override
@@ -30,7 +31,7 @@ def upgrade():
     # raw DDL.  On SQLite: batch_alter_table recreates the table from scratch
     # and the old unique constraint disappears automatically; we only need to
     # create the new index afterward.
-    if dialect == "postgresql":
+    if has_scheduled_sessions and dialect == "postgresql":
         op.execute(sa.text(
             "ALTER TABLE parade_night_timing_overrides "
             "DROP CONSTRAINT IF EXISTS "
@@ -52,7 +53,7 @@ def upgrade():
     else:
         # SQLite: batch_alter_table recreates without the old unique index.
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
-            batch_op.drop_index("ix_parade_night_timing_overrides_parade_night_id")
+            batch_op.drop_index("ix_pnto_parade_night_id")
             batch_op.create_index(
                 "ix_pnto_parade_night_id",
                 ["parade_night_id"],
@@ -126,8 +127,11 @@ def upgrade():
             "FOREIGN KEY (scheduled_session_id) REFERENCES sessions(id) "
             "ON DELETE SET NULL"
         ))
-    else:
-        with op.batch_alter_table("planning_conflicts") as batch_op:
+    elif has_scheduled_sessions:
+        with op.batch_alter_table(
+            "planning_conflicts",
+            reflect_kwargs={"resolve_fks": False},
+        ) as batch_op:
             batch_op.create_foreign_key(
                 "fk_planning_conflicts_session",
                 "sessions",
@@ -141,7 +145,9 @@ def downgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    if dialect == "postgresql":
+    has_scheduled_sessions = sa.inspect(bind).has_table("scheduled_sessions")
+
+    if has_scheduled_sessions and dialect == "postgresql":
         op.execute(sa.text(
             "ALTER TABLE planning_conflicts "
             "DROP CONSTRAINT IF EXISTS fk_planning_conflicts_session"
@@ -165,8 +171,11 @@ def downgrade():
         # Likewise the upgrade's DROP INDEX IF EXISTS
         # ix_parade_night_timing_overrides_parade_night_id is a no-op on the
         # canonical chain, so there is nothing to recreate here.
-    else:
-        with op.batch_alter_table("planning_conflicts") as batch_op:
+    elif has_scheduled_sessions:
+        with op.batch_alter_table(
+            "planning_conflicts",
+            reflect_kwargs={"resolve_fks": False},
+        ) as batch_op:
             batch_op.drop_constraint("fk_planning_conflicts_session", type_="foreignkey")
         with op.batch_alter_table("session_audience") as batch_op:
             batch_op.drop_constraint("uq_session_audience_pair", type_="unique")
