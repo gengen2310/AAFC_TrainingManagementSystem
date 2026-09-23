@@ -33,7 +33,7 @@ test.describe("Year rollover", () => {
 
   test("sqn_admin can rollover a planning year with parade dates", async ({ page }) => {
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2000 + (RUN_ID % 7998);
+    const srcYear = 2000 + (RUN_ID % 1800);
     let yearId = "";
     let newYearId = "";
 
@@ -107,7 +107,10 @@ test.describe("Year rollover", () => {
 
   test("duplicate rollover returns 409", async ({ page }) => {
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2100 + (RUN_ID % 7898);
+    // Keep each scenario in a disjoint year range. The CI database retains
+    // inactive planning years, so adjacent tests must not derive overlapping
+    // source/target pairs from the same run id.
+    const srcYear = 4000 + (RUN_ID % 1800);
     let yearId = "";
     let rolledYearId = "";
 
@@ -137,7 +140,7 @@ test.describe("Year rollover", () => {
   test("sqn_general cannot rollover", async ({ page }) => {
     const adminHdr = await authHeader(page, "ADMIN703");
     const genHdr = await authHeader(page, "703SQN2026");
-    const srcYear = 2200 + (RUN_ID % 7798);
+    const srcYear = 6000 + (RUN_ID % 1800);
     let yearId = "";
 
     try {
@@ -161,7 +164,7 @@ test.describe("Year rollover", () => {
     await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2300 + (RUN_ID % 7698);
+    const srcYear = 8000 + (RUN_ID % 1500);
     let yearId = "";
     let rolledYearId = "";
 
