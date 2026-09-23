@@ -151,6 +151,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 @media screen{
   .print-pn-block{background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:24px;}
   .print-schedule-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  .wp-schedule-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}
   .print-schedule-table th,.print-schedule-table td{border:1px solid var(--border-light);padding:6px 8px;vertical-align:top;text-align:left;}
   /* Specificity has to match .print-schedule-table td above, or the gridline wins
      over the banner and paints a hairline through it. */
@@ -11292,7 +11293,7 @@ function _wpUpdateNavBtns(){
   if(!sel) return;
   const n=sel.options.length;
   const i=sel.selectedIndex;
-  if(prevBtn) prevBtn.disabled=(i<=0||n===0);
+  if(prevBtn) prevBtn.disabled=(i<=1||n<=1);
   if(nextBtn) nextBtn.disabled=(i<0||i>=n-1||n===0);
 }
 function _wpPrev(){
@@ -11337,7 +11338,7 @@ function _wpPaint() {
     // Always show exactly one night — no multi-night view.
     if (!oneNight) {
         // REM-92: distinguish "nights exist but none chosen" from "no nights at all"
-        if (_wpData && _wpData.pns && _wpData.pns.length) {
+        if (_wpNightsInTerm().length) {
             wrap.innerHTML = '<p class="muted p-4">Choose a parade night from the dropdown above to view its programme.</p>';
         } else {
             wrap.innerHTML = '<p class="muted p-4">No parade nights for this term. Choose a different term above.</p>';
@@ -11379,7 +11380,7 @@ function _wpPaint() {
         return;
     }
     const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
-    wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+    wrap.innerHTML = `<div class="wp-schedule-scroll" tabindex="0" role="region" aria-label="Weekly Program schedule">${html}</div><div class="print-footer">Generated ${esc(today)}</div>`;
     _wpUpdateNavBtns();
 }
 

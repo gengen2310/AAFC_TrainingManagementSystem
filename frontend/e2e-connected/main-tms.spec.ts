@@ -236,16 +236,15 @@ test.describe("Facilitator statistics", () => {
     // One reloadAndRender() at the end re-syncs S.facs in a single pass.
     const staleCount = await page.evaluate(async () => {
       try {
-        const r = (await (window as any).api("/api/facilitators")) as {
-          facilitators: { id: string; first: string; is_archived: boolean }[];
-        };
-        const debris = r.facilitators.filter(
-          (f: { id: string; first: string; is_archived: boolean }) =>
-            f.first.startsWith("ZZRem111") && !f.is_archived
+        const r = (await (window as any).api("/api/facilitators")) as
+          { facilitator_id: string; first_name: string; is_archived: boolean }[];
+        const debris = r.filter(
+          (f: { facilitator_id: string; first_name: string; is_archived: boolean }) =>
+            f.first_name.startsWith("ZZRem111") && !f.is_archived
         );
         for (const f of debris) {
           try {
-            await (window as any).api(`/api/facilitators/${f.id}`, { method: "DELETE" });
+            await (window as any).api(`/api/facilitators/${f.facilitator_id}`, { method: "DELETE" });
           } catch {
             // ignore individual failures — best-effort cleanup
           }

@@ -18,8 +18,6 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name  # "sqlite" or "postgresql"
-    has_scheduled_sessions = sa.inspect(bind).has_table("scheduled_sessions")
-
     # ── R5-M14: parade_night_timing_overrides ───────────────────────────────
     # The column had unique=True which blocks creating a replacement override
     # after the old one is archived (soft-deleted). Replace with a partial
@@ -127,7 +125,7 @@ def upgrade():
             "FOREIGN KEY (scheduled_session_id) REFERENCES sessions(id) "
             "ON DELETE SET NULL"
         ))
-    elif has_scheduled_sessions:
+    else:
         with op.batch_alter_table(
             "planning_conflicts",
             reflect_kwargs={"resolve_fks": False},
@@ -145,9 +143,7 @@ def downgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    has_scheduled_sessions = sa.inspect(bind).has_table("scheduled_sessions")
-
-    if has_scheduled_sessions and dialect == "postgresql":
+    if dialect == "postgresql":
         op.execute(sa.text(
             "ALTER TABLE planning_conflicts "
             "DROP CONSTRAINT IF EXISTS fk_planning_conflicts_session"
@@ -171,7 +167,7 @@ def downgrade():
         # Likewise the upgrade's DROP INDEX IF EXISTS
         # ix_parade_night_timing_overrides_parade_night_id is a no-op on the
         # canonical chain, so there is nothing to recreate here.
-    elif has_scheduled_sessions:
+    else:
         with op.batch_alter_table(
             "planning_conflicts",
             reflect_kwargs={"resolve_fks": False},
