@@ -1,7 +1,7 @@
 # AAFC TMS UI Design-Compliance Report
 
-Status: PASS — design remediation and the authenticated facilitator lifecycle gate are complete  
-Date: 2026-09-23  
+Status: PASS — design remediation and the authenticated facilitator lifecycle gate are complete
+Date: 2026-09-23
 Scope: `connected-frontend/index.html` and `frontend/`
 
 This report records the audit without copying the design contract. The contract remains
