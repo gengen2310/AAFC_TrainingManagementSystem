@@ -687,15 +687,67 @@ class CeaMemberImportIn(BaseModel):
 
 def _parse_cea_csv(csv_text: str):
     """Parse CEA member CSV. Returns (headers, rows_as_dicts, errors)."""
-    reader = csv.reader(io.StringIO(csv_text))
+    text = (csv_text or "").replace("﻿", "")
+    if not text.strip():
+        return [], [], ["no_rows"]
+    sample = text.lstrip("\r\n")
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=";,\t|")
+        delimiter = dialect.delimiter
+    except csv.Error:
+        delimiter = ";" if ";" in sample else "," if "," in sample else "\t"
+
+    reader = csv.reader(io.StringIO(sample), delimiter=delimiter)
     raw = [r for r in reader if any(c.strip() for c in r)]
     if not raw:
         return [], [], ["no_rows"]
-    headers = [h.strip().lower() for h in raw[0]]
+
+    aliases = {
+        "id": {"service number", "service no", "service no.", "service #", "service_number"},
+        "rank": {"rank"},
+        "name": {"first name", "first_name", "firstname", "given name", "given names", "name"},
+        "family name": {"family name", "family_name", "surname", "last name", "last_name", "lastname"},
+        "position": {"position"},
+        "unit": {"unit"},
+        "scope": {"scope"},
+        "gender": {"gender"},
+        "access": {"access"},
+    }
+
+    def norm(h: str) -> str:
+        import re
+        return re.sub(r"[^a-z0-9]+", " ", (h or "").strip().lower()).strip()
+
     rows = []
+    required = ["id", "rank", "name", "family name"]
+    seen = set()
+    for header in raw[0]:
+        key = None
+        n = norm(header)
+        for canonical, variants in aliases.items():
+            if n in variants or n.replace(" ", "_") in variants:
+                key = canonical
+                break
+        if key is not None:
+            seen.add(key)
+
+    if not all(req in seen for req in required):
+        return [], [], ["missing_required_columns"]
+
     for r in raw[1:]:
-        rows.append({h: (r[i].strip() if i < len(r) else "") for i, h in enumerate(headers)})
-    return headers, rows, []
+        row = {}
+        for idx, header in enumerate(raw[0]):
+            key = None
+            n = norm(header)
+            for canonical, variants in aliases.items():
+                if n in variants or n.replace(" ", "_") in variants:
+                    key = canonical
+                    break
+            if key is None:
+                continue
+            row[key] = (r[idx].strip() if idx < len(r) else "")
+        rows.append(row)
+    return raw[0], rows, []
 
 
 def _cea_field(row, *names):
@@ -719,6 +771,9 @@ def cea_member_preview(
 
     _, rows, errors = _parse_cea_csv(body.csv_text)
     if errors:
+        if errors[0] == "missing_required_columns":
+            raise HTTPException(400, detail={"error": "missing_required_columns",
+                                              "message": "Missing required columns: Service Number, Rank, First Name, Surname"})
         raise HTTPException(400, detail={"error": errors[0]})
     if not rows:
         raise HTTPException(400, detail={"error": "no_data_rows"})
@@ -798,6 +853,9 @@ def cea_member_commit(
 
     _, rows, errors = _parse_cea_csv(body.csv_text)
     if errors:
+        if errors[0] == "missing_required_columns":
+            raise HTTPException(400, detail={"error": "missing_required_columns",
+                                              "message": "Missing required columns: Service Number, Rank, First Name, Surname"})
         raise HTTPException(400, detail={"error": errors[0]})
 
     new_count = update_count = unchanged_count = error_count = 0
