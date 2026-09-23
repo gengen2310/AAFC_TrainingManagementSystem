@@ -29,7 +29,7 @@ def upgrade():
     # raw DDL.  On SQLite: batch_alter_table recreates the table from scratch
     # and the old unique constraint disappears automatically; we only need to
     # create the new index afterward.
-    if has_scheduled_sessions and dialect == "postgresql":
+    if dialect == "postgresql":
         op.execute(sa.text(
             "ALTER TABLE parade_night_timing_overrides "
             "DROP CONSTRAINT IF EXISTS "
