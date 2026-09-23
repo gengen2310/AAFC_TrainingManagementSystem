@@ -703,7 +703,10 @@ def _parse_cea_csv(csv_text: str):
         return [], [], ["no_rows"]
 
     aliases = {
-        "id": {"service number", "service no", "service no.", "service #", "service_number"},
+        "id": {
+            "id", "cea id", "cea_id", "service number", "service no",
+            "service no.", "service #", "service_number",
+        },
         "rank": {"rank"},
         "name": {"first name", "first_name", "firstname", "given name", "given names", "name"},
         "family name": {"family name", "family_name", "surname", "last name", "last_name", "lastname"},
@@ -1006,4 +1009,3 @@ def cea_member_rollback(
         # aliases expected by older tests
         "new_archived": archived, "updated_restored": restored,
     }
-
