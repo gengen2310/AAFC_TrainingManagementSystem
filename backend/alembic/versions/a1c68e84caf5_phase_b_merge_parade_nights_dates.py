@@ -269,22 +269,37 @@ def downgrade():
         batch.alter_column("planned_parade_night_id", new_column_name="planned_parade_date_id")
 
     # Restore planning_conflicts (drop new FK, rename column back)
+    conflict_fks = {
+        fk.get("name")
+        for fk in sa.inspect(op.get_bind()).get_foreign_keys("planning_conflicts")
+    }
     with op.batch_alter_table(
         "planning_conflicts",
         reflect_kwargs={"resolve_fks": False},
     ) as batch:
-        batch.drop_constraint("fk_planning_conflicts_parade_night_id", type_="foreignkey")
+        if "fk_planning_conflicts_parade_night_id" in conflict_fks:
+            batch.drop_constraint("fk_planning_conflicts_parade_night_id", type_="foreignkey")
         batch.alter_column("parade_night_id", new_column_name="parade_date_id")
 
     # Restore planning_notices (drop new FK, rename column back, re-add planning_year_id)
+    notice_fks = {
+        fk.get("name")
+        for fk in sa.inspect(op.get_bind()).get_foreign_keys("planning_notices")
+    }
     with op.batch_alter_table("planning_notices") as batch:
-        batch.drop_constraint("fk_planning_notices_parade_night_id", type_="foreignkey")
+        if "fk_planning_notices_parade_night_id" in notice_fks:
+            batch.drop_constraint("fk_planning_notices_parade_night_id", type_="foreignkey")
         batch.alter_column("parade_night_id", new_column_name="parade_date_id")
         batch.add_column(sa.Column("planning_year_id", sa.String(), nullable=True))
 
     # Restore parade_nights (add back training_year, drop new columns)
+    parade_fks = {
+        fk.get("name")
+        for fk in sa.inspect(op.get_bind()).get_foreign_keys("parade_nights")
+    }
     with op.batch_alter_table("parade_nights") as batch:
-        batch.drop_constraint("fk_parade_nights_planning_year_id", type_="foreignkey")
+        if "fk_parade_nights_planning_year_id" in parade_fks:
+            batch.drop_constraint("fk_parade_nights_planning_year_id", type_="foreignkey")
         batch.add_column(sa.Column("training_year", sa.Integer(), nullable=True))
         # The index has to come back with the column. The upgrade drops both,
         # but this downgrade restored only the column, so the base migration
