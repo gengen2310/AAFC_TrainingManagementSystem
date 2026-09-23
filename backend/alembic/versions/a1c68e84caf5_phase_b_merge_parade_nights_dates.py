@@ -259,8 +259,13 @@ def downgrade():
     op.rename_table("_parade_dates_deprecated", "parade_dates")
 
     # Restore anchor_prep_plans (drop new FK, rename column back)
+    anchor_fks = {
+        fk.get("name")
+        for fk in sa.inspect(op.get_bind()).get_foreign_keys("anchor_prep_plans")
+    }
     with op.batch_alter_table("anchor_prep_plans") as batch:
-        batch.drop_constraint("fk_anchor_prep_plans_planned_parade_night_id", type_="foreignkey")
+        if "fk_anchor_prep_plans_planned_parade_night_id" in anchor_fks:
+            batch.drop_constraint("fk_anchor_prep_plans_planned_parade_night_id", type_="foreignkey")
         batch.alter_column("planned_parade_night_id", new_column_name="planned_parade_date_id")
 
     # Restore planning_conflicts (drop new FK, rename column back)
