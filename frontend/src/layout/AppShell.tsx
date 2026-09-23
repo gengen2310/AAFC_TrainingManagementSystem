@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
   const applyDensity = (d: "comfortable" | "compact") => {
     setDensityState(d);
-    try { sessionStorage.setItem("displayDensity", d); } catch (_) {}
+    try { sessionStorage.setItem("displayDensity", d); } catch (error) { void error; }
   };
   const r = visibleRoutes(session);
   const proxy = session?.proxy;

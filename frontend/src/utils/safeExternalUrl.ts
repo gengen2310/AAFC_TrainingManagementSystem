@@ -35,7 +35,12 @@ export function safeExternalUrl(value: string | null | undefined): string | null
   // [\s -] would be a character RANGE from U+0020 to U+002D, silently
   // swallowing '#', '(', '+', ',', '-' and '.' -- a real bug hit earlier in
   // this codebase's history.
-  const flat = raw.replace(/[\s\x00-\x1f\x7f]/g, "").toLowerCase();
+  let flat = "";
+  for (const char of raw) {
+    const code = char.charCodeAt(0);
+    if (!/\s/.test(char) && code > 31 && code !== 127) flat += char;
+  }
+  flat = flat.toLowerCase();
 
   if (flat.startsWith("//")) return null; // protocol-relative: off-site
   return /^https?:/.test(flat) ? raw : null;

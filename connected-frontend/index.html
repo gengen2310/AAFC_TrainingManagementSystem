@@ -64,6 +64,10 @@
   /* Status / semantic */
   --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
   --warn:        #c97a00;   --warn-bg: #fff3cd;   --warn-text: #7a5200; /* DES-H04: warn text that passes WCAG AA on --warn-bg (5.4:1) */
+  --success-tint-bg: #e8f5ee; --danger-tint-bg: #fdecee; --warning-tint-bg: #fff3e0;
+  --info-tint-bg: #ebf5ff; --holiday-bg: #fff3e0; --holiday-border: #ffb74d;
+  --success-on-tint: #0f5a33; --danger-on-tint: #8a0f22;
+  --warning-on-tint: #7a3a00; --info-on-tint: #004b8d;
   --rescheduled: #7c3aed;
   /* Semantic shortcuts */
   --accent:       var(--blue);
@@ -132,7 +136,8 @@
 }
 /* shared/tokens.css sync end */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth;overflow-x:hidden;}
+body{overflow-x:hidden;}
 body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:var(--fs-md);line-height:1.6;}
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--lgrey);border-radius:3px;}
 
@@ -334,7 +339,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .nav-item-ext:hover{background:rgba(255,255,255,.07);color:#fff;}
 .nav-item-ext:focus-visible{outline:none;box-shadow:0 0 0 2px var(--focus-ring) inset;}
 .nav-icon{font-size:var(--fs-md);width:18px;text-align:center;flex-shrink:0;opacity:.8;}
-.main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
+.main{flex:1;padding:24px 28px;overflow-y:auto;overflow-x:hidden;min-width:0;}
 .page{display:none;}.page.active{display:block;}
 
 /* ── PAGE HEADER ── */
@@ -614,7 +619,7 @@ a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-ra
 .st-not_delivered{background:#eef0f2;color:var(--steel);}
 
 /* ── TABLE ── */
-.tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+.tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border);contain:paint;}
 table,.data-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
 table td{font-family:system-ui,Arial,sans-serif;} /* T-01: prose reading clarity */
 thead{background:var(--surface-2);}
@@ -14595,7 +14600,7 @@ async function doMergeFac(){
     const r=await api('/api/facilitators/'+targetId+'/absorb',{method:'POST',body:JSON.stringify({source_id:_mergeFacSourceId})});
     closeModal('m-fac-merge');
     await reloadAndRender();
-    loadFacilitatorStats();
+    await loadFacilitatorStats();
     showToast('Merged: '+(r.sessions_moved||0)+' session(s) re-attributed.',false);
   }catch(e){
     document.getElementById('fac-merge-state').textContent='';

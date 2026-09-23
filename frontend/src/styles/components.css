@@ -37,9 +37,9 @@
 .stat-btn:hover .stat{border-left-color:var(--aafc-blue);}
 .link-btn{border:0;background:none;color:var(--aafc-royal-blue);font-weight:700;cursor:pointer;padding:0;}
 .muted{color:var(--muted-text);}
-.errnote{background:#FDECEE;border:1px solid var(--aafc-red);color:#8A0F22;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:var(--fs-base);}
+.errnote{background:var(--danger-tint-bg);border:1px solid var(--aafc-red);color:var(--danger-on-tint);border-radius:8px;padding:10px 12px;margin:10px 0;font-size:var(--fs-base);}
 html[data-theme="dark"] .errnote{background:#3A1620;color:#FFB4BE;}
-.okmsg{background:#E8F5EE;border:1px solid var(--success);color:#0F5A33;border-radius:8px;padding:8px 12px;font-size:var(--fs-base);margin-bottom:10px;}
+.okmsg{background:var(--success-tint-bg);border:1px solid var(--success);color:var(--success-on-tint);border-radius:8px;padding:8px 12px;font-size:var(--fs-base);margin-bottom:10px;}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .btn.danger{background:var(--aafc-red);border-color:var(--aafc-red);color:var(--on-danger);}
 .btn.light{color:#fff;border-color:rgba(255,255,255,.6);background:transparent;}
@@ -74,9 +74,9 @@ textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-
 .cal-sessions{font-size:var(--fs-xs);color:var(--muted-text);margin:6px 0;}
 .cal-chips{display:flex;gap:4px;flex-wrap:wrap;}
 .chip{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;font-size:var(--fs-xs);font-weight:800;border:1px solid var(--border);}
-.chip-delivered{background:#E8F5EE;border-color:var(--success);}
-.chip-not_delivered{background:#FFF3E0;border-color:var(--warning);}
-.chip-cancelled,.chip-cancelled_late{background:#FDECEE;border-color:var(--aafc-red);}
+.chip-delivered{background:var(--success-tint-bg);border-color:var(--success);}
+.chip-not_delivered{background:var(--warning-tint-bg);border-color:var(--warning);}
+.chip-cancelled,.chip-cancelled_late{background:var(--danger-tint-bg);border-color:var(--aafc-red);}
 .chip-rescheduled{background:#F2EBFE;border-color:var(--rescheduled);}
 .risk-list{margin:0;padding-left:18px;}.risk-list li{margin:4px 0;}
 .sensitive{font-style:italic;color:var(--muted-text);}

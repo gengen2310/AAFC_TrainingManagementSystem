@@ -54,6 +54,16 @@
   --ok-text:     #145f38;
   --warn:        #c97a00;
   --warn-bg:     #fff3cd;
+  --success-tint-bg: #e8f5ee;
+  --danger-tint-bg:  #fdecee;
+  --warning-tint-bg: #fff3e0;
+  --info-tint-bg:    #ebf5ff;
+  --holiday-bg:      #fff3e0;
+  --holiday-border:  #ffb74d;
+  --success-on-tint: #0f5a33;
+  --danger-on-tint:  #8a0f22;
+  --warning-on-tint:#7a3a00;
+  --info-on-tint:    #004b8d;
   --rescheduled: #7c3aed;   /* purple — rescheduled/pending sessions */
 
   /* ── Semantic shortcuts ──────────────────────────────────────────────── */

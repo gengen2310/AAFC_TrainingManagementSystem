@@ -1,8 +1,16 @@
-# AAFC TMS — Design System
+# AAFC TMS — Design System Contract
 
-This file records the current visual design language of the AAFC Training Management System.
-It is descriptive (what currently exists), not prescriptive. Any changes to tokens, components,
-or patterns require explicit review — see `docs/ui-review/design_system_proposal.md`.
+This file is the mandatory visual design contract for all current and future AAFC TMS frontend
+work. It defines the approved AAFC TMS visual language for both independently deployed
+frontends. Existing UI that conflicts with this contract is design debt and must be identified
+when the area is next audited or changed. New or modified UI must comply with this contract.
+Any deliberate departure requires explicit review and documented justification.
+
+The AAFC Visual Identity Guide (VIG) remains the ultimate brand authority. Accessibility
+requirements override purely aesthetic consistency where necessary. Changes to approved brand
+colours or tokens require VIG verification and WCAG re-validation. This contract governs
+presentation only; it does not authorise removing capabilities, changing workflows, or merging
+the two frontend architectures.
 
 ---
 
@@ -283,9 +291,12 @@ Never bypass `esc()` for user-supplied content. The Planning Workspace uses Reac
 
 ---
 
-## What this file is not
+## Governance
 
-- Not a Figma/Sketch spec
-- Not a changelog of design decisions
-- Not a prescription for the Planning Workspace (it has its own token set)
-- Not authority to change any token value — changes require VIG verification and WCAG AA re-check
+- This is not a Figma/Sketch spec or a changelog; it is the enforceable implementation contract.
+- The Main TMS and Planning Workspace retain separate token names and architectures. Both must
+  implement this contract and remain recognisably part of the same AAFC TMS product family.
+- Token or component changes must preserve the semantic meaning described here across light,
+  dark, high-contrast, and responsive contexts where those contexts exist.
+- Do not change a token value merely to make an implementation convenient. Verify any proposed
+  brand change against the VIG and re-run WCAG AA checks first.

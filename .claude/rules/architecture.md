@@ -2,6 +2,10 @@
 
 ## Two frontends, by design — not a migration in progress
 
+Before changing either frontend's UI, read the repository-root [DESIGN.md](../../DESIGN.md).
+It is the canonical visual contract; this rule preserves the separate architectures and token
+naming conventions without duplicating that contract.
+
 - `connected-frontend/` (`aafc-tms-frontend` service) is the TMS root frontend: a single-file
   HTML/CSS/JS SPA, no build step, served by its own Dockerfile/nginx. This is what beta users land
   on.

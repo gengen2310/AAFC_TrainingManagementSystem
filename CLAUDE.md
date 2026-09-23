@@ -27,6 +27,9 @@ convention for this package. Work directly in the git checkout.
 
 ## Frontend architecture — do not "simplify" this into one app
 
+Before making any frontend change, read the repository-root [DESIGN.md](DESIGN.md). It is the
+mandatory visual design contract for both surfaces; do not copy its rules into local instructions.
+
 Two independently deployed frontends by design:
 - `aafc-tms-frontend` service → `connected-frontend/` — the existing TMS root, plain HTML/CSS/JS, `esc()`-escaped innerHTML, `S` session state from `/api/auth/me`, `nav()`/`NAV_BY_SCOPE` routing.
 - `aafc-tms-planning-workspace-preview` service → `frontend/` — React/Vite Planning Workspace, mounted at `/planning`.

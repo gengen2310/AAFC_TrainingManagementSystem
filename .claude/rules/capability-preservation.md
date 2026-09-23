@@ -6,6 +6,10 @@ on this repository, not just that program.
 
 ## 1. Capability preservation
 
+For any frontend work, read the repository-root [DESIGN.md](../../DESIGN.md) before assessing or
+changing UI. Visual remediation must preserve every existing capability and must not be used as
+pretext for a redesign that removes actions, routes, or role-specific functionality.
+
 Do not touch, alter, remove, rename, hide, or delete an existing feature,
 capability, route, endpoint, role, data field, import format, or workflow
 without:
