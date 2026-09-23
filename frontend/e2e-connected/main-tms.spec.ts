@@ -427,16 +427,20 @@ test.describe("Facilitator statistics", () => {
     await expect(page.locator("#fac-tbody")).not.toContainText(deltaName);
 
     // ── Cleanup: archive the two survivors so staging returns to baseline ──
-    // Serialize via waitForFreshCharts so each archive callback's loadFacilitatorStats
-    // completes before the next archive fires — avoids racing two in-flight chart GETs.
-    await waitForFreshCharts(async () => {
-      await page.evaluate((id) => (window as any).delFac(id), alphaId);
-      await page.locator("#confirm-yes-btn").click();
-    });
-    const final = await waitForFreshCharts(async () => {
-      await page.evaluate((id) => (window as any).delFac(id), charlieId);
-      await page.locator("#confirm-yes-btn").click();
-    });
+    // Cleanup uses the authenticated API directly so a failed UI confirmation
+    // cannot leave test-created records behind for a later run.
+    async function archiveFacForCleanup(id: string) {
+      const archived = await page.evaluate(async (facilitatorId) => {
+        const response = await (window as any).api(`/api/facilitators/${facilitatorId}`, {
+          method: "DELETE",
+        });
+        return response?.ok === true;
+      }, id);
+      expect(archived, `cleanup archive failed for facilitator ${id}`).toBe(true);
+    }
+    await archiveFacForCleanup(alphaId);
+    await archiveFacForCleanup(charlieId);
+    const final = await fetchCharts();
     expect(statusTotal(final), "staging must return to its exact pre-test baseline").toBe(baselineTotal);
   });
 });

@@ -29,7 +29,7 @@ test.beforeEach(async () => {
 // ---------------------------------------------------------------------------
 const cleanupFns: (() => Promise<void>)[] = [];
 
-test.afterEach(async ({}, testInfo) => {
+test.afterEach(async (_fixtures, testInfo) => {
   // Give cleanup its own 60-second budget regardless of how long the test body ran.
   testInfo.setTimeout(60_000);
   const fns = cleanupFns.splice(0);
