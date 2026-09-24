@@ -10,7 +10,15 @@ import { expect, type Page } from "@playwright/test";
  */
 export async function selectConnectedPlanningYear(page: Page, requestedId?: string): Promise<string> {
   await page.evaluate("nav('activities')");
+  await page.evaluate("typeof _ynFetchYears === 'function' ? _ynFetchYears().catch(() => null) : Promise.resolve()");
 
+  if (requestedId) {
+    await expect.poll(async () =>
+      page.evaluate((wanted) =>
+        (P.years || []).some((y: any) => String(y.id || y.planning_year_id || "") === wanted),
+        requestedId),
+      { timeout: 10000, message: `planning year ${requestedId} did not load` }).toBe(true);
+  }
   await expect.poll(async () =>
     page.evaluate("Array.isArray(P.years) ? P.years.filter(y => y && y.materialised !== false && (y.id || y.planning_year_id)).length : 0"),
   { timeout: 10000, message: "materialised planning years did not load" }).toBeGreaterThan(0);

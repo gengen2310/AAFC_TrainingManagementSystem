@@ -283,7 +283,7 @@ body.pw-active .main {
   align-items: center; justify-content: center; gap: 4px;
   transition: background .1s;
 }
-.pn-add-btn:hover { background: var(--info-tint-bg); color: var(--aafc-dark-blue); }
+.pn-add-btn:hover { background: var(--info-tint-bg); color: var(--info-on-tint); }
 .pn-add-btn:focus-visible {
   outline: 2px solid var(--accent, #51b0e3);
   outline-offset: -2px;
@@ -768,7 +768,7 @@ body.pw-active .main {
 .pw-night-cell.conflict-fac { border-color: var(--warning); background: #fffbf0; }
 .pw-night-cell:not(.empty):hover { background: #f0f7ff; }
 .pw-night-cell-inner { padding: 8px 10px; min-height: 72px; position: relative; }
-.pw-nc-empty { font-size: var(--fs-xs); color: #6b7073; font-style: italic; }
+.pw-nc-empty { font-size: var(--fs-xs); color: var(--muted-text); font-style: italic; }
 .pw-nc-code { font-size: var(--fs-2xs); font-weight: 700; color: var(--aafc-royal-blue); margin-bottom: 2px; }
 .pw-nc-title { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 2px; line-height: 1.3; }
 .pw-nc-detail { font-size: var(--fs-2xs); color: var(--muted-text); margin-bottom: 1px; }

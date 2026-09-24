@@ -87,10 +87,11 @@ async function apiBase() {
 // real Parade Nights page.
 async function seedClassAndSession(page: Page, token: string, uniqueSuffix: string) {
   const base = await apiBase();
+  const fixtureYear = 3000 + (Date.now() % 1000);
   const auth = { Authorization: `Bearer ${token}` };
 
   const yearRes = await page.request.post(`${base}/api/planning/years`, {
-    data: { year: 2064, name: `2064 Session-Class Test Year ${uniqueSuffix}` },
+    data: { year: fixtureYear, name: `Session-Class Test Year ${uniqueSuffix}` },
     headers: auth,
   });
   let yearId: string;
@@ -105,8 +106,8 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
       const yearsResp = await page.request.get(`${base}/api/planning/years`, { headers: auth });
       const years = await yearsResp.json();
       const yearsArr = Array.isArray(years) ? years : [];
-      const existing = yearsArr.find((y: any) => y.year === 2064);
-      if (!existing) throw new Error(`Could not create or find 2064 planning year: ${JSON.stringify(errBody)}`);
+      const existing = yearsArr.find((y: any) => y.year === fixtureYear);
+      if (!existing) throw new Error(`Could not create or find planning year: ${JSON.stringify(errBody)}`);
       yearId = existing.planning_year_id;
     }
   }
@@ -124,8 +125,7 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   _createdClassIds.push(classId);
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
-  const testDate = new Date(2065, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
-  const fixtureYear = Number(testDate.slice(0, 4));
+  const testDate = new Date(fixtureYear, 5, 1 + (Date.now() % 28)).toISOString().slice(0, 10);
   const marker = `E2E-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -145,13 +145,16 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   });
   expect(sessRes.ok()).toBe(true);
 
-  return { className, marker, fixtureYear };
+  return { className, marker, fixtureYear: yearId };
 }
 
-async function openQuickEditForFirstSession(page: Page, marker: string, fixtureYear: number) {
+async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, fixtureYear);
+  await selectConnectedPlanningYear(page, planningYearId);
   await page.evaluate("nav('parade-nights')");
+  await page.evaluate("reloadAndRender()");
+  await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
+  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -246,16 +249,19 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
 
     await selectConnectedPlanningYear(page, fixtureYear);
     await page.evaluate("nav('parade-nights')");
+    await page.evaluate("reloadAndRender()");
+    await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
     const card = page.locator(".pn-card").filter({ hasText: marker });
     await expect(card).toBeVisible({ timeout: 8000 });
     await expect(card.getByRole("button", { name: "Edit Session 1" })).toHaveCount(0);
   });
 });
 
-async function openPNDetailForMarker(page: Page, marker: string, fixtureYear: number) {
+async function openPNDetailForMarker(page: Page, marker: string, planningYearId: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, fixtureYear);
+  await selectConnectedPlanningYear(page, planningYearId);
   await page.evaluate("nav('parade-nights')");
+  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   // The rendered Parade Night card exposes this action as "Open / edit".

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow, iso_z
 from ..models import (TimingTemplate, TimingBlock, ParadeNightTimingOverride,
                       ParadeNight, Squadron, Session)
+from ..models.training import SessionAudience, TrainingClass
 from ..models.training import BLOCK_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_can_view_squadron, require_can_write_squadron
@@ -658,8 +659,8 @@ def remove_timing_override(
 # ── Parade-night schedule shaping (shared by the single and bulk endpoints) ───
 
 
-def _schedule_session_dict(s: Session) -> dict:
-    return {
+def _schedule_session_dict(s: Session, training_classes: list | None = None) -> dict:
+    result = {
         "session_id": s.id,
         "period_number": s.period_number,
         "timing_block_id": s.timing_block_id,
@@ -670,6 +671,9 @@ def _schedule_session_dict(s: Session) -> dict:
         "training_area_name_at_time": s.training_area_name_at_time,
         "status": s.status,
     }
+    if training_classes is not None:
+        result["training_classes"] = training_classes
+    return result
 
 
 def _schedule_block_dict(b: TimingBlock) -> dict:
@@ -687,7 +691,8 @@ def _schedule_block_dict(b: TimingBlock) -> dict:
 
 
 def _shape_schedule(pn_id: str, template_id: str | None, blocks: list,
-                    sessions: list) -> dict:
+                    sessions: list,
+                    training_classes_by_session: dict[str, list] | None = None) -> dict:
     """Group a parade night's sessions by timing block. Pure shaping, no queries —
     so the bulk endpoint can feed it pre-fetched rows instead of re-querying."""
     sessions_by_block: dict[str, list] = {}
@@ -695,9 +700,15 @@ def _shape_schedule(pn_id: str, template_id: str | None, blocks: list,
     for s in sessions:
         if s.timing_block_id:
             sessions_by_block.setdefault(s.timing_block_id, []).append(
-                _schedule_session_dict(s))
+                _schedule_session_dict(
+                    s,
+                    (training_classes_by_session or {}).get(s.id),
+                ))
         else:
-            unlinked.append(_schedule_session_dict(s))
+            unlinked.append(_schedule_session_dict(
+                s,
+                (training_classes_by_session or {}).get(s.id),
+            ))
     return {
         "parade_night_id": pn_id,
         "timing_template_id": template_id,
@@ -745,7 +756,22 @@ def get_parade_night_schedule(
         )
         .all()
     )
-    return _shape_schedule(pn_id, pn.timing_template_id, blocks, sessions)
+    audience_rows = db.query(SessionAudience, TrainingClass).join(
+        TrainingClass, TrainingClass.id == SessionAudience.training_class_id,
+    ).filter(
+        SessionAudience.session_id.in_([s.id for s in sessions]),
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).all() if sessions else []
+    classes_by_session: dict[str, list] = {}
+    for audience, training_class in audience_rows:
+        classes_by_session.setdefault(audience.session_id, []).append({
+            "training_class_id": training_class.id,
+            "display_name": training_class.display_name,
+            "stage_code": training_class.stage_code,
+        })
+    return _shape_schedule(
+        pn_id, pn.timing_template_id, blocks, sessions, classes_by_session,
+    )
 
 
 # ── GET /api/parade-night-schedules ───────────────────────────────────────────
@@ -814,11 +840,27 @@ def list_parade_night_schedules(
 
     # Sessions: one query for every night on the page.
     sessions_by_pn: dict[str, list] = {}
-    for sess in db.query(Session).filter(
+    sessions = db.query(Session).filter(
         Session.parade_night_id.in_(pn_ids),
         Session.is_archived == False,  # noqa: E712
-    ).all():
+    ).all()
+    for sess in sessions:
         sessions_by_pn.setdefault(sess.parade_night_id, []).append(sess)
+    session_ids = [sess.id for sess in sessions]
+    classes_by_session: dict[str, list] = {}
+    if session_ids:
+        audience_rows = db.query(SessionAudience, TrainingClass).join(
+            TrainingClass, TrainingClass.id == SessionAudience.training_class_id,
+        ).filter(
+            SessionAudience.session_id.in_(session_ids),
+            TrainingClass.is_archived == False,  # noqa: E712
+        ).all()
+        for audience, training_class in audience_rows:
+            classes_by_session.setdefault(audience.session_id, []).append({
+                "training_class_id": training_class.id,
+                "display_name": training_class.display_name,
+                "stage_code": training_class.stage_code,
+            })
 
     return {"schedules": [
         _shape_schedule(
@@ -827,7 +869,7 @@ def list_parade_night_schedules(
             blocks_by_tpl.get(pn.timing_template_id, [])
             if pn.timing_template_id in live_tpl_ids else [],
             sessions_by_pn.get(pn.id, []),
+            classes_by_session,
         )
         for pn in pns
     ]}
-

@@ -71,11 +71,11 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
 
-  // Weekly Program is planning-year scoped. Materialise a dedicated 2065 year
+  // Weekly Program is planning-year scoped. Materialise a dedicated test year
   // first, then create both the Training Class and Parade Night in that year.
   // The previous fixture created the class in years[0] (normally 2026) and the
   // parade night in 2065/2066, which is not a valid same-year user workflow.
-  const fixtureYear = 2065;
+  const fixtureYear = 4000 + (Date.now() % 1000);
   const yearRes = await page.request.post(`${base}/api/planning/years`, {
     data: { year: fixtureYear, name: `${fixtureYear} Weekly Program E2E` },
     headers: auth,
@@ -117,7 +117,7 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   const classId = (await classRes.json()).training_class_id as string;
   _createdClassIds.push(classId);
 
-  // Start from January so the 0..299-day offset cannot roll into 2066.
+  // Start from January so the offset remains within the materialised year.
   const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },

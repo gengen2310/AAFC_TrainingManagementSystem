@@ -49,6 +49,11 @@ def upgrade():
             "WHERE NOT is_archived"
         ))
     else:
+        # The pre-v55 SQLite schema may retain the original full-unique index
+        # under either Alembic's generated name or the model's name.
+        op.execute(sa.text(
+            "DROP INDEX IF EXISTS uq_pnto_parade_night_id"
+        ))
         # SQLite: batch_alter_table recreates without the old unique index.
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
             batch_op.drop_index("ix_pnto_parade_night_id")

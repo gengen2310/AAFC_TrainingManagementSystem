@@ -11485,7 +11485,10 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
                     if (!cl.training_class_id) { tbody += dash; return; }
                     const inactive = (cl.start_date && pn.date < cl.start_date) || (cl.end_date && pn.date > cl.end_date);
                     if (inactive) { tbody += dash; return; }
-                    const sess = blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group));
+                    const sess = blockSessions.find(s =>
+                        Array.isArray(s.training_classes) &&
+                        s.training_classes.some(tc => tc.training_class_id === cl.training_class_id)
+                    ) || blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group));
                     if (!sess) {
                         tbody += `<td><em style="color:#aaa">Unassigned</em></td>`;
                     } else {

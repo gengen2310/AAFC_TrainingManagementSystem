@@ -1920,8 +1920,6 @@ class CadetIn(BaseModel):
 
 @router.post("/cadets", status_code=201)
 def create_cadet(body: CadetIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
-        raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = _active_squadron(p)
     if not sq_id:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})

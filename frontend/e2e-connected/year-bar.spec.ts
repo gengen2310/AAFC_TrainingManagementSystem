@@ -65,9 +65,13 @@ test("stepping reaches a future year that has no row at all", async ({ page }) =
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
 
-  const start = Number(await page.locator("#ynLabel").textContent());
-  // Guard: delete the next year if it was left materialised by a previous run.
-  await deleteYear(page, start + 1);
+  const start = await page.evaluate(`(() => {
+    const rows = P.years.filter(y => y.materialised).sort((a, b) => a.year - b.year);
+    const row = rows.find(candidate => !P.years.some(other => other.year === candidate.year + 1));
+    if (!row) throw new Error("No materialised year followed by an unmaterialised year");
+    setCurrentYear(row);
+    return row.year;
+  })()`);
   await page.locator("#ynNext").click();
   const next = Number(await page.locator("#ynLabel").textContent());
   expect(next).toBe(start + 1);
@@ -155,6 +159,14 @@ async function apiToken(page: Page): Promise<string> {
   return await page.evaluate("sessionStorage.getItem('aafc_token')") as string;
 }
 
+async function unmaterialisedFutureYear(page: Page): Promise<number> {
+  const years = await page.evaluate("P.years.map(y => Number(y.year))") as number[];
+  for (let year = 3000; year < 4000; year += 1) {
+    if (!years.includes(year)) return year;
+  }
+  throw new Error("No unmaterialised future planning year available for this test");
+}
+
 /** Remove a year's row again so these tests do not poison the shared database
  *  for the "no row at all" test above, which needs 2027 unmaterialised.
  *
@@ -193,9 +205,7 @@ test("an empty future year offers exactly the two things that can be done", asyn
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  const target = current + 1;
-  // Guard: delete the target year if materialised from a prior run.
-  await deleteYear(page, target);
+  const target = await unmaterialisedFutureYear(page);
   await page.locator("#ynNext").click();
 
   const notice = page.locator("#yn-year-notice .yn-notice");
@@ -215,9 +225,7 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  const target = current + 1;
-  // Guard: delete the target year if materialised from a prior run.
-  await deleteYear(page, target);
+  const target = await unmaterialisedFutureYear(page);
   await page.locator("#ynNext").click();
   await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
 
@@ -227,7 +235,8 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
     expect(await page.evaluate("P.currentYearId")).not.toBeNull();
     expect(Number(await page.locator("#ynLabel").textContent())).toBe(target);
   } finally {
-    await deleteYear(page, target);
+    // Keep the test-owned year as historical state; archived history is
+    // intentionally retained and blocks destructive year deletion.
   }
 });
 
@@ -235,9 +244,7 @@ test("Copy setup brings the class structure across and says how much it copied",
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  const target = current + 1;
-  // Guard: delete the target year if materialised from a prior run.
-  await deleteYear(page, target);
+  const target = await unmaterialisedFutureYear(page);
   await page.locator("#ynNext").click();
 
   try {
@@ -251,7 +258,8 @@ test("Copy setup brings the class structure across and says how much it copied",
       { headers: { Authorization: `Bearer ${token}` } })).json();
     expect(classes.length).toBeGreaterThan(0);
   } finally {
-    await deleteYear(page, target);
+    // Keep the test-owned year as historical state; archived history is
+    // intentionally retained and blocks destructive year deletion.
   }
 });
 

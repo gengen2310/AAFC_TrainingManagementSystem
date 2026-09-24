@@ -56,7 +56,15 @@ async function loginSquadron(page: Page, code: string) {
 
 async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix: string) {
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
-  const testDate = new Date(2066, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  const fixtureYear = 3000 + (Date.now() % 1000);
+  const yearRes = await page.request.post(`${base}/api/planning/years`, {
+    data: { year: fixtureYear, name: `${fixtureYear} Reason E2E ${uniqueSuffix}` },
+    headers: hdr,
+  });
+  expect(yearRes.ok() || yearRes.status() === 409).toBe(true);
+  const yearBody = await yearRes.json().catch(() => ({}));
+  const planningYearId = (yearBody.planning_year_id || yearBody.existing_id) as string;
+  const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -70,13 +78,16 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
     data: { parade_night_id: pnId, period_number: 1 }, headers: hdr,
   });
   expect(sessRes.ok()).toBe(true);
-  return marker;
+  return { marker, fixtureYear: planningYearId };
 }
 
-async function openQuickEditForFirstSession(page: Page, marker: string) {
+async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, 2066);
+  await selectConnectedPlanningYear(page, planningYearId);
   await page.evaluate("nav('parade-nights')");
+  await page.evaluate("reloadAndRender()");
+  await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
+  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -91,9 +102,9 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
-    const marker = await seedSession(page, hdr, String(Date.now()));
+    const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()));
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("cancelled");
     // The reason modal only opens as a blocking sub-step of saveSessEdit()
     // (see collectOutcomeReason()'s call site) -- not immediately on
@@ -119,9 +130,9 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
   test("+ Add new reason creates a governed tag and it appears in the dropdown selected", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
-    const marker = await seedSession(page, hdr, String(Date.now()) + "b");
+    const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "b");
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("not_delivered");
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
