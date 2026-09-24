@@ -38,7 +38,10 @@ async function openYearBar(page: Page) {
   // LEXICAL environment and are never properties of window. Reading them off
   // window yields undefined, and an assertion against undefined passes
   // vacuously -- which is exactly what happened to this spec once already.
-  await page.evaluate("nav('activities')");
+  await page.evaluate(async () => {
+    nav("activities");
+    await reloadAndRender();
+  });
   await expect(page.locator("#ynLabel")).toBeVisible({ timeout: 10000 });
 }
 
@@ -65,11 +68,12 @@ test("stepping reaches a future year that has no row at all", async ({ page }) =
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
 
-  const start = await page.evaluate(`(() => {
+  const start = await page.evaluate(`(async () => {
     const rows = P.years.filter(y => y.materialised).sort((a, b) => a.year - b.year);
     const row = rows.find(candidate => !P.years.some(other => other.year === candidate.year + 1));
     if (!row) throw new Error("No materialised year followed by an unmaterialised year");
-    setCurrentYear(row);
+    await setCurrentYear(row, false);
+    await _ynFetchYears();
     return row.year;
   })()`);
   await page.locator("#ynNext").click();
@@ -160,7 +164,25 @@ async function apiToken(page: Page): Promise<string> {
 }
 
 async function unmaterialisedFutureYear(page: Page): Promise<number> {
-  const years = await page.evaluate("P.years.map(y => Number(y.year))") as number[];
+  const years = await page.evaluate(
+    "P.years.filter(y => y && y.materialised !== false && (y.id || y.planning_year_id)).map(y => Number(y.year))",
+  ) as number[];
+  const current = Number(await page.locator("#ynLabel").textContent());
+  if (!years.includes(current + 1)) return current + 1;
+  const source = years
+    .filter((year) => year > current)
+    .sort((a, b) => a - b)
+    .find((year) => !years.includes(year + 1));
+  if (source !== undefined) {
+    await page.evaluate(async (year) => {
+      const row = P.years.find((candidate: any) => Number(candidate.year) === year);
+      if (!row) throw new Error(`Planning year ${year} was not loaded`);
+      await setCurrentYear(row, false);
+    }, source);
+    await page.evaluate("typeof _ynFetchYears === 'function' ? _ynFetchYears() : null");
+    await expect(page.locator("#ynLabel")).toHaveText(String(source));
+    return source + 1;
+  }
   for (let year = 3000; year < 4000; year += 1) {
     if (!years.includes(year)) return year;
   }
@@ -204,8 +226,8 @@ async function deleteYear(page: Page, year: number) {
 test("an empty future year offers exactly the two things that can be done", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
-  const current = Number(await page.locator("#ynLabel").textContent());
   const target = await unmaterialisedFutureYear(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
   await page.locator("#ynNext").click();
 
   const notice = page.locator("#yn-year-notice .yn-notice");
@@ -224,8 +246,8 @@ test("an empty future year offers exactly the two things that can be done", asyn
 test("Set up materialises the year and the panel goes away", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
-  const current = Number(await page.locator("#ynLabel").textContent());
   const target = await unmaterialisedFutureYear(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
   await page.locator("#ynNext").click();
   await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
 
@@ -243,8 +265,8 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
 test("Copy setup brings the class structure across and says how much it copied", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
-  const current = Number(await page.locator("#ynLabel").textContent());
   const target = await unmaterialisedFutureYear(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
   await page.locator("#ynNext").click();
 
   try {

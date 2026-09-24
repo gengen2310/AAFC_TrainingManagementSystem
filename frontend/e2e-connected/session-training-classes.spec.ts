@@ -151,8 +151,10 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
 async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
   await selectConnectedPlanningYear(page, planningYearId);
-  await page.evaluate("nav('parade-nights')");
-  await page.evaluate("reloadAndRender()");
+  await page.evaluate(async () => {
+    nav("parade-nights");
+    await reloadAndRender();
+  });
   await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
   await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });

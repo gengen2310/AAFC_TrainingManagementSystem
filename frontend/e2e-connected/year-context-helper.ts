@@ -23,7 +23,7 @@ export async function selectConnectedPlanningYear(page: Page, requestedId?: stri
     page.evaluate("Array.isArray(P.years) ? P.years.filter(y => y && y.materialised !== false && (y.id || y.planning_year_id)).length : 0"),
   { timeout: 10000, message: "materialised planning years did not load" }).toBeGreaterThan(0);
 
-  const selectedId = await page.evaluate((wanted: string | undefined) => {
+  const selectedId = await page.evaluate(async (wanted: string | undefined) => {
     const years = (P.years || []).filter((y: any) => y && y.materialised !== false && (y.id || y.planning_year_id));
     const idOf = (y: any) => String(y.id || y.planning_year_id || "");
     const target = wanted
@@ -34,7 +34,7 @@ export async function selectConnectedPlanningYear(page: Page, requestedId?: stri
         ? `Requested planning year ${wanted} is not present in P.years`
         : "No materialised planning year is available");
     }
-    setCurrentYear(target);
+    await setCurrentYear(target);
     return idOf(target);
   }, requestedId);
 

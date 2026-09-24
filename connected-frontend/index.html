@@ -5816,7 +5816,15 @@ async function loadData(){
 // Writes now go to the backend then re-load. save() is retained as a no-op so existing
 // handlers that call it do not break; real persistence happens via the API helpers below.
 function save(){ /* no-op: backend is the source of truth */ }
-async function reloadAndRender(){ try{ await loadData(); renderAll(); }catch(e){ showToast(apiErr(e),true); } }
+let _reloadRenderPromise=Promise.resolve();
+function reloadAndRender(){
+  const run=_reloadRenderPromise.then(async()=>{
+    try{ await loadData(); renderAll(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
+  _reloadRenderPromise=run.catch(()=>{});
+  return run;
+}
 
 // Backend write helpers (used by the wired handlers).
 async function apiSetSessionStatus(sessionId, status, reason){
@@ -11485,10 +11493,15 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
                     if (!cl.training_class_id) { tbody += dash; return; }
                     const inactive = (cl.start_date && pn.date < cl.start_date) || (cl.end_date && pn.date > cl.end_date);
                     if (inactive) { tbody += dash; return; }
+                    const explicitAudienceExists = blockSessions.some(s =>
+                        Array.isArray(s.training_classes) && s.training_classes.length > 0
+                    );
                     const sess = blockSessions.find(s =>
                         Array.isArray(s.training_classes) &&
                         s.training_classes.some(tc => tc.training_class_id === cl.training_class_id)
-                    ) || blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group));
+                    ) || (!explicitAudienceExists
+                        ? blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group))
+                        : null);
                     if (!sess) {
                         tbody += `<td><em style="color:#aaa">Unassigned</em></td>`;
                     } else {
@@ -12423,7 +12436,8 @@ function setCurrentYear(yearObj, reload) {
   _ynUpdateDisplay();
   _ynUpdateArrows();
   if (typeof ynSyncPwBadge === 'function') ynSyncPwBadge();
-  if (reload !== false) _loadActivitiesPage();
+  if (reload !== false) return _loadActivitiesPage();
+  return Promise.resolve();
 }
 
 // The year bar steps through YEAR INTEGERS, not planning_year_id. A year the

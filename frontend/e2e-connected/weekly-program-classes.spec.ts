@@ -139,11 +139,11 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   });
   expect(audRes.ok()).toBe(true);
 
-  await page.evaluate(() => (window as any).reloadAndRender());
-  // The test parade night is deliberately outside the active planning year to
-  // avoid collisions, so clear the current-year filter before opening Weekly Program.
-  await page.evaluate(() => { (window as any).P.currentYearId = null; });
-  await page.evaluate(() => (window as any).nav("weekly-program"));
+  await page.evaluate(async () => {
+    await (window as any).reloadAndRender();
+    (window as any).nav("weekly-program");
+    await (window as any).reloadAndRender();
+  });
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
   const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);
