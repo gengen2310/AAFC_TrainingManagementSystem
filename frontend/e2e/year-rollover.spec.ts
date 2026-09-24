@@ -152,7 +152,7 @@ test.describe("Year rollover", () => {
   test("sqn_general cannot rollover", async ({ page }) => {
     const adminHdr = await authHeader(page, "ADMIN703");
     const genHdr = await authHeader(page, "703SQN2026");
-    const srcYear = await allocateYear(page, hdr, 6000 + (RUN_ID % 1800));
+    const srcYear = await allocateYear(page, adminHdr, 6000 + (RUN_ID % 1800));
     let yearId = "";
 
     try {
