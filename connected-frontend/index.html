@@ -1507,7 +1507,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-lbl">Cadets &amp; Training</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('cadets')">Cadet Management</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('training-records')">Training Records</div>
-      <div class="nav-item plan-write-el" role="link" tabindex="0" onclick="nav('cea-import')">CEA Member Import</div>
       <div class="nav-lbl">Needs Attention</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-lbl" style="display:none">Administration</div>
@@ -2308,6 +2307,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print" style="gap:6px">
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
+            <button class="btn btn-out btn-sm plan-write-el" onclick="nav('cea-import')" title="Import cadet roster from the Cadet Enterprise Application">CEA Import</button>
           </div>
         </div>
         <div id="cadets-roster-wrap">
@@ -2580,8 +2580,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- filter + create -->
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <input id="acct-search" placeholder="Filter by name, role, unit…" oninput="renderAccounts()" autocomplete="off" aria-label="Filter accounts by name, role, or unit" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm)">
-            <select id="acct-filter-wing" aria-label="Filter accounts by Wing" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);display:none">
+            <input id="acct-search" placeholder="Filter by name, role, unit…" oninput="_renderAccountTable()" autocomplete="off" aria-label="Filter accounts by name, role, or unit" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm)">
+            <select id="acct-filter-wing" aria-label="Filter accounts by Wing" onchange="_acctWingChanged()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);display:none">
               <option value="">All Wings</option>
             </select>
             <select id="acct-filter-sqn" aria-label="Filter accounts by Squadron" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);display:none">
@@ -7012,6 +7012,19 @@ function _roleScopeType(role){
   if(_NATIONAL_SCOPE_ROLES.includes(role)) return 'national';
   if(_WING_SCOPE_ROLES.includes(role)) return 'wing';
   return 'squadron';
+}
+
+function _acctWingChanged(){
+  const wingSel=document.getElementById('acct-filter-wing');
+  const sqnSel=document.getElementById('acct-filter-sqn');
+  if(sqnSel){
+    const wingId=wingSel?wingSel.value:'';
+    // Rebuild squadron options filtered to the selected wing
+    sqnSel.innerHTML='<option value="">All Squadrons</option>';
+    const src=(S.squadrons||[]).filter(s=>!wingId||s.wing_id===wingId);
+    src.forEach(s=>{ const o=new Option((s.code||s.short_name||s.name),s.squadron_id); sqnSel.appendChild(o); });
+  }
+  renderAccounts();
 }
 
 async function renderAccounts(){
