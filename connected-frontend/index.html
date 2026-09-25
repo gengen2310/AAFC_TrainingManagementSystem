@@ -5657,7 +5657,15 @@ async function loadData(){
       }
       // planning_year_id is null for a year with no row -- requesting
       // /years/null/holidays would 404 every boot.
-      const activeIds=(years||[]).filter(y=>y.active_status&&y.planning_year_id).map(y=>y.planning_year_id);
+      // Historical rows remain active so they can be selected from the year
+      // bar, but they are not dashboard/calendar inputs. Fetching holidays for
+      // every retained year made boot fan out into hundreds of requests and
+      // allowed a stale load to overwrite the selected-year context. Keep the
+      // operational set to the current/future years (plus an explicitly
+      // selected past year, handled by its year-scoped page load).
+      const activeIds=(years||[]).filter(y=>y.active_status&&y.planning_year_id &&
+        (y.state !== 'past' || y.planning_year_id === P.currentYearId))
+        .map(y=>y.planning_year_id);
       const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
       return lists.flat();
     }catch(_){ return []; }

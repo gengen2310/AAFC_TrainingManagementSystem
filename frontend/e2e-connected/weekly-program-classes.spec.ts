@@ -174,7 +174,9 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
 
   // Create a parade night with a known date so we can select it in the Weekly Program picker.
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
-  const testDate = new Date(2068, 0, 15).toISOString().slice(0, 10); // 2068-01-15
+  const years = await (await page.request.get(`${base}/api/planning/years`, { headers: auth })).json();
+  const year = years.find((y: any) => y.state === "current") || years[0];
+  const testDate = new Date(Number(year.year), 0, 15).toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
     headers: auth,
@@ -182,6 +184,7 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
   expect(pnRes.ok()).toBe(true);
   if (pnRes.ok()) _createdPnIds.push((await pnRes.json()).parade_night_id as string);
 
+  await selectConnectedPlanningYear(page, year.planning_year_id);
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));
@@ -219,7 +222,9 @@ test("Weekly Program header shows the Wing's real name from the session (not har
   expect(wingName).not.toBe("7 Wing Australian Air Force Cadets");
 
   // Create a parade night at a unique far-future date so the dropdown has a selectable option.
-  const testDate = new Date(2072, 4, 21).toISOString().slice(0, 10); // 2072-05-21
+  const years = await (await page.request.get(`${base}/api/planning/years`, { headers: auth })).json();
+  const year = years.find((y: any) => y.state === "current") || years[0];
+  const testDate = new Date(Number(year.year), 4, 21).toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
     headers: auth,
@@ -227,6 +232,7 @@ test("Weekly Program header shows the Wing's real name from the session (not har
   expect(pnRes.ok()).toBe(true);
   if (pnRes.ok()) _createdPnIds.push((await pnRes.json()).parade_night_id as string);
 
+  await selectConnectedPlanningYear(page, year.planning_year_id);
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));

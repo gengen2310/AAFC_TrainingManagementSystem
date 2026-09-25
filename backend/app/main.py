@@ -137,13 +137,21 @@ ENCODERS_BY_TYPE[_dt.datetime] = _isoformat_utc
 app = FastAPI(title="AAFC Training Management System — National", version="17.1.1", lifespan=lifespan,
              docs_url=None, redoc_url=None, openapi_url=None)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
-)
+# CORSMiddleware is registered *last* among app.add_middleware()/@app.middleware("http")
+# calls (see the block just above app.include_router() below), not here where a
+# CORS-enabled API server would normally add it first. Starlette builds its
+# middleware stack by prepending each newly-registered middleware, so the *last*
+# one registered ends up outermost -- wrapping every other middleware, including
+# ones below (request_size_guard/maintenance_gate/api_rate_limit) that can
+# short-circuit with an early JSONResponse (413/503/429) via `return` instead of
+# `call_next(request)`. Registering CORSMiddleware here (first) used to leave it
+# *innermost*, so those early-return error responses skipped it entirely and
+# reached the browser with no Access-Control-Allow-Origin header -- a real
+# cross-origin caller (and every Playwright spec here, since connected-frontend
+# on :8080 calls the API on :8000) then sees an opaque "blocked by CORS policy"
+# network error instead of a readable 429/503/413, silently breaking whatever
+# UI fetch triggered it (see DEFECT-004's comment on api_rate_limit below for
+# the confirmed-live trip case).
 
 
 @app.middleware("http")
@@ -384,6 +392,15 @@ async def security_headers(request: Request, call_next):
     if settings.is_prod:
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+)
 
 
 for r in (health.router, auth.router, organisations.router, accounts.router,

@@ -145,18 +145,35 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   });
   expect(sessRes.ok()).toBe(true);
 
+  await selectConnectedPlanningYear(page, yearId);
   return { className, marker, fixtureYear: yearId };
 }
 
 async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
-  await page.evaluate(() => (window as any).reloadAndRender());
-  await selectConnectedPlanningYear(page, planningYearId);
-  await page.evaluate(async () => {
-    nav("parade-nights");
-    await reloadAndRender();
+  // nav('parade-nights') triggers its own internal, fire-and-forget
+  // reloadAndRender() (connected-frontend/index.html's nav()). This helper
+  // used to *also* call reloadAndRender() explicitly both before and after
+  // nav(), stacking three concurrent loadData() cycles per call. Each cycle
+  // fans out to dozens of parallel GETs, and under CI's shared-backend load
+  // (multiple browser projects hitting one backend) that volume tripped the
+  // per-IP API rate limiter; loadData()'s _apiT() helper silently falls
+  // back to an empty list on a failed fetch, so whichever of the three
+  // overlapping cycles happened to resolve *last* -- even one that 429'd --
+  // clobbered S.pns last, hiding the just-created marker card with no
+  // visible error. Firing nav() alone (its single internal reload) and
+  // waiting for the network to go idle removes the extra overlapping
+  // cycles and the resulting last-write-wins race.
+  await page.evaluate(() => {
+    (window as any).nav("parade-nights");
   });
-  await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
-  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    for (const [id, value] of [["pn-f-term", "all"], ["pn-f-status", "all"], ["pn-search", ""]] as const) {
+      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) el.value = value;
+    }
+    (window as any).renderPN();
+  });
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
