@@ -70,7 +70,10 @@ test("stepping reaches a future year that has no row at all", async ({ page }) =
 
   const start = await page.evaluate(`(async () => {
     const rows = P.years.filter(y => y.materialised).sort((a, b) => a.year - b.year);
-    const row = rows.find(candidate => !P.years.some(other => other.year === candidate.year + 1));
+    const row = rows.find(candidate =>
+      candidate.year >= new Date().getFullYear() &&
+      !P.years.some(other => other.year === candidate.year + 1)
+    );
     if (!row) throw new Error("No materialised year followed by an unmaterialised year");
     await setCurrentYear(row, false);
     await _ynFetchYears();

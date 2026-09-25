@@ -11,9 +11,10 @@ from sqlalchemy import create_engine, String, DateTime, Boolean
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
 
-from .config import settings
+from .config import normalize_database_url, settings
 
-_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_database_url = normalize_database_url(settings.DATABASE_URL)
+_is_sqlite = _database_url.startswith("sqlite")
 connect_args = {"check_same_thread": False} if _is_sqlite else {}
 
 # Production runs on Railway-native Postgres, not a Supabase Session Pooler
@@ -45,7 +46,7 @@ _pool_kwargs = build_pool_kwargs(
 )
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    _database_url,
     connect_args=connect_args,
     pool_pre_ping=True,
     future=True,

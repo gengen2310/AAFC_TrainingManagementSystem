@@ -87,7 +87,7 @@ details summary{cursor:pointer;font-weight:700;font-size:var(--fs-base);margin:8
 /* Field-level validation messages (422) */
 .field-err { color: var(--danger); font-size: 0.82rem; margin: -6px 0 4px; }
 input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--danger); }
-.okmsg { color: var(--ok); font-size: 0.88rem; margin: 4px 0; }
+.okmsg { font-size: 0.88rem; margin: 4px 0; }
 
 /* Pagination */
 .pager { display: flex; align-items: center; gap: 12px; justify-content: flex-end; margin-top: 10px; }

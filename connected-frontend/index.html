@@ -11494,15 +11494,13 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
                     if (!cl.training_class_id) { tbody += dash; return; }
                     const inactive = (cl.start_date && pn.date < cl.start_date) || (cl.end_date && pn.date > cl.end_date);
                     if (inactive) { tbody += dash; return; }
-                    const explicitAudienceExists = blockSessions.some(s =>
-                        Array.isArray(s.training_classes) && s.training_classes.length > 0
-                    );
                     const sess = blockSessions.find(s =>
                         Array.isArray(s.training_classes) &&
                         s.training_classes.some(tc => tc.training_class_id === cl.training_class_id)
-                    ) || (!explicitAudienceExists
-                        ? blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group))
-                        : null);
+                    ) || blockSessions.find(s =>
+                        (!Array.isArray(s.training_classes) || s.training_classes.length === 0) &&
+                        _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group)
+                    );
                     if (!sess) {
                         tbody += `<td><em style="color:#aaa">Unassigned</em></td>`;
                     } else {
@@ -12475,7 +12473,14 @@ function _ynUpdateDisplay() {
   const st = document.getElementById('ynState');
   if (st) {
     const row = _ynYears().find(y => y.year === P.currentYearInt);
-    st.textContent = (row && _YN_STATE_TEXT[row.state]) || '';
+    const state = row && row.state
+      ? row.state
+      : P.currentYearInt < new Date().getFullYear()
+        ? 'past'
+        : P.currentYearInt > new Date().getFullYear()
+          ? 'future'
+          : 'current';
+    st.textContent = _YN_STATE_TEXT[state] || '';
   }
   _ynRenderYearNotice();
   _ynRenderRolloverNotice();
@@ -12688,25 +12693,27 @@ async function ynCopySetupFrom(src, tgt) {
 }
 
 function _ynUpdateArrows() {
-  const sorted = _ynYears();
   const prev = document.getElementById('ynPrev');
   const next = document.getElementById('ynNext');
-  if (!sorted.length) {
-    if (prev) prev.disabled = true;
-    if (next) next.disabled = true;
-    return;
-  }
-  const idx = sorted.findIndex(y => y.year === P.currentYearInt);
-  if (prev) prev.disabled = idx <= 0;
-  if (next) next.disabled = idx < 0 || idx >= sorted.length - 1;
+  const year = Number(P.currentYearInt);
+  if (prev) prev.disabled = !Number.isFinite(year) || year <= 1990;
+  if (next) next.disabled = !Number.isFinite(year) || year >= 2999;
 }
 
 function ynNav(dir) {
-  const sorted = _ynYears();
-  if (!sorted.length) return;
-  const idx = sorted.findIndex(y => y.year === P.currentYearInt);
-  const target = sorted[idx + dir];
-  if (!target) return;
+  const year = Number(P.currentYearInt);
+  if (!Number.isFinite(year)) return;
+  const targetYear = year + dir;
+  if (targetYear < 1990 || targetYear > 2999) return;
+  const target = _ynYears().find(y => Number(y.year) === targetYear) || {
+    year: targetYear,
+    planning_year_id: null,
+    materialised: false,
+    state: targetYear < year ? 'past' : 'future',
+  };
+  if (!target.planning_year_id && !(P.years || []).some(y => Number(y.year) === targetYear)) {
+    P.years = [...(P.years || []), target];
+  }
   setCurrentYear(target);
 }
 

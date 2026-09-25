@@ -721,6 +721,10 @@ def _parse_cea_csv(csv_text: str):
         import re
         return re.sub(r"[^a-z0-9]+", " ", (h or "").strip().lower()).strip()
 
+    aliases = {
+        canonical: {norm(alias) for alias in variants | {canonical}}
+        for canonical, variants in aliases.items()
+    }
     rows = []
     required = ["id", "rank", "name", "family name"]
     seen = set()
@@ -728,7 +732,7 @@ def _parse_cea_csv(csv_text: str):
         key = None
         n = norm(header)
         for canonical, variants in aliases.items():
-            if n in variants or n.replace(" ", "_") in variants:
+            if n in variants:
                 key = canonical
                 break
         if key is not None:
@@ -743,7 +747,7 @@ def _parse_cea_csv(csv_text: str):
             key = None
             n = norm(header)
             for canonical, variants in aliases.items():
-                if n in variants or n.replace(" ", "_") in variants:
+                if n in variants:
                     key = canonical
                     break
             if key is None:
