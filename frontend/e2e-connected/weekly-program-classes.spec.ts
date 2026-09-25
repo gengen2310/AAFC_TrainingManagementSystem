@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // CLASS-06 (connected-frontend side): verify that the live Weekly Program
 // surfaces the Training Class audience attached to a session. The Weekly
@@ -117,8 +118,9 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   const classId = (await classRes.json()).training_class_id as string;
   _createdClassIds.push(classId);
 
-  // Start from January so the offset remains within the materialised year.
-  const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  // Keep the generated date inside the selected planning year; JavaScript date
+  // overflow would otherwise move late offsets into the following year.
+  const testDate = new Date(fixtureYear, 5, 1 + (Date.now() % 28)).toISOString().slice(0, 10);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
     headers: auth,
@@ -141,9 +143,9 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
 
   await page.evaluate(async () => {
     await (window as any).reloadAndRender();
-    (window as any).nav("weekly-program");
-    await (window as any).reloadAndRender();
   });
+  await selectConnectedPlanningYear(page, yearId);
+  await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
   const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);
