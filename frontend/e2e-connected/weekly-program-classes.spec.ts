@@ -141,11 +141,9 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   });
   expect(audRes.ok()).toBe(true);
 
-  await page.evaluate(async () => {
-    await (window as any).reloadAndRender();
-  });
   await selectConnectedPlanningYear(page, yearId);
   await page.evaluate(() => (window as any).nav("weekly-program"));
+  await page.waitForLoadState("networkidle");
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
   const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);

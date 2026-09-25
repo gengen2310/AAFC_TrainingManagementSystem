@@ -145,7 +145,6 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   });
   expect(sessRes.ok()).toBe(true);
 
-  await selectConnectedPlanningYear(page, yearId);
   return { className, marker, fixtureYear: yearId };
 }
 
@@ -277,9 +276,16 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
 });
 
 async function openPNDetailForMarker(page: Page, marker: string, planningYearId: string) {
-  await page.evaluate(() => (window as any).reloadAndRender());
   await selectConnectedPlanningYear(page, planningYearId);
-  await page.evaluate("nav('parade-nights')");
+  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    for (const [id, value] of [["pn-f-term", "all"], ["pn-f-status", "all"], ["pn-search", ""]] as const) {
+      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+      if (el) el.value = value;
+    }
+    (window as any).renderPN();
+  });
   await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
