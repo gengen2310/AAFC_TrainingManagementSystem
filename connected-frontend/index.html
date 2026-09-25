@@ -10523,18 +10523,25 @@ async function _pnCellClick(pnId,ds,period,classId,customPhaseId,sessionId){
   const ip=(plan.timing.instructional_periods||[]).find(x=>x.period_number===period);
   const periodLabel=ip?(ip.block_label+(ip.start_time?` (${ip.start_time.slice(0,5)})`:'')):`Period ${period}`;
   let classLabel='';
-  if(classId){const cl=plan.groups.flatMap(g=>g.classes||[]).find(c=>c.training_class_id===classId);if(cl)classLabel=cl.display_name;}
-  else if(customPhaseId){const cg=plan.groups.find(g=>g.custom_phase_id===customPhaseId);if(cg)classLabel=cg.name;}
+  let derivedPhase=null;
+  if(classId){
+    const cl=plan.groups.flatMap(g=>g.classes||[]).find(c=>c.training_class_id===classId);
+    if(cl){classLabel=cl.display_name; if(cl.stage_code)derivedPhase=sess?sess.phase_at_time||cl.stage_code:cl.stage_code;}
+  } else if(customPhaseId){const cg=plan.groups.find(g=>g.custom_phase_id===customPhaseId);if(cg)classLabel=cg.name;}
   const cArg=classId?`'${esc(classId)}'`:'null';
   const cpArg=customPhaseId?`'${esc(customPhaseId)}'`:'null';
   const sessArg=sess?`'${esc(sess.session_id)}'`:'null';
+  // Phase row is shown only when phase cannot be derived from the Training Class's stage_code.
+  const phaseRow=derivedPhase
+    ? `<input type="hidden" id="pce-ph" value="${esc(derivedPhase)}">`
+    : `<div class="ff"><label for="pce-ph" style="font-size:var(--fs-xs)">Phase</label><select id="pce-ph" aria-label="Phase">${phOpts}</select></div>`;
   editorEl.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div style="font-size:var(--fs-xs);font-weight:700;color:var(--dark)">${esc(periodLabel)} — ${esc(classLabel)}</div>
       <button class="btn btn-xs btn-out" onclick="document.getElementById('pn-cell-editor').style.display='none'">Dismiss</button>
     </div>
     <div class="form-row" style="margin-bottom:8px">
-      <div class="ff"><label for="pce-ph" style="font-size:var(--fs-xs)">Phase</label><select id="pce-ph" aria-label="Phase">${phOpts}</select></div>
+      ${phaseRow}
       <div class="ff"><label for="pce-st" style="font-size:var(--fs-xs)">Status</label><select id="pce-st" aria-label="Status">${stOpts}</select></div>
     </div>
     <div class="ff" style="margin-bottom:8px"><label for="pce-ex" style="font-size:var(--fs-xs)">Curriculum Item</label>
@@ -10552,7 +10559,7 @@ async function _pnCellClick(pnId,ds,period,classId,customPhaseId,sessionId){
   editorEl.style.display='';
   setTimeout(()=>{
     const phEl=document.getElementById('pce-ph');
-    if(phEl){
+    if(phEl&&phEl.tagName==='SELECT'){
       if(sess&&sess.phase_at_time&&![...phEl.options].some(o=>o.value===sess.phase_at_time)) phEl.appendChild(new Option(sess.phase_at_time+' (not in catalogue)',sess.phase_at_time));
       phEl.value=sess?sess.phase_at_time||'B. Initial':'B. Initial';
     }
