@@ -1505,7 +1505,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-item" role="link" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('resources')">Locations and Resources</div>
       <div class="nav-lbl">Cadets &amp; Training</div>
-      <div class="nav-item" role="link" tabindex="0" onclick="nav('cadets')">Cadet Rosters</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('cadets')">Cadet Management</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('training-records')">Training Records</div>
       <div class="nav-item plan-write-el" role="link" tabindex="0" onclick="nav('cea-import')">CEA Member Import</div>
       <div class="nav-lbl">Needs Attention</div>
@@ -2055,7 +2055,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              populates it. USER-AUTHORISED CHANGE (2026-08-27): exposed wing events overlay UI. -->
         <div class="card" id="py-wing-events-card" style="display:none;margin-top:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Wing HQ Events</h2>
+            <h2 class="ctitle" style="margin:0">Inherited Activities</h2>
             <select id="py-we-imp-filter" aria-label="Filter by planning importance" onchange="_renderWingEventsOverlay()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
               <option value="">All Importance</option>
               <option value="must_attend">Must Attend</option>
@@ -2073,7 +2073,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              USER-AUTHORISED CHANGE (2026-08-27): exposed anchor events on Activities page. -->
         <div class="card" style="margin-top:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Anchor Events</h2>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="anch-show-archived" onchange="loadAnchors(P.currentYearId)"> Show archived</label>
               <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddAnchorModal()">+ Add Anchor</button>
@@ -2305,7 +2304,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <!-- CADETS -->
       <div id="page-cadets" class="page">
         <div class="ph">
-          <div><h1 class="ph-title">Cadet Rosters</h1><div class="ph-sub" id="cadets-sub">Select a Training Class to view or manage its roster.</div></div>
+          <div><h1 class="ph-title">Cadet Management</h1><div class="ph-sub" id="cadets-sub">Select a Training Class to view or manage its roster.</div></div>
           <div class="ph-actions no-print" style="gap:6px">
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
@@ -19812,7 +19811,7 @@ async function loadCadetRoster(){
     const data=await api(`/api/training-classes/${classId}/roster`);
     const cadets=data.cadets||[];
     const className=data.class_name||'';
-    document.getElementById('cadets-sub').textContent=className?`Roster for ${className}`:'Cadet roster';
+    document.getElementById('cadets-sub').textContent=className?`Roster for ${className}`:'Cadet Management';
     if(cadets.length===0){
       wrap.innerHTML='<p class="muted" style="font-size:var(--fs-sm)">No cadets in this class. Use <b>Add Cadet</b> to enrol cadets.</p>';
       return;
