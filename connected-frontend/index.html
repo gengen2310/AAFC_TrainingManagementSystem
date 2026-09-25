@@ -1865,6 +1865,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <div class="fbar no-print">
+          <label for="wp-f-year" class="fbar-lbl">Year</label>
+          <select id="wp-f-year" aria-label="Filter Weekly Program by training year" onchange="wpYearChanged()">
+            <option value="">All years</option>
+          </select>
           <label for="wp-f-term" class="fbar-lbl">Term</label>
           <select id="wp-f-term" aria-label="Filter Weekly Program by term" onchange="wpTermChanged()">
             <option value="all">All terms</option>
@@ -11227,15 +11231,35 @@ const WP_STAGE_GROUPS = [
 // just the entry point nav() already calls. It used to write its own flat list
 // of every night, which would overwrite the term-filtered one.
 function populateWPDD(){
+  _wpPopulateYearSel();
   if(typeof _wpSyncNightOptions==='function') _wpSyncNightOptions();
+}
+
+// WP-9: populate the year selector from P.years, defaulting to P.currentYearId.
+// The selector drives renderWP()'s planning_year_id query param.
+function _wpPopulateYearSel(){
+  const sel=document.getElementById('wp-f-year');
+  if(!sel) return;
+  const years=((typeof P!=='undefined')&&P.years)||[];
+  const curId=((typeof P!=='undefined')&&P.currentYearId)||'';
+  const opts=years
+    .filter(y=>y&&y.planning_year_id)
+    .sort((a,b)=>(b.year||0)-(a.year||0))
+    .map(y=>'<option value="'+esc(y.planning_year_id)+'"'+(y.planning_year_id===curId?' selected':'')+'>'+esc(String(y.year||'—'))+'</option>')
+    .join('');
+  sel.innerHTML='<option value="">All years</option>'+opts;
 }
 async function renderWP() {
     const wrap = document.getElementById('wp-content');
     if (!wrap) return;
     wrap.innerHTML = '<p class="muted p-4">Loading\u2026</p>';
     try {
-        const yearQ = (typeof P !== 'undefined' && P.currentYearId)
-            ? `?planning_year_id=${encodeURIComponent(P.currentYearId)}` : '';
+        // WP-9: use the year selector value; fall back to P.currentYearId on first
+        // load (before the selector is populated by _wpPopulateYearSel).
+        const wpYearSel = document.getElementById('wp-f-year');
+        const wpYear = (wpYearSel && wpYearSel.value) ||
+                       ((typeof P !== 'undefined' && P.currentYearId) ? P.currentYearId : '');
+        const yearQ = wpYear ? `?planning_year_id=${encodeURIComponent(wpYear)}` : '';
 
         // WP-1/WP-2: three requests for the whole page. This was previously two
         // plus one /schedule per parade night -- 244 locally -- issued serially
@@ -11245,7 +11269,7 @@ async function renderWP() {
             api(`/api/parade-night-schedules${yearQ}`),
         ]);
 
-        const yearId = (typeof P !== 'undefined' && P.currentYearId) ? P.currentYearId : '';
+        const yearId = wpYear;
         const classes = yearId
             ? (await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`))
               .filter(c => !c.is_archived)
@@ -11329,6 +11353,13 @@ function wpTermChanged(){
   const t=document.getElementById('wp-f-term');
   if(t) t.dataset.userSet='1';
   _wpSyncNightOptions(); _wpPaint();
+}
+// WP-9: changing year resets the term auto-selection (the new year may have
+// different terms) and re-fetches all data.
+function wpYearChanged(){
+  const t=document.getElementById('wp-f-term');
+  if(t) delete t.dataset.userSet;
+  renderWP();
 }
 
 // WP-8: printReport() has existed all along and nothing ever called it, and this
