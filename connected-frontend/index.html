@@ -2102,45 +2102,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="anchors-body"><p class="muted" style="font-size:var(--fs-xs)">Select a year above.</p></div>
         </div>
 
-        <!-- Mission Backlog — missions-empty shown when no year; filter + table shown when loaded.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed Mission Backlog on Activities page. -->
-        <div id="missions-empty" style="margin-top:0">
-          <p class="muted" style="font-size:var(--fs-xs)">Select a year above to load the Mission Backlog.</p>
-        </div>
-        <div class="card" id="missions-filters-card" style="display:none;margin-top:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
-              <button class="btn btn-xs btn-out" onclick="exportPerClassDeliveryCSV()" aria-label="Export per-class delivery CSV">Per-Class CSV</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <select id="mission-filter-phase" aria-label="Filter by training phase" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Phases</option>
-              <option value="A. Orientation">Orientation</option>
-              <option value="B. Initial">Initial</option>
-              <option value="C. Junior">Junior</option>
-              <option value="D. Intermediate">Intermediate</option>
-              <option value="E. Senior">Senior</option>
-              <option value="I. Bronze">Bronze</option>
-              <option value="J. Silver">Silver</option>
-              <option value="K. Gold">Gold</option>
-            </select>
-            <select id="mission-filter-status" aria-label="Filter by schedule status" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Status</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="unscheduled">Unscheduled</option>
-            </select>
-            <select id="mission-filter-class" aria-label="Filter by training class" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Classes</option>
-            </select>
-            <input id="mission-search" placeholder="Search code or title…" oninput="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm);min-width:160px" aria-label="Search missions by code or title">
-          </div>
-        </div>
-        <div class="card" id="missions-table-card" style="display:none;margin-top:0">
-          <div id="missions-body"></div>
-        </div>
+        <!-- Mission Backlog relocated to Needs Attention — USER-AUTHORISED CHANGE (2026-09-26) -->
+        <p class="muted" style="font-size:var(--fs-xs);margin-top:0"><a href="#" onclick="nav('action-items');return false;" style="color:var(--blue)">Mission Backlog</a> is now in Needs Attention.</p>
 
         <!-- VH-02: section break before inherited activities -->
         <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
@@ -2264,6 +2227,46 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <tr><td colspan="6" class="muted" style="font-style:italic">Loading…</td></tr>
             </tbody>
           </table></div>
+        </div>
+
+        <!-- Mission Backlog — missions-empty shown when no year; filter + table shown when loaded.
+             USER-AUTHORISED CHANGE (2026-09-26): moved Mission Backlog from Activities to Needs Attention. -->
+        <div id="missions-empty" style="margin-top:18px">
+          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to load the Mission Backlog.</p>
+        </div>
+        <div class="card" id="missions-filters-card" style="display:none;margin-top:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <h2 class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
+              <button class="btn btn-xs btn-out" onclick="exportPerClassDeliveryCSV()" aria-label="Export per-class delivery CSV">Per-Class CSV</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="mission-filter-phase" aria-label="Filter by training phase" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Phases</option>
+              <option value="A. Orientation">Orientation</option>
+              <option value="B. Initial">Initial</option>
+              <option value="C. Junior">Junior</option>
+              <option value="D. Intermediate">Intermediate</option>
+              <option value="E. Senior">Senior</option>
+              <option value="I. Bronze">Bronze</option>
+              <option value="J. Silver">Silver</option>
+              <option value="K. Gold">Gold</option>
+            </select>
+            <select id="mission-filter-status" aria-label="Filter by schedule status" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="unscheduled">Unscheduled</option>
+            </select>
+            <select id="mission-filter-class" aria-label="Filter by training class" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Classes</option>
+            </select>
+            <input id="mission-search" placeholder="Search code or title…" oninput="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm);min-width:160px" aria-label="Search missions by code or title">
+          </div>
+        </div>
+        <div class="card" id="missions-table-card" style="display:none;margin-top:18px">
+          <div id="missions-body"></div>
         </div>
 
         <!-- Planning Checks: conflict detection and decision guide.
@@ -16262,7 +16265,7 @@ const _origNav = nav;
 nav = function(pg) {
   _origNav(pg);
   if(pg === 'wing-calendar') { loadWingCalendar(); }
-  if(pg === 'action-items') { loadPlanningChecks(P.currentYearId||null); }
+  if(pg === 'action-items') { loadPlanningChecks(P.currentYearId||null); loadMissions(P.currentYearId||null); }
 };
 
 function _autoSelectFirstDate(selId, loadFnName) {
