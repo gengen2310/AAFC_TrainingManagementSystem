@@ -28,12 +28,24 @@ async function deactivateYear(page: import("@playwright/test").Page, hdr: Record
   });
 }
 
+async function allocateYear(page: import("@playwright/test").Page, hdr: Record<string, string>, start: number): Promise<number> {
+  const response = await page.request.get(`${API}/planning/years`, { headers: hdr });
+  expect(response.ok()).toBe(true);
+  const years = (await response.json()) as { year: number }[];
+  const used = new Set(years.map((row) => row.year));
+  for (let offset = 0; offset < 1000; offset += 1) {
+    const candidate = start + offset;
+    if (!used.has(candidate) && !used.has(candidate + 1)) return candidate;
+  }
+  throw new Error(`Could not allocate an unused rollover year from ${start}`);
+}
+
 test.describe("Year rollover", () => {
   const RUN_ID = Date.now();
 
   test("sqn_admin can rollover a planning year with parade dates", async ({ page }) => {
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2000 + (RUN_ID % 7998);
+    const srcYear = await allocateYear(page, hdr, 2000 + (RUN_ID % 1800));
     let yearId = "";
     let newYearId = "";
 
@@ -107,7 +119,10 @@ test.describe("Year rollover", () => {
 
   test("duplicate rollover returns 409", async ({ page }) => {
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2100 + (RUN_ID % 7898);
+    // Keep each scenario in a disjoint year range. The CI database retains
+    // inactive planning years, so adjacent tests must not derive overlapping
+    // source/target pairs from the same run id.
+    const srcYear = await allocateYear(page, hdr, 4000 + (RUN_ID % 1800));
     let yearId = "";
     let rolledYearId = "";
 
@@ -137,7 +152,7 @@ test.describe("Year rollover", () => {
   test("sqn_general cannot rollover", async ({ page }) => {
     const adminHdr = await authHeader(page, "ADMIN703");
     const genHdr = await authHeader(page, "703SQN2026");
-    const srcYear = 2200 + (RUN_ID % 7798);
+    const srcYear = await allocateYear(page, adminHdr, 6000 + (RUN_ID % 1800));
     let yearId = "";
 
     try {
@@ -161,7 +176,7 @@ test.describe("Year rollover", () => {
     await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = 2300 + (RUN_ID % 7698);
+    const srcYear = await allocateYear(page, hdr, 8000 + (RUN_ID % 1500));
     let yearId = "";
     let rolledYearId = "";
 

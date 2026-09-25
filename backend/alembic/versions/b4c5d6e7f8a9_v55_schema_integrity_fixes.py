@@ -18,7 +18,6 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name  # "sqlite" or "postgresql"
-
     # ── R5-M14: parade_night_timing_overrides ───────────────────────────────
     # The column had unique=True which blocks creating a replacement override
     # after the old one is archived (soft-deleted). Replace with a partial
@@ -50,9 +49,15 @@ def upgrade():
             "WHERE NOT is_archived"
         ))
     else:
+        # The pre-v55 SQLite schema may retain the original full-unique index
+        # under either Alembic's generated name or the model's name.
+        op.execute(sa.text(
+            "DROP INDEX IF EXISTS uq_pnto_parade_night_id"
+        ))
         # SQLite: batch_alter_table recreates without the old unique index.
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
-            batch_op.drop_index("ix_parade_night_timing_overrides_parade_night_id")
+            batch_op.drop_constraint("uq_pnto_parade_night_id", type_="unique")
+            batch_op.drop_index("ix_pnto_parade_night_id")
             batch_op.create_index(
                 "ix_pnto_parade_night_id",
                 ["parade_night_id"],
@@ -127,7 +132,10 @@ def upgrade():
             "ON DELETE SET NULL"
         ))
     else:
-        with op.batch_alter_table("planning_conflicts") as batch_op:
+        with op.batch_alter_table(
+            "planning_conflicts",
+            reflect_kwargs={"resolve_fks": False},
+        ) as batch_op:
             batch_op.create_foreign_key(
                 "fk_planning_conflicts_session",
                 "sessions",
@@ -166,16 +174,54 @@ def downgrade():
         # ix_parade_night_timing_overrides_parade_night_id is a no-op on the
         # canonical chain, so there is nothing to recreate here.
     else:
-        with op.batch_alter_table("planning_conflicts") as batch_op:
+        with op.batch_alter_table(
+            "planning_conflicts",
+            reflect_kwargs={"resolve_fks": False},
+        ) as batch_op:
             batch_op.drop_constraint("fk_planning_conflicts_session", type_="foreignkey")
-        with op.batch_alter_table("session_audience") as batch_op:
-            batch_op.drop_constraint("uq_session_audience_pair", type_="unique")
+        # SQLite stores both named UNIQUE constraints as anonymous
+        # sqlite_autoindex entries, so Alembic cannot selectively drop the
+        # migration-added one. Rebuild the table while retaining v49's
+        # pre-existing constraint.
+        op.execute(sa.text("""
+            CREATE TABLE session_audience__v55_downgrade (
+                id VARCHAR(36) NOT NULL,
+                session_id VARCHAR(36) NOT NULL,
+                training_class_id VARCHAR(36) NOT NULL,
+                outcome_override VARCHAR(30),
+                outcome_override_reason TEXT,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                created_by VARCHAR(36),
+                updated_by VARCHAR(36),
+                PRIMARY KEY (id),
+                CONSTRAINT uq_session_audience_session_class
+                    UNIQUE (session_id, training_class_id),
+                FOREIGN KEY(training_class_id) REFERENCES training_classes (id),
+                FOREIGN KEY(session_id) REFERENCES sessions (id)
+            )
+        """))
+        op.execute(sa.text("""
+            INSERT INTO session_audience__v55_downgrade
+            SELECT id, session_id, training_class_id, outcome_override,
+                   outcome_override_reason, created_at, updated_at,
+                   created_by, updated_by
+            FROM session_audience
+        """))
+        op.drop_table("session_audience")
+        op.rename_table("session_audience__v55_downgrade", "session_audience")
+        op.create_index("ix_session_audience_training_class_id", "session_audience", ["training_class_id"])
+        op.create_index("ix_session_audience_session_id", "session_audience", ["session_id"])
         op.drop_index("uq_pnto_active_per_night",
                       table_name="parade_night_timing_overrides")
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
             batch_op.drop_index("ix_pnto_parade_night_id")
             batch_op.create_index(
-                "ix_parade_night_timing_overrides_parade_night_id",
+                "ix_pnto_parade_night_id",
                 ["parade_night_id"],
-                unique=True,
+                unique=False,
+            )
+            batch_op.create_unique_constraint(
+                "uq_pnto_parade_night_id",
+                ["parade_night_id"],
             )

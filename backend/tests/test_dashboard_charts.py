@@ -4,6 +4,7 @@ Covers: auth, scope detection, chart shape, key presence, empty state,
 squadron/wing/national scope, window parameter validation.
 """
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from conftest import login
@@ -281,6 +282,75 @@ def test_squadron_returns_facilitator_status_distribution(client):
     counts = {row["status"]: row["count"] for row in fsd["data"]}
     assert sum(counts.values()) == 5
     assert counts["on_leave"] == 0
+
+
+def _facilitator_status_total(client, headers):
+    charts = _charts(client.get(CHARTS_URL + "?window=term", headers=headers))
+    return sum(row["count"] for row in charts["facilitator_status_distribution"]["data"])
+
+
+def test_facilitator_chart_tracks_active_archive_and_merge_lifecycle(client):
+    """Current facilitator charts count active canonical rows only.
+
+    Archived rows remain available through include_archived for history, but
+    must not inflate the operational status or type summaries. A merge archives
+    the source while retaining the target, so the total drops by one.
+    """
+    hdrs = _sqn_admin(client)
+    baseline = _facilitator_status_total(client, hdrs)
+    suffix = uuid4().hex[:10]
+
+    def create(label):
+        response = client.post(
+            "/api/facilitators",
+            json={"first_name": f"REM111{label}{suffix}", "last_name": "ChartLifecycle"},
+            headers=hdrs,
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["facilitator_id"]
+
+    archived_id = create("Archived")
+    assert _facilitator_status_total(client, hdrs) == baseline + 1
+    assert client.delete(f"/api/facilitators/{archived_id}", headers=hdrs).status_code == 200
+    assert _facilitator_status_total(client, hdrs) == baseline
+    archived = client.get("/api/facilitators?include_archived=true", headers=hdrs)
+    archived_row = next(row for row in archived.json() if row["facilitator_id"] == archived_id)
+    assert archived_row["is_archived"] is True
+
+    target_id = create("Target")
+    source_id = create("Source")
+    assert _facilitator_status_total(client, hdrs) == baseline + 2
+    merged = client.post(
+        f"/api/facilitators/{target_id}/absorb",
+        json={"source_id": source_id},
+        headers=hdrs,
+    )
+    assert merged.status_code == 200, merged.text
+    assert _facilitator_status_total(client, hdrs) == baseline + 1
+    active_rows = client.get("/api/facilitators", headers=hdrs).json()
+    assert {row["facilitator_id"] for row in active_rows} >= {target_id}
+    assert source_id not in {row["facilitator_id"] for row in active_rows}
+
+    # Keep the shared seeded test database isolated for later tests.
+    for facilitator_id in (target_id,):
+        assert client.delete(f"/api/facilitators/{facilitator_id}", headers=hdrs).status_code == 200
+
+
+def test_facilitator_chart_respects_squadron_scope(client):
+    """A facilitator created in 703 must not appear in 704's chart."""
+    hdrs_703 = _sqn_admin(client)
+    hdrs_704 = login(client, "ADMIN704")
+    suffix = uuid4().hex[:10]
+    created = client.post(
+        "/api/facilitators",
+        json={"first_name": f"REM111Scope{suffix}", "last_name": "ChartLifecycle"},
+        headers=hdrs_703,
+    )
+    assert created.status_code == 200, created.text
+    facilitator_id = created.json()["facilitator_id"]
+    before_704 = _facilitator_status_total(client, hdrs_704)
+    assert before_704 == 0
+    assert client.delete(f"/api/facilitators/{facilitator_id}", headers=hdrs_703).status_code == 200
 
 def test_squadron_returns_subject_area_resilience(client):
     hdrs = _sqn_admin(client)

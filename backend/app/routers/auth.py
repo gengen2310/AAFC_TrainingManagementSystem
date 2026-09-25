@@ -316,7 +316,12 @@ def logout(response: Response, request: Request, db: DBSession = Depends(get_db)
             audit(db, p, object_type="proxy", object_id=ps.acting_squadron_id,
                   action=("proxy_exit_on_logout" if ps.mode == "proxy" else "intervention_exit_on_logout"))
     audit(db, p, object_type="auth", object_id=p.user_id, action="logout")
-    response.delete_cookie(settings.COOKIE_NAME)
+    response.delete_cookie(
+        settings.COOKIE_NAME,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+    )
     return {"ok": True}
 
 

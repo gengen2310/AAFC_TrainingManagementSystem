@@ -29,7 +29,7 @@ test.beforeEach(async () => {
 // ---------------------------------------------------------------------------
 const cleanupFns: (() => Promise<void>)[] = [];
 
-test.afterEach(async ({}, testInfo) => {
+test.afterEach(async ({ page: _page }, testInfo) => {
   // Give cleanup its own 60-second budget regardless of how long the test body ran.
   testInfo.setTimeout(60_000);
   const fns = cleanupFns.splice(0);
@@ -163,6 +163,10 @@ test("CLASS-19: class focus chip — clicking a class chip dims sessions not ass
   const allChip = page.locator('.pw-filter-chips button[aria-pressed="true"]').first();
   await expect(allChip).toContainText("All");
 
+  // Wait for the period grid before clicking — confirms the annual-program query
+  // has resolved in addition to trainingClasses (two independent React Query keys).
+  await expect(page.locator('.pw-night-grid').first()).toBeVisible({ timeout: 15000 });
+
   // Click the first class chip.
   await classChip.click();
 
@@ -217,6 +221,10 @@ test("CLASS-21: tier filter — 'Foundation' chip dims a session with core_statu
   // Initially "All" is pressed (aria-pressed="true") for the tier section.
   const tierAllChip = page.locator('.pw-filter-chips button', { hasText: 'All' }).first();
   await expect(tierAllChip).toHaveAttribute('aria-pressed', 'true');
+
+  // Wait for the period grid before clicking — confirms the annual-program query
+  // has resolved in addition to trainingClasses (two independent React Query keys).
+  await expect(page.locator('.pw-night-grid').first()).toBeVisible({ timeout: 15000 });
 
   // Click "Foundation" chip.
   const foundationChip = page.locator('.pw-filter-chips button', { hasText: 'Foundation' });
@@ -328,6 +336,10 @@ test("CLASS-22: stage focus — clicking a stage chip dims sessions from other s
   const stageFocusSection = page.locator('.pw-section-hdr', { hasText: 'Stage focus' });
   await expect(stageFocusSection).toBeVisible({ timeout: 10000 });
 
+  // Wait for the period grid before clicking — confirms the annual-program query
+  // has resolved in addition to trainingClasses (two independent React Query keys).
+  await expect(page.locator('.pw-night-grid').first()).toBeVisible({ timeout: 15000 });
+
   // Click Stage A chip.
   const stageAChip = page.locator('.pw-filter-chips button[aria-pressed]', { hasText: stageAName });
   await expect(stageAChip).toBeVisible({ timeout: 5000 });
@@ -363,8 +375,9 @@ test("CLASS-23: collapse button — clicking collapse hides block body; clicking
   await expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
 
   // Block body contains the period grid table (.pw-night-grid), hidden on collapse.
+  // 15 s gives both the annual-program query AND trainingClasses query time to resolve.
   const blockGrid = page.locator('.pw-night-grid').first();
-  await expect(blockGrid).toBeVisible({ timeout: 5000 });
+  await expect(blockGrid).toBeVisible({ timeout: 15000 });
 
   // Collapse.
   await collapseBtn.click();

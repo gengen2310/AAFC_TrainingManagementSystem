@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- data tables use keyboard-scrollable regions */
 import { useState, type ReactNode } from "react";
 
 // ── Sortable comparison table (Wing: squadrons; National: wings) ──
@@ -89,8 +90,9 @@ export function GapHeatmap({ rows, cols, label }: {
     if (pct < 34) return "hm-warn";
     return "hm-red";
   };
+  // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- wide data table needs keyboard scrolling
   return (
-    <div className="heatmap-wrap" tabIndex={0}>
+    <div className="heatmap-wrap" tabIndex={0} role="region" aria-label={label}>
       <table className="heatmap">
         <caption className="vis-hidden">{label}</caption>
         <thead>
@@ -132,8 +134,9 @@ export function HeatmapGrid({ rows, cols, label }: {
   label: string;
 }) {
   const tone = (v: number | undefined) => v == null ? "hm-na" : v >= 67 ? "hm-ok" : v >= 34 ? "hm-warn" : "hm-red";
+  // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- wide data table needs keyboard scrolling
   return (
-    <div className="heatmap-wrap" tabIndex={0}>
+    <div className="heatmap-wrap" tabIndex={0} role="region" aria-label={label}>
       <table className="heatmap">
         <caption className="vis-hidden">{label}</caption>
         <thead>
@@ -154,3 +157,5 @@ export function HeatmapGrid({ rows, cols, label }: {
     </div>
   );
 }
+
+/* eslint-enable jsx-a11y/no-noninteractive-tabindex */

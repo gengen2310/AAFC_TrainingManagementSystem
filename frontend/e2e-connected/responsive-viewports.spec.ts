@@ -35,21 +35,46 @@ async function loginSquadronAdmin(page: Page) {
 }
 
 async function expectNoRootHorizontalOverflow(page: Page, width: number) {
-  const metrics = await page.evaluate(() => ({
-    viewportWidth: window.innerWidth,
-    documentClientWidth: document.documentElement.clientWidth,
-    documentScrollWidth: document.documentElement.scrollWidth,
-    bodyScrollWidth: document.body.scrollWidth,
-  }));
+  const metrics = await page.evaluate(() => {
+    const clientWidth = document.documentElement.clientWidth;
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>("body *"))
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          tag: el.tagName.toLowerCase(),
+          id: el.id,
+          cls: typeof el.className === "string" ? el.className : "",
+          left: Math.round(r.left),
+          right: Math.round(r.right),
+          width: Math.round(r.width),
+          text: (el.innerText || "").replace(/\s+/g, " ").trim().slice(0, 80),
+        };
+      })
+      .filter((x) => x.right > clientWidth + 1 || x.left < -1)
+      .sort((a, b) => (b.right - clientWidth) - (a.right - clientWidth))
+      .slice(0, 8);
+
+    return {
+      viewportWidth: window.innerWidth,
+      documentClientWidth: clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      bodyScrollWidth: document.body.scrollWidth,
+      offenders,
+    };
+  });
+
+  const offenderText = metrics.offenders.length
+    ? ` offenders=${JSON.stringify(metrics.offenders)}`
+    : " offenders=[]";
 
   expect(metrics.viewportWidth).toBe(width);
   expect(
     metrics.documentScrollWidth,
-    `document overflow at ${width}px: scrollWidth=${metrics.documentScrollWidth}, clientWidth=${metrics.documentClientWidth}`,
+    `document overflow at ${width}px: scrollWidth=${metrics.documentScrollWidth}, clientWidth=${metrics.documentClientWidth}.${offenderText}`,
   ).toBeLessThanOrEqual(metrics.documentClientWidth + 1);
   expect(
     metrics.bodyScrollWidth,
-    `body overflow at ${width}px: scrollWidth=${metrics.bodyScrollWidth}, clientWidth=${metrics.documentClientWidth}`,
+    `body overflow at ${width}px: scrollWidth=${metrics.bodyScrollWidth}, clientWidth=${metrics.documentClientWidth}.${offenderText}`,
   ).toBeLessThanOrEqual(metrics.documentClientWidth + 1);
 }
 

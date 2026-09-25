@@ -1,13 +1,13 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
-// REM-21: expands the Getting Started guided workflow from 9 steps (2
-// national + 7 squadron) to 17 (2 national + 15 squadron), backed by
+// REM-21: expands the Getting Started guided workflow, backed by
 // GET /api/setup/status (backend/app/routers/setup.py). The frontend page
 // itself is entirely data-driven (_renderGsSections()/_gsStepRow() render
-// whatever `steps` array the backend returns) -- no new nav wiring was
-// needed, only the new "Optional" badge for flights_created, the one step
-// that's guidance rather than a completion requirement.
+// whatever `steps` array the backend returns). The backend currently returns
+// 14 squadron steps; "cadets_added" was removed 2026-08-28 and
+// "flights_created" was removed 2026-08-25. The optional step is now
+// training_classes_created ("Create training classes").
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
@@ -30,7 +30,7 @@ async function loginSquadron(page: Page, code: string) {
   await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
-test("Getting Started shows all 15 squadron steps, including the new ones, with no console errors", async ({ page }) => {
+test("Getting Started shows all 14 squadron steps with no console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await loginSquadron(page, "ADMIN703");
@@ -40,14 +40,19 @@ test("Getting Started shows all 15 squadron steps, including the new ones, with 
   await expect(body).toBeVisible({ timeout: 10000 });
   await expect(body.getByText("Squadron Setup", { exact: false })).toBeVisible({ timeout: 10000 });
 
-  // A representative sample of the newly added steps -- not every one, to
-  // keep this test focused, but enough to prove the fuller sequence reached
-  // the actual rendered page, not just the API response.
+  // Representative sample from the current 14-step backend definition
+  // (setup.py). Labels must match exactly what the backend returns.
+  // "cadets_added" (2026-08-28) and "flights_created" (2026-08-25) were
+  // deliberately removed from the checklist -- they must NOT appear here.
   for (const label of [
-    "Set Up Active Planning Year", "Add Equipment", "Set Squadron Crest",
-    "Add Cadets to Squadron Roster", "Classify Activities by Priority & Audience",
-    "Review Annual Training Program Anchor Events", "Publish a Parade Night",
-    "Organise Cadets into Flights",
+    "Create training classes",       // training_classes_created (optional)
+    "Add facilitators",              // facilitators_added
+    "Add equipment",                 // equipment_added
+    "Set the squadron crest",        // crest_set
+    "Classify activities by priority and audience",  // activities_classified
+    "Review annual program anchor events",           // anchor_events_reviewed
+    "Publish a parade night",        // parade_night_published
+    "Schedule curriculum sessions",  // curriculum_coverage
   ]) {
     await expect(body.getByText(label, { exact: true })).toBeVisible();
   }
@@ -55,14 +60,16 @@ test("Getting Started shows all 15 squadron steps, including the new ones, with 
   expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
 });
 
-test("Organise Cadets into Flights shows an Optional badge, distinguishing it from required steps", async ({ page }) => {
+test("Create training classes shows an Optional badge, distinguishing it from required steps", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await page.evaluate(() => (window as any).nav("getting-started"));
   const body = page.locator("#gs-body");
   await expect(body).toBeVisible({ timeout: 10000 });
 
-  const flightsRow = body.locator('[data-step-key="flights_created"]');
-  await expect(flightsRow.getByText("Optional", { exact: true })).toBeVisible();
+  // training_classes_created is the one optional step in the current
+  // 14-step backend definition. "flights_created" was removed 2026-08-25.
+  const classesRow = body.locator('[data-step-key="training_classes_created"]');
+  await expect(classesRow.getByText("Optional", { exact: true })).toBeVisible();
 
   // A required step, by contrast, must NOT carry the Optional badge --
   // proves the badge is conditional on the backend's own `optional` flag,

@@ -12,7 +12,10 @@ const EFFECTIVE_BASE = process.env.E2E_BACKEND_BASE_URL || BASE;
 // IDs of parade nights created during this run — cleaned up in afterAll.
 const _createdPnIds: string[] = [];
 
-test.beforeAll(async () => {
+// Each case performs several login/read/write calls against the same process-
+// wide test limiter. Reset per test so the final direct export assertion cannot
+// inherit another scenario's exhausted budget and report a false endpoint failure.
+test.beforeEach(async () => {
   await resetBackendRateLimits(EFFECTIVE_BASE);
 });
 

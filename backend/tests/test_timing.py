@@ -43,7 +43,7 @@ def _create_template(client, headers, *, name="Test Template", effective_from="2
     return r.json()
 
 
-def _create_pn(client, headers, date="2026-09-15", session_count=None):
+def _create_pn(client, headers, date="2099-09-15", session_count=None):
     body = {"date": date, "term": "T3"}
     if session_count is not None:
         body["session_count"] = session_count
@@ -273,11 +273,11 @@ def test_future_parade_nights_use_new_template(client):
         {"display_order": 1, "block_name": "Period B", "block_type": "training_period",
          "is_instructional_period": True},
     ]
-    _create_template(client, h, name="Future 2-Session", effective_from="2026-11-01",
+    _create_template(client, h, name="Future 2-Session", effective_from="2098-11-01",
                      blocks=blocks)
 
-    # Create parade night on 2026-11-15 (after effective date) without specifying session_count
-    pnid = _create_pn(client, h, date="2026-11-15")
+    # Create parade night on 2098-11-15 (after effective date) without specifying session_count
+    pnid = _create_pn(client, h, date="2098-11-15")
 
     # The parade night should have session_count = 2 (from template)
     r = client.get("/api/parade-nights", headers=h)
@@ -341,10 +341,10 @@ def test_body_session_count_ignored_when_template_resolves(client):
         {"display_order": 2, "block_name": "Period 3", "block_type": "training_period",
          "is_instructional_period": True},
     ]
-    _create_template(client, h, name="3-IP Body-Ignored Test", effective_from="2026-12-01",
+    _create_template(client, h, name="3-IP Body-Ignored Test", effective_from="2098-12-01",
                      blocks=blocks)
 
-    pnid = _create_pn(client, h, date="2026-12-15", session_count=2)
+    pnid = _create_pn(client, h, date="2098-12-15", session_count=2)
     r = client.get("/api/parade-nights", headers=h)
     pn = next((p for p in r.json() if p["parade_night_id"] == pnid), None)
     assert pn is not None
@@ -426,7 +426,7 @@ def test_one_night_override_does_not_change_default_template(client):
 
 def test_get_parade_night_timing_shows_override(client):
     h = login(client, "ADMIN703")
-    pnid = _create_pn(client, h, date="2026-10-07")
+    pnid = _create_pn(client, h, date="2099-10-07")
     short = _create_template(client, h, name="Override Visible", effective_from="2026-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
@@ -446,7 +446,7 @@ def test_get_parade_night_timing_shows_override(client):
 
 def test_remove_timing_override(client):
     h = login(client, "ADMIN703")
-    pnid = _create_pn(client, h, date="2026-10-08")
+    pnid = _create_pn(client, h, date="2099-10-08")
     short = _create_template(client, h, name="Remove Override Test", effective_from="2026-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
@@ -570,7 +570,7 @@ def test_audit_entry_created_for_template_edit(client):
 
 def test_audit_entry_for_timing_override(client):
     h = login(client, "ADMIN703")
-    pnid = _create_pn(client, h, date="2026-10-11")
+    pnid = _create_pn(client, h, date="2099-10-11")
     short = _create_template(client, h, name="Audit Override", effective_from="2026-01-01",
                               blocks=[{"display_order": 0, "block_name": "P1",
                                        "block_type": "training_period",

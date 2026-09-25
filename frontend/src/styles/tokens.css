@@ -120,6 +120,16 @@
   --muted-text:  var(--muted);
   --success:     var(--ok);
   --warning:     var(--warn);
+  --success-tint-bg: #e8f5ee;
+  --danger-tint-bg:  #fdecee;
+  --warning-tint-bg: #fff3e0;
+  --info-tint-bg:    #ebf5ff;
+  --holiday-bg:      #fff3e0;
+  --holiday-border:  #ffb74d;
+  --success-on-tint: #0f5a33;
+  --danger-on-tint:  #8a0f22;
+  --warning-on-tint: #7a3a00;
+  --info-on-tint:    #004b8d;
   /* Foreground for text sitting ON --warn/--warning. Must be redefined in every
      theme: --warn is a mid amber in light/dark but a dark brown in hc and
      prefers-contrast, so a single hard-coded ink cannot serve both. */
@@ -186,6 +196,16 @@ html[data-theme="dark"] {
   --danger-on-tint: #ff6b6b;   /* 5.03:1 */
   --resch-on-tint:  #df68ff;   /* 5.52:1 — base #7c3aed was 2.69:1 on the dark tint */
   --blue-on-tint:   #51b0e3;   /* 6.53:1 — base #004b8d was 1.8:1 on the dark tint */
+  --success-tint-bg: #173b2b;
+  --danger-tint-bg:  #3a1620;
+  --warning-tint-bg: #3a2b12;
+  --info-tint-bg:    #152f47;
+  --holiday-bg:      #3a2b12;
+  --holiday-border:  #d9982e;
+  --success-on-tint: #9de0b8;
+  --danger-on-tint:  #ffb4be;
+  --warning-on-tint: #ffd080;
+  --info-on-tint:    #9ed7ff;
   --danger:     var(--red);
   --aafc-blue:  var(--blue);
   --aafc-dark-blue: var(--primary);
@@ -225,6 +245,16 @@ html[data-theme="hc"] {
   --danger-on-tint: #ad000e;   /* 5.71:1 — base #cc0011 was 4.45:1 */
   --resch-on-tint:  #44007a;   /* 10.08:1 */
   --blue-on-tint:   #004b8d;   /* 6.81:1 */
+  --success-tint-bg: #e8f5ee;
+  --danger-tint-bg:  #fdecee;
+  --warning-tint-bg: #fff3e0;
+  --info-tint-bg:    #ebf5ff;
+  --holiday-bg:      #fff3e0;
+  --holiday-border:  #6a3800;
+  --success-on-tint: #004d24;
+  --danger-on-tint:  #ad000e;
+  --warning-on-tint: #6a3800;
+  --info-on-tint:    #004b8d;
   --rescheduled: #44007a;
   --aafc-blue:  var(--blue);
   --aafc-dark-blue: var(--dark);
@@ -263,6 +293,16 @@ html[data-theme="hc"] {
     --danger-on-tint: #ad000e;
     --resch-on-tint:  #44007a;
     --blue-on-tint:   #004b8d;
+    --success-tint-bg: #e8f5ee;
+    --danger-tint-bg:  #fdecee;
+    --warning-tint-bg: #fff3e0;
+    --info-tint-bg:    #ebf5ff;
+    --holiday-bg:      #fff3e0;
+    --holiday-border:  #6a3800;
+    --success-on-tint: #004d24;
+    --danger-on-tint:  #ad000e;
+    --warning-on-tint: #6a3800;
+    --info-on-tint:    #004b8d;
   }
 }
 

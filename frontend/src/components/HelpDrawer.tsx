@@ -199,7 +199,8 @@ export function HelpDrawer({ onClose }: Props) {
         ))}
       </div>
 
-      <div className="pw-help-body" tabIndex={0}>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- wide help content needs keyboard scrolling */}
+      <div className="pw-help-body" tabIndex={0} role="region" aria-label="Help content">
         {tab === "overview" && (
           <div className="pw-help-section">
             <h3>Two systems, one program</h3>

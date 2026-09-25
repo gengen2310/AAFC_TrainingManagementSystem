@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 interface ConfirmState {
   message: string;
@@ -19,6 +19,7 @@ export function useConfirm() { return useContext(Ctx); }
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConfirmState | null>(null);
   const resolveRef = useRef<((ok: boolean) => void) | null>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const confirm = useCallback(
     (message: string, opts: { title?: string; confirmLabel?: string; danger?: boolean } = {}) =>
@@ -35,6 +36,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     resolveRef.current = null;
     if (cb) cb(ok);
   }
+
+  useEffect(() => {
+    if (state) confirmButtonRef.current?.focus();
+  }, [state]);
 
   return (
     <Ctx.Provider value={{ confirm }}>
@@ -68,7 +73,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <button
                 className={`btn sm ${state.danger ? "danger" : ""}`}
                 onClick={() => close(true)}
-                autoFocus
+                ref={confirmButtonRef}
               >
                 {state.confirmLabel ?? "Confirm"}
               </button>

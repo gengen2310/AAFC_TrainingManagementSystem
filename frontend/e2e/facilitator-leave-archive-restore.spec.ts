@@ -23,7 +23,7 @@ test.beforeAll(async () => {
 // in afterEach, separate from the test body's 60-second budget.
 const cleanupFns: (() => Promise<void>)[] = [];
 
-test.afterEach(async ({}, testInfo) => {
+test.afterEach(async ({ page: _page }, testInfo) => {
   testInfo.setTimeout(30_000);
   const fns = cleanupFns.splice(0);
   for (const fn of fns) {

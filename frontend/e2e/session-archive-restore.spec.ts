@@ -22,6 +22,12 @@ async function authHeader(page: Page, code: string): Promise<Record<string, stri
 }
 
 test("an archived session is hidden from the Night grid, visible via Show archived sessions, and Restore brings it back", async ({ page }) => {
+  // Firefox + Vite-proxy over SQLite is slower than Chromium: the initial
+  // archived-sessions GET (Show archived sessions) and the post-restore
+  // refetch can each take > 15 s. 90 s gives all three network round-trips
+  // (archived-sessions fetch, restore POST, archived-sessions refetch)
+  // enough headroom without being unreasonably long.
+  test.setTimeout(90000);
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
@@ -103,17 +109,28 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
 
     await page.getByRole("button", { name: "Show archived sessions" }).click();
     const row = page.locator("tr", { hasText: activityTitle });
-    await expect(row).toBeVisible({ timeout: 5000 });
+    await expect(row).toBeVisible({ timeout: 60000 });
 
-    await row.getByRole("button", { name: "Restore" }).click();
+    // Wait for the restore POST (200) before asserting UI state. The component
+    // fires invalidateQueries + refetchArchived without awaiting after the POST,
+    // so the spinner clears immediately and the archived list updates reactively
+    // once the GET lands. We give the DOM assertions generous timeouts so
+    // Firefox's slower JS event loop has time to process both refetches.
+    await Promise.all([
+      page.waitForResponse(
+        r => r.url().includes(`/sessions/${sessionId}/restore`) && r.status() === 200,
+        { timeout: 20000 },
+      ),
+      row.getByRole("button", { name: "Restore" }).click(),
+    ]);
     // The archived table (this session was the only entry) collapses to the
     // empty state -- checked directly rather than "no <tr> contains the
     // title" (too broad: the restored session's own live grid row also
     // contains the title once the weekly-program query re-fetches).
-    await expect(page.getByText("No archived sessions for this parade night.")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("No archived sessions for this parade night.")).toBeVisible({ timeout: 50000 });
 
     // Restored session must now render as a live grid cell.
-    await expect(page.locator(".pn-cell-title", { hasText: activityTitle })).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".pn-cell-title", { hasText: activityTitle })).toBeVisible({ timeout: 50000 });
   } finally {
     // Clean up -- archive the session, delete the training class, archive
     // the phase, then deactivate the year so nothing lingers.

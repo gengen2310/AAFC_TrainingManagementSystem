@@ -1,5 +1,13 @@
 # Frontend Rules — AAFC TMS
 
+## Mandatory visual design contract
+
+Before modifying any UI, read the repository-root [DESIGN.md](../../DESIGN.md). It is the
+authoritative visual design contract for both frontends. New or modified UI must comply with it;
+identify conflicting existing UI as design debt, and document any deliberate exception with
+explicit review and justification. The AAFC VIG remains the brand authority and WCAG 2.2 AA
+overrides aesthetic consistency. Do not duplicate the design system in this rule file.
+
 ## SPA structure
 
 - Single-file SPA: `connected-frontend/index.html`

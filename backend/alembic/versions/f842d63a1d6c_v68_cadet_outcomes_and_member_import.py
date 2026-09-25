@@ -70,4 +70,5 @@ def downgrade() -> None:
     op.drop_table("cadet_member_import_batches")
     op.drop_table("cadet_session_outcomes")
     with op.batch_alter_table("sessions") as batch_op:
+        batch_op.drop_index("ix_sessions_rescheduled_to_session_id")
         batch_op.drop_column("rescheduled_to_session_id")

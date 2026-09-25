@@ -1,12 +1,11 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
-// REM-96/REM-97: the duplicate-facilitator 409 warning must show enough of
-// the existing facilitator's profile (rank, type, subject areas, status,
-// last-updated) that a user can tell "same person, re-added by accident"
-// from "different person, same name" without leaving the Add Facilitator
-// modal. REM-96 specifically asked for rank to appear in the warning text
-// itself; REM-97 asked for the fuller profile card.
+// REM-96/REM-97: duplicate-facilitator detection must show enough of the
+// existing facilitator's profile (rank, type, subject areas, status,
+// last-updated) that a user can distinguish "same person, re-added by
+// accident" from "different person, same name" before deciding what to do.
+// The current workflow presents this in the dedicated "Possible Match" modal.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
@@ -31,15 +30,14 @@ async function loginSquadron(page: Page, code: string) {
   await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
 }
 
-test("adding a same-named facilitator shows the existing one's rank, type and subject areas inline", async ({ page }) => {
+test("adding a same-named facilitator shows the existing one's rank, type and subject areas in the Possible Match workflow", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
 
   const suffix = String(Date.now());
   const last = `Dup${suffix}`;
-
-  // Seed the "existing" facilitator directly via API for a deterministic profile.
   const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
   const base = LOCAL_API_BASE || "http://localhost:8000";
+
   const seedRes = await page.request.post(`${base}/api/facilitators`, {
     data: { first_name: "Alex", last_name: last, current_rank: "CUO", type: "Senior Cadet", subject_areas: ["Drill"] },
     headers: hdr,
@@ -55,28 +53,23 @@ test("adding a same-named facilitator shows the existing one's rank, type and su
   await page.locator("#fac-rank").fill("CSGT");
   await page.locator("#fac-save-btn").click();
 
-  const warn = page.locator("#fac-dup-warn");
-  await expect(warn).toBeVisible({ timeout: 8000 });
-  await expect(warn).toContainText("CUO"); // REM-96: rank in the warning text itself
-  await expect(warn).toContainText("Senior Cadet"); // REM-97: profile card
-  await expect(warn).toContainText("Drill");
-  await expect(warn).toContainText("Active");
+  // Duplicate detection now closes the Add modal and opens a dedicated
+  // decision surface. Assert the information a user actually sees rather than
+  // the retired inline #fac-dup-warn container.
+  const match = page.getByRole("dialog", { name: "Possible Match" });
+  await expect(match).toBeVisible({ timeout: 8000 });
+  await expect(match).toContainText("CUO");
+  await expect(match).toContainText("Senior Cadet");
+  await expect(match).toContainText("Drill");
+  await expect(match).toContainText("Active");
+  await expect(match.getByRole("button", { name: "Use Existing Facilitator" })).toBeVisible();
+  await expect(match.getByRole("button", { name: "Create a Different Person" })).toBeVisible();
+  await expect(match.getByRole("button", { name: "Merge Records" })).toBeVisible();
 
-  await page.locator("#fac-save-anyway-btn").click();
-  await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 8000 });
+  // Cancel leaves the existing profile untouched; no second duplicate record
+  // is needed to verify REM-96/97.
+  await match.getByRole("button", { name: "Cancel" }).click();
+  await expect(match).toBeHidden({ timeout: 5000 });
 
-  // Cleanup both facilitators created by this test. Best-effort: a transient
-  // hiccup on this GET must never fail the test after the real assertions
-  // above have already passed -- this is tidy-up, not verification.
-  try {
-    await page.request.delete(`${base}/api/facilitators/${existingId}`, { headers: hdr });
-    const facsRes = await page.request.get(`${base}/api/facilitators`, { headers: hdr });
-    const facs = await facsRes.json();
-    if (Array.isArray(facs)) {
-      const created = facs.find((f: { first_name?: string; last_name?: string }) => f.last_name === last);
-      if (created) await page.request.delete(`${base}/api/facilitators/${created.facilitator_id}`, { headers: hdr });
-    }
-  } catch {
-    // best-effort cleanup only
-  }
+  await page.request.delete(`${base}/api/facilitators/${existingId}`, { headers: hdr });
 });

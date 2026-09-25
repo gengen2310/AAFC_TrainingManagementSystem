@@ -128,7 +128,7 @@ body.pw-active .main {
   min-height: 70px;
 }
 .pw-date-cell:hover { border-color: var(--aafc-blue); }
-.pw-date-cell.holiday { background: #FFF3E0; border-color: #FFB74D; }
+.pw-date-cell.holiday { background: var(--holiday-bg); border-color: var(--holiday-border); }
 .pw-date-cell.conflict { border-color: var(--aafc-red); }
 .pw-date-label { font-weight: 800; font-size: var(--fs-sm); color: var(--text); margin-bottom: 4px; }
 .pw-date-type { font-size: var(--fs-2xs); color: var(--muted-text); }
@@ -140,10 +140,10 @@ body.pw-active .main {
   display: inline-block; font-size: var(--fs-2xs); font-weight: 700;
   padding: 2px 7px; border-radius: 20px; margin: 1px 2px 1px 0;
 }
-.pw-anchor-pill.must_attend { background: #FDECEE; color: #8A0F22; border: 1px solid var(--aafc-red); }
-.pw-anchor-pill.key_event { background: #E8F5EE; color: #0F5A33; border: 1px solid var(--success); }
+.pw-anchor-pill.must_attend { background: var(--danger-tint-bg); color: var(--danger-on-tint); border: 1px solid var(--aafc-red); }
+.pw-anchor-pill.key_event { background: var(--success-tint-bg); color: var(--success-on-tint); border: 1px solid var(--success); }
 .pw-anchor-pill.optional { background: var(--background); color: var(--muted-text); border: 1px solid var(--border); }
-.pw-anchor-pill.wing { background: #EBF5FF; color: #004B8D; border: 1px solid var(--aafc-blue); }
+.pw-anchor-pill.wing { background: var(--info-tint-bg); color: var(--info-on-tint); border: 1px solid var(--aafc-blue); }
 
 /* ── 8-week view ─────────────────────────────────────────── */
 .pw-8week { display: flex; flex-direction: column; gap: 12px; }
@@ -169,8 +169,8 @@ body.pw-active .main {
   font-size: var(--fs-xs); cursor: pointer; transition: border-color .12s;
 }
 .pw-sess-mini:hover { border-color: var(--aafc-blue); }
-.pw-sess-mini.conflict-room { border-color: var(--aafc-red); background: #FFF5F5; }
-.pw-sess-mini.conflict-fac { border-color: var(--warning); background: #FFFBF0; }
+.pw-sess-mini.conflict-room { border-color: var(--aafc-red); background: var(--danger-tint-bg); }
+.pw-sess-mini.conflict-fac { border-color: var(--warning); background: var(--warning-tint-bg); }
 .pw-sess-mini-period { font-size: var(--fs-2xs); font-weight: 700; color: var(--muted-text); margin-bottom: 2px; }
 .pw-sess-mini-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pw-sess-mini-fac { font-size: var(--fs-2xs); color: var(--muted-text); }
@@ -178,8 +178,8 @@ body.pw-active .main {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: var(--fs-2xs); font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 6px;
 }
-.pw-conflict-badge.room { background: #FDECEE; color: #8A0F22; }
-.pw-conflict-badge.fac { background: #FFF3E0; color: #7A3A00; }
+.pw-conflict-badge.room { background: var(--danger-tint-bg); color: var(--danger-on-tint); }
+.pw-conflict-badge.fac { background: var(--warning-tint-bg); color: var(--warning-on-tint); }
 .pw-conflict-badge.load { background: #FFF8E1; color: #5A4000; }
 
 /* ── Parade Night Grid ───────────────────────────────────── */
@@ -257,7 +257,7 @@ body.pw-active .main {
   border-radius: 2px;
 }
 .pn-cell-inner.empty { background: var(--background); }
-.pn-cell-inner.conflict-room { background: #FFF5F5; }
+.pn-cell-inner.conflict-room { background: var(--danger-tint-bg); }
 .pn-cell-inner.conflict-fac { background: #FFFBEC; }
 .pn-cell-inner.break-cell { background: var(--surface-2); text-align: center; color: var(--muted-on-sunk); font-style: italic; vertical-align: middle; display: flex; align-items: center; justify-content: center; }
 .pn-cell-title { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 3px; line-height: 1.3; }
@@ -274,7 +274,7 @@ body.pw-active .main {
   display: inline-block;
 }
 .pn-conflict-dot.room { background: var(--aafc-red); }
-.pn-conflict-dot.fac { background: #F57C00; }
+.pn-conflict-dot.fac { background: var(--warning); }
 .pn-conflict-dot.load { background: #FFB300; }
 .pn-add-btn {
   width: 100%; min-height: 80px; border: none;   /* AUDIT-2026-08 G3: was a fixed height */
@@ -283,7 +283,7 @@ body.pw-active .main {
   align-items: center; justify-content: center; gap: 4px;
   transition: background .1s;
 }
-.pn-add-btn:hover { background: #EBF5FF; color: var(--aafc-dark-blue); }
+.pn-add-btn:hover { background: var(--info-tint-bg); color: var(--info-on-tint); }
 .pn-add-btn:focus-visible {
   outline: 2px solid var(--accent, #51b0e3);
   outline-offset: -2px;
@@ -330,8 +330,8 @@ body.pw-active .main {
   display: flex; align-items: flex-start; gap: 7px;
   padding: 8px 10px; border-radius: 7px; font-size: var(--fs-sm); margin-bottom: 8px;
 }
-.pw-conflict-alert.err { background: #FDECEE; border: 1px solid var(--aafc-red); color: #8A0F22; }
-.pw-conflict-alert.warn { background: #FFF3E0; border: 1px solid #F57C00; color: #7A3A00; }
+.pw-conflict-alert.err { background: var(--danger-tint-bg); border: 1px solid var(--aafc-red); color: var(--danger-on-tint); }
+.pw-conflict-alert.warn { background: var(--warning-tint-bg); border: 1px solid var(--warning); color: var(--warning-on-tint); }
 .pw-conflict-alert.soft { background: #FFF8E1; border: 1px solid #FFB300; color: #5A4000; }
 .pw-override-box {
   border: 1px dashed var(--border); border-radius: 8px; padding: 10px; margin-top: 8px;
@@ -341,8 +341,8 @@ body.pw-active .main {
   display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs);
   padding: 2px 8px; border-radius: 20px; font-weight: 700;
 }
-.pw-badge-wing { background: #EBF5FF; color: #004B8D; border: 1px solid var(--aafc-blue); }
-.pw-badge-sqn { background: #E8F5EE; color: #0F5A33; border: 1px solid var(--success); }
+.pw-badge-wing { background: var(--info-tint-bg); color: var(--info-on-tint); border: 1px solid var(--aafc-blue); }
+.pw-badge-sqn { background: var(--success-tint-bg); color: var(--success-on-tint); border: 1px solid var(--success); }
 .pw-badge-national { background: #F2EBFE; color: #4A1080; border: 1px solid var(--rescheduled); }
 .pw-review-status { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
@@ -559,7 +559,7 @@ body.pw-active .main {
   transition: box-shadow .15s;
 }
 .pw-block:hover { box-shadow: 0 3px 10px rgba(0,47,101,.12); }
-.pw-block.holiday { background: #fffaf2; border-color: #f5c26b; }
+.pw-block.holiday { background: var(--holiday-bg); border-color: var(--holiday-border); }
 .pw-block.has-conflict { border-left: 3px solid var(--aafc-red); }
 .pw-block.skeleton { opacity: .55; }
 
@@ -571,22 +571,23 @@ body.pw-active .main {
   color: #fff;
   flex-shrink: 0;
 }
-.pw-block-hdr:hover { background: #003a80; }
-/* Header action button (opens parade night modal) — takes all available space */
-.pw-block-hdr-action {
-  flex: 1;
+/* Nav button: fills header space, resets <button> defaults, keeps dark-blue look. */
+.pw-block-hdr-nav {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 0 9px 14px;
+  flex: 1;
+  padding: 10px 14px 9px;
   background: none;
   border: none;
   color: #fff;
   cursor: pointer;
   user-select: none;
   text-align: left;
+  font: inherit;
   min-width: 0;
 }
+.pw-block-hdr-nav:hover { background: #003a80; }
 .pw-block-date {
   font-weight: 800;
   font-size: var(--fs-base);
@@ -615,7 +616,7 @@ body.pw-active .main {
   background: none;
   border: none;
   cursor: pointer;
-  color: #b3c1d1;
+  color: rgba(255,255,255,.7);
   font-size: var(--fs-3xs);
   padding: 2px 4px;
   flex-shrink: 0;
@@ -630,7 +631,7 @@ body.pw-active .main {
   border-radius: 4px;
   font-size: var(--fs-2xs);
   font-weight: 700;
-  color: #bfcbd9;
+  color: rgba(255,255,255,.75);
   padding: 2px 7px;
   cursor: pointer;
   transition: all .1s;
@@ -780,7 +781,7 @@ body.pw-active .main {
 .pn-conflict-dot.load { background: #ffb300; }
 
 /* ── Compact (sm) overrides — tighter cells, same structure ── */
-.pw-block.pw-block-sm .pw-block-hdr-action { padding: 7px 0 7px 10px; }
+.pw-block.pw-block-sm .pw-block-hdr-nav { padding: 7px 10px; }
 .pw-block.pw-block-sm .pw-block-date { font-size: var(--fs-sm); }
 .pw-block.pw-block-sm .pw-block-band-hdr { padding: 3px 10px; font-size: var(--fs-3xs); }
 .pw-block.pw-block-sm .pw-block-band-body { padding: 3px 10px 5px; }

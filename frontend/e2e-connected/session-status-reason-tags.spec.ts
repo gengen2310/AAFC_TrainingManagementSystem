@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // REM-23 continuation: #or-reason (the "reason required" modal shown when a
 // session's status changes to cancelled/not_delivered/delivered_with_issue)
@@ -14,9 +15,28 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
+const _createdPnIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -36,7 +56,15 @@ async function loginSquadron(page: Page, code: string) {
 
 async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix: string) {
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
-  const testDate = new Date(2066, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  const fixtureYear = 3000 + (Date.now() % 1000);
+  const yearRes = await page.request.post(`${base}/api/planning/years`, {
+    data: { year: fixtureYear, name: `${fixtureYear} Reason E2E ${uniqueSuffix}` },
+    headers: hdr,
+  });
+  expect(yearRes.ok() || yearRes.status() === 409).toBe(true);
+  const yearBody = await yearRes.json().catch(() => ({}));
+  const planningYearId = (yearBody.planning_year_id || yearBody.existing_id) as string;
+  const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -44,17 +72,22 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
+  _createdPnIds.push(pnId);
   await page.request.patch(`${base}/api/parade-nights/${pnId}`, { data: { notes: marker }, headers: hdr });
   const sessRes = await page.request.post(`${base}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1 }, headers: hdr,
   });
   expect(sessRes.ok()).toBe(true);
-  return marker;
+  return { marker, fixtureYear: planningYearId };
 }
 
-async function openQuickEditForFirstSession(page: Page, marker: string) {
+async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
-  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await selectConnectedPlanningYear(page, planningYearId);
+  await page.evaluate("nav('parade-nights')");
+  await page.evaluate("reloadAndRender()");
+  await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
+  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
   await expect(card).toBeVisible({ timeout: 8000 });
   const editBtn = card.getByRole("button", { name: "Edit Session 1" });
@@ -69,9 +102,9 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
-    const marker = await seedSession(page, hdr, String(Date.now()));
+    const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()));
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("cancelled");
     // The reason modal only opens as a blocking sub-step of saveSessEdit()
     // (see collectOutcomeReason()'s call site) -- not immediately on
@@ -97,16 +130,23 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
   test("+ Add new reason creates a governed tag and it appears in the dropdown selected", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
-    const marker = await seedSession(page, hdr, String(Date.now()) + "b");
+    const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "b");
 
-    await openQuickEditForFirstSession(page, marker);
+    await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("not_delivered");
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
 
+    // HARD-09 replaced native prompt() with the accessible promptText() modal.
+    // Exercise that real UI instead of accepting a native browser dialog that
+    // no longer exists.
     const reasonName = `E2E Custom Reason ${Date.now()}`;
-    page.once("dialog", (d) => d.accept(reasonName));
     await page.locator("#or-reason").selectOption("__add_new__");
+    const textModal = page.locator("#m-text-input");
+    await expect(textModal).toBeVisible({ timeout: 5000 });
+    await page.locator("#ti-input").fill(reasonName);
+    await page.locator("#ti-ok-btn").click();
+    await expect(textModal).toBeHidden({ timeout: 5000 });
     await expect(page.locator("#or-reason")).toHaveValue(reasonName, { timeout: 5000 });
 
     // Cleanup.

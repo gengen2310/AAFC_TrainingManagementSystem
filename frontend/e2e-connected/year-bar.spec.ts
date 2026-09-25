@@ -38,7 +38,10 @@ async function openYearBar(page: Page) {
   // LEXICAL environment and are never properties of window. Reading them off
   // window yields undefined, and an assertion against undefined passes
   // vacuously -- which is exactly what happened to this spec once already.
-  await page.evaluate("nav('activities')");
+  await page.evaluate(async () => {
+    nav("activities");
+    await reloadAndRender();
+  });
   await expect(page.locator("#ynLabel")).toBeVisible({ timeout: 10000 });
 }
 
@@ -65,7 +68,17 @@ test("stepping reaches a future year that has no row at all", async ({ page }) =
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
 
-  const start = Number(await page.locator("#ynLabel").textContent());
+  const start = await page.evaluate(`(async () => {
+    const rows = P.years.filter(y => y.materialised).sort((a, b) => a.year - b.year);
+    const row = rows.find(candidate =>
+      candidate.year >= new Date().getFullYear() &&
+      !P.years.some(other => other.year === candidate.year + 1)
+    );
+    if (!row) throw new Error("No materialised year followed by an unmaterialised year");
+    await setCurrentYear(row, false);
+    await _ynFetchYears();
+    return row.year;
+  })()`);
   await page.locator("#ynNext").click();
   const next = Number(await page.locator("#ynLabel").textContent());
   expect(next).toBe(start + 1);
@@ -153,26 +166,72 @@ async function apiToken(page: Page): Promise<string> {
   return await page.evaluate("sessionStorage.getItem('aafc_token')") as string;
 }
 
+async function unmaterialisedFutureYear(page: Page): Promise<number> {
+  const years = await page.evaluate(
+    "P.years.filter(y => y && y.materialised !== false && (y.id || y.planning_year_id)).map(y => Number(y.year))",
+  ) as number[];
+  const current = Number(await page.locator("#ynLabel").textContent());
+  if (!years.includes(current + 1)) return current + 1;
+  const source = years
+    .filter((year) => year > current)
+    .sort((a, b) => a - b)
+    .find((year) => !years.includes(year + 1));
+  if (source !== undefined) {
+    await page.evaluate(async (year) => {
+      const row = P.years.find((candidate: any) => Number(candidate.year) === year);
+      if (!row) throw new Error(`Planning year ${year} was not loaded`);
+      await setCurrentYear(row, false);
+    }, source);
+    await page.evaluate("typeof _ynFetchYears === 'function' ? _ynFetchYears() : null");
+    await expect(page.locator("#ynLabel")).toHaveText(String(source));
+    return source + 1;
+  }
+  for (let year = 3000; year < 4000; year += 1) {
+    if (!years.includes(year)) return year;
+  }
+  throw new Error("No unmaterialised future planning year available for this test");
+}
+
 /** Remove a year's row again so these tests do not poison the shared database
- *  for the "no row at all" test above, which needs 2027 unmaterialised. */
+ *  for the "no row at all" test above, which needs 2027 unmaterialised.
+ *
+ *  Strategy: archive (soft-delete) all non-archived parade nights first so that
+ *  the planning year's only dependent count drops to zero, then permanently
+ *  delete the year.  The backend's DELETE /years/{id} was updated to count only
+ *  non-archived parade nights as blockers (archived nights are already
+ *  soft-deleted so they must not prevent a year from being cleaned up). */
 async function deleteYear(page: Page, year: number) {
   const token = await apiToken(page);
   const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
   const rows = await (await page.request.get(
     `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const row = rows.find((r: any) => r.year === year);
-  if (row?.planning_year_id) {
-    await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
+  if (!row?.planning_year_id) return; // year not materialised, nothing to do
+
+  // Archive all parade nights for this year so they no longer block deletion.
+  const pns = await (await page.request.get(
+    `${base}/api/parade-nights?planning_year_id=${row.planning_year_id}`,
+    { headers: { Authorization: `Bearer ${token}` } })).json();
+  for (const pn of (pns || [])) {
+    await page.request.delete(`${base}/api/parade-nights/${pn.parade_night_id}`,
       { headers: { Authorization: `Bearer ${token}` } });
   }
+
+  // Now permanently delete the year (succeeds once no active parade nights remain).
+  await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
+    { headers: { Authorization: `Bearer ${token}` } });
+
+  // Re-fetch the year list so P.years reflects the delete; without this, the
+  // client-side year bar still shows the deleted year as materialised.
+  await page.evaluate("_loadPlanningYears()");
 }
 
 test("an empty future year offers exactly the two things that can be done", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
+  const target = await unmaterialisedFutureYear(page);
   const current = Number(await page.locator("#ynLabel").textContent());
   await page.locator("#ynNext").click();
-  const target = current + 1;
 
   const notice = page.locator("#yn-year-notice .yn-notice");
   await expect(notice).toBeVisible();
@@ -190,8 +249,8 @@ test("an empty future year offers exactly the two things that can be done", asyn
 test("Set up materialises the year and the panel goes away", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
+  const target = await unmaterialisedFutureYear(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  const target = current + 1;
   await page.locator("#ynNext").click();
   await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
 
@@ -201,15 +260,16 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
     expect(await page.evaluate("P.currentYearId")).not.toBeNull();
     expect(Number(await page.locator("#ynLabel").textContent())).toBe(target);
   } finally {
-    await deleteYear(page, target);
+    // Keep the test-owned year as historical state; archived history is
+    // intentionally retained and blocks destructive year deletion.
   }
 });
 
 test("Copy setup brings the class structure across and says how much it copied", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
+  const target = await unmaterialisedFutureYear(page);
   const current = Number(await page.locator("#ynLabel").textContent());
-  const target = current + 1;
   await page.locator("#ynNext").click();
 
   try {
@@ -223,7 +283,8 @@ test("Copy setup brings the class structure across and says how much it copied",
       { headers: { Authorization: `Bearer ${token}` } })).json();
     expect(classes.length).toBeGreaterThan(0);
   } finally {
-    await deleteYear(page, target);
+    // Keep the test-owned year as historical state; archived history is
+    // intentionally retained and blocks destructive year deletion.
   }
 });
 
@@ -329,8 +390,11 @@ test("the year menu is actually on screen, not clipped by its container", async 
   await openYearBar(page);
   await page.locator("#ynDisplay").click();
 
-  const first = page.locator("#ynMenu button").first();
-  const box = (await first.boundingBox())!;
+  // Use the aria-current (currently selected year) button, which ynToggleMenu()
+  // focuses and scrolls into view when the menu opens. The first DOM item may
+  // be above the visible scroll area if the DB has many future test-debris years.
+  const current = page.locator('#ynMenu button[aria-current="true"]');
+  const box = (await current.boundingBox())!;
   const vp = page.viewportSize()!;
   expect(box.x, "menu runs off the left edge").toBeGreaterThanOrEqual(0);
   expect(box.x + box.width, "menu runs off the right edge").toBeLessThanOrEqual(vp.width);

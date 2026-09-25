@@ -94,8 +94,10 @@ test("Year view shows a session's real Training Class assignment without opening
     // chip.
     await page.getByRole("button", { name: `CLASS-06 Year View Test ${suffix}` }).click();
 
-    // Year view is the default -- the class name must be visible directly
-    // in the calendar block, with no click required.
+    // Year view is the default -- wait for the period grid first (confirms
+    // both the annual-program and trainingClasses queries have resolved),
+    // then check the class name is visible inline in the block.
+    await expect(page.locator('.pw-night-grid').first()).toBeVisible({ timeout: 15000 });
     const classLine = page.locator(".pw-nc-classes", { hasText: className });
     await expect(classLine).toBeVisible({ timeout: 10000 });
   } finally {
