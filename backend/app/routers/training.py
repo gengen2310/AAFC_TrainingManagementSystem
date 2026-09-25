@@ -1934,7 +1934,11 @@ def create_cadet(body: CadetIn, db: DBSession = Depends(get_db), p: Principal = 
     if not service_number or not first_name or not last_name:
         raise HTTPException(400, detail={"error": "invalid_cadet", "message": "service_number, first_name and last_name are required"})
 
-    existing = db.query(Cadet).filter(Cadet.squadron_id == sq_id, Cadet.service_number == service_number, Cadet.is_archived == False).first()  # noqa: E712
+    existing = db.query(Cadet).filter(
+        Cadet.service_number == service_number,
+        Cadet.is_archived == False,
+        Cadet.active_status == True,
+    ).first()  # noqa: E712
     if existing:
         raise HTTPException(409, detail={"error": "cadet_already_exists", "cadet_id": existing.id})
 

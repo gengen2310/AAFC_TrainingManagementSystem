@@ -151,6 +151,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 @media screen{
   .print-pn-block{background:#fff;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:24px;}
   .print-schedule-table{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  .wp-table-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}
   .wp-schedule-scroll{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch;}
   .print-schedule-table th,.print-schedule-table td{border:1px solid var(--border-light);padding:6px 8px;vertical-align:top;text-align:left;}
   /* Specificity has to match .print-schedule-table td above, or the gridline wins
@@ -4237,14 +4238,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 <!-- Facilitator Duplicate Disambiguation (FAC-DUP-01) -->
 <div class="modal-bg" id="m-fac-dup" aria-modal="true" role="dialog" aria-labelledby="fac-dup-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="fac-dup-title">Possible Match</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-dup')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="fac-dup-title">Possible Match</div><button class="modal-x" aria-label="Close" onclick="_facDupCancel()">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="margin-bottom:14px">We found another Facilitator with the same name in this squadron.</div>
       <div id="fac-dup-existing-card"></div>
       <div id="fac-dup-merge-panel" style="display:none"></div>
     </div>
     <div class="modal-foot" id="fac-dup-actions">
-      <button class="btn btn-out" onclick="closeModal('m-fac-dup')">Cancel</button>
+      <button class="btn btn-out" onclick="_facDupCancel()">Cancel</button>
       <button class="btn btn-out" onclick="_facDupUseExisting()">Use Existing Facilitator</button>
       <button class="btn btn-out" onclick="_facDupCreateDifferent()">Create a Different Person</button>
       <button class="btn btn-warn" onclick="_facDupShowMergePreview()">Merge Records</button>
@@ -11531,12 +11532,12 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
     const sessionCount = Object.keys(byBlock).reduce((n,k) => n + ((byBlock[k]||[]).length), 0)
                        + unlinked.length;
     if (!sessionCount) {
-        return `<div class="print-pn-block"><table class="print-schedule-table"><thead>${nightHeaderRow}</thead></table>`
+        return `<div class="print-pn-block"><div class="wp-table-scroll" tabindex="0" role="region" aria-label="Weekly Program schedule"><table class="print-schedule-table"><thead>${nightHeaderRow}</thead></table></div>`
              + `<div class="wp-empty-night">No sessions planned</div></div>`;
     }
     // margin-bottom moved to the stylesheet: it was the only separation between
     // nights on screen, and an inline style cannot be overridden per medium.
-    return `<div class="print-pn-block"><table class="print-schedule-table">${thead}${tbody}</table></div>`;
+    return `<div class="print-pn-block"><div class="wp-table-scroll" tabindex="0" role="region" aria-label="Weekly Program schedule"><table class="print-schedule-table">${thead}${tbody}</table></div></div>`;
 }
 
 function _stageCodeMatchesCadetGroup(stageCode, cadetGroup) {
@@ -14439,6 +14440,12 @@ function _openFacDupModal(detail,pending){
   document.getElementById('fac-dup-merge-panel').style.display='none';
   document.getElementById('fac-dup-actions').style.display='';
   closeModal('m-add-fac'); openModal('m-fac-dup');
+}
+
+function _facDupCancel(){
+  closeModal('m-fac-dup');
+  _clearFacDupWarning();
+  openModal('m-add-fac');
 }
 
 function _facDupUseExisting(){
