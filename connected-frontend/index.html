@@ -482,9 +482,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .cls-table .cls-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
   font-size:var(--fs-xs);}
 .cls-table .cls-prog{width:38%;min-width:110px;}
+.cls-prog .pbar{height:14px;}
 .cls-table .cls-name{padding-left:22px;font-size:var(--fs-xs);color:var(--text-2);}
+.cls-num-badge{font-size:var(--fs-2xs);color:var(--muted);font-weight:600;margin-right:3px;}
 .cls-table .cls-stage-row th{font-size:var(--fs-sm);font-weight:800;color:var(--text);text-align:left;}
-.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:2px solid var(--border);background:var(--surface-2);}
+.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:2px solid var(--border);background:var(--surface-2);padding:9px 12px;}
 .cls-flag{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.05em;text-transform:uppercase;
   color:var(--red);white-space:nowrap;}
 @media(max-width:560px){
@@ -637,7 +639,7 @@ tbody tr:hover{background:#f0f7fc;}
 tbody td{padding:9px 12px;vertical-align:middle;}
 .clk-row{cursor:pointer;}.clk-row:hover td{background:#deeefa!important;}
 /* Training Classes — stage-grouped redesign */
-.tc-stage-header td{background:var(--surface-2);font-weight:700;font-size:var(--fs-xs);color:var(--steel);padding:6px 12px;border-top:2px solid var(--border);border-bottom:1px solid var(--border-light);}
+.tc-stage-header td{background:var(--surface-2);font-weight:700;font-size:var(--fs-xs);color:var(--steel);padding:9px 12px;border-top:2px solid var(--border);border-bottom:1px solid var(--border-light);}
 tr.tc-archived{opacity:.6;}
 .tc-overflow{position:relative;display:inline-block;vertical-align:middle;}
 .tc-overflow>summary{list-style:none;cursor:pointer;padding:4px 9px;font-size:var(--fs-xs);border-radius:5px;min-height:var(--ctl-min);min-width:var(--ctl-min);display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--surface);}
