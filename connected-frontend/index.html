@@ -9788,7 +9788,7 @@ async function openApplyTemplateModal(pnId){
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn btn-xs btn-primary" onclick="doApplyTemplate('${esc(t.id)}')">Apply</button>
-          <button class="btn btn-xs btn-red-out" title="Delete this template" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
+          <button class="btn btn-xs btn-red-out" title="Delete this template" aria-label="Delete template ${esc(t.name||t.id)}" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
         </div>
       </div>`).join('');
   }catch(e){ listEl.innerHTML=''; errEl.textContent=apiErr(e); errEl.style.display='block'; }
@@ -15113,10 +15113,10 @@ function _ttBlockRow(b,i){
   const dur=_ttDur(b);
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
-    <td style="padding:2px 3px"><input class="tt-block-name" value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input class="tt-block-name" value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" aria-label="Block name for period ${i+1}" style="width:100%;min-width:95px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value);_ttBSet(${i},'is_instructional_period',this.value==='training_period');ttSyncBlockType(this)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:var(--fs-xs)">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" aria-label="Start time for period ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" aria-label="End time for period ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted)">${dur!=null?dur:''}</td>
     <td style="padding:2px 4px;text-align:center"><input class="tt-block-ip" type="checkbox"${b.is_instructional_period?' checked':''}${b.block_type==='training_period'?' disabled':''} onchange="_ttBSet(${i},'is_instructional_period',this.checked)" aria-label="Instructional period for ${esc(b.block_name||'period '+(i+1))}"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_ttBSet(${i},'is_optional',this.checked)" aria-label="Optional for ${esc(b.block_name||'period '+(i+1))}"></td>
@@ -15254,10 +15254,10 @@ function _pnCbBlockRow(b, i) {
   })() : '';
   return `<tr>
     <td style="padding:2px 4px;color:var(--muted);font-size:var(--fs-xs)">${i+1}</td>
-    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:var(--fs-xs)" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='training_period');renderPNCbBlocks()">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" aria-label="Block name for block ${i+1}" style="width:100px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><select aria-label="Block type for block ${i+1}" style="font-size:var(--fs-xs)" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='training_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" aria-label="Start time for block ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" aria-label="End time for block ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted)">${sh}</td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_pnCbSet(${i},'is_instructional_period',this.checked)" aria-label="Instructional period for ${esc(b.block_name||'block '+(i+1))}"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_pnCbSet(${i},'is_optional',this.checked)" aria-label="Optional for ${esc(b.block_name||'block '+(i+1))}"></td>
@@ -19346,12 +19346,12 @@ async function sessionReschedule(sessionId,btn){
   }catch(e){showToast(apiErr(e),true);return;}
   if(nights.length===0){showToast('No upcoming Parade Nights found. Please create a Parade Night first.',true);return;}
   const opts=nights.map((pn,i)=>`${i+1}: ${pn.date}${pn.term?' ('+pn.term+')':''}`).join('\n');
-  const choice=await promptText('Reschedule Session',`Select a Parade Night (enter number):\n${opts}`);
+  const choice=await promptText('Reschedule Session',`Select a Parade Night (enter number):\n${opts}`,{okLabel:'Select'});
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
   if(isNaN(idx)||idx<0||idx>=nights.length){showToast('Invalid selection.',true);return;}
   const pnid=nights[idx].id||nights[idx].parade_night_id;
-  const period=await promptText('Reschedule Session','Period number',{defaultValue:'1'});
+  const period=await promptText('Reschedule Session','Period number',{defaultValue:'1',okLabel:'Confirm'});
   if(period===null)return;
   btn.disabled=true;
   try{
@@ -19472,7 +19472,7 @@ async function moveCadetsToClass(fromClassId){
   if(classes.length===0){showToast('No other Training Classes available to move to.',true);return;}
 
   const opts=classes.map((c,i)=>`${i+1}: ${c.display_name}`).join('\n');
-  const choice=await promptText('Move Cadets',`Select a target Training Class (enter number):\n${opts}`);
+  const choice=await promptText('Move Cadets',`Select a target Training Class (enter number):\n${opts}`,{okLabel:'Select'});
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
   if(isNaN(idx)||idx<0||idx>=classes.length){showToast('Invalid selection.',true);return;}
