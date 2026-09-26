@@ -64,6 +64,7 @@
   /* Status / semantic */
   --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
   --warn:        #c97a00;   --warn-bg: #fff3cd;   --warn-text: #7a5200; /* DES-H04: warn text that passes WCAG AA on --warn-bg (5.4:1) */
+  --on-warn-amber: #101A26; /* dark text on amber --warn bg in default context */
   --success-tint-bg: #e8f5ee; --danger-tint-bg: #fdecee; --warning-tint-bg: #fff3e0;
   --info-tint-bg: #ebf5ff; --holiday-bg: #fff3e0; --holiday-border: #ffb74d;
   --success-on-tint: #0f5a33; --danger-on-tint: #8a0f22;
@@ -225,6 +226,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
     --ok-text:  #003318;
     --warn:     #6a3800;
     --warn-bg:  #ffe090;
+    --on-warn-amber: #ffe090; /* light text needed on darkened amber #6a3800 in HC */
     --red:      #cc0011;
     --status-text-danger: #b00010;
     --accent-light: #c8e6ff;
@@ -252,6 +254,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   }
   /* Badges must be readable — darken muted variant */
   .badge.b-grey { color: #222 !important; background: #d0d0d0 !important; }
+  /* no scoped override needed — --on-warn-amber handles both contexts */
 }
 
 /* forced-colors: active — Windows High Contrast Mode; the OS enforces its own
@@ -291,7 +294,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid var(--red);border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);color:#8b1a1a;margin-top:10px;display:none;}
-.auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
+.auth-acct-banner{background:#f0f7ff;border:1.5px solid var(--royal);border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
 .auth-back-btn{display:block;background:none;border:none;color:#004b8d;font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em;cursor:pointer;padding:4px 0;margin-top:var(--sp-xs);text-decoration:none;width:100%;text-align:center;font-family:inherit;opacity:.9;transition:opacity .15s,color .15s;} /* DES-H01: was #51b0e3 (2.33:1 on white, fails AA); #004b8d=7.3:1 */
 .auth-back-btn:hover{opacity:1;color:#004b8d;}
 
@@ -523,9 +526,9 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-dk{background:var(--dark);color:white;}
 .btn-dk:hover{background:var(--royal);}
 .btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
-.btn-out:hover{background:var(--dark);color:white;}
+.btn-out:hover{background:var(--dark);color:white;border-color:var(--surface);}
 .btn-red-out{background:white;color:var(--red);border:1.5px solid var(--red);}
-.btn-red-out:hover{background:var(--red);color:white;}
+.btn-red-out:hover{background:var(--red);color:white;border-color:var(--surface);}
 .btn-sky{background:var(--accent-light);color:var(--dark);border:1px solid var(--royal);}
 .btn-sky:hover{background:#c4e4f5;color:var(--dark);}
 .btn-danger,.btn-red{background:var(--red);color:white;}
@@ -562,7 +565,7 @@ label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:var(
 .btn-primary{background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s,box-shadow .12s;}
 .btn-primary:hover{background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
 .btn-primary:active{background:linear-gradient(180deg,#001e42 0%,#00183a 100%);transform:translateY(1px);}
-.btn-secondary{background:#f0f7ff;color:#002f65;border:1.5px solid #bee3f8;box-shadow:0 1px 2px rgba(0,47,101,.06);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s;}
+.btn-secondary{background:#f0f7ff;color:#002f65;border:1.5px solid var(--royal);box-shadow:0 1px 2px rgba(0,47,101,.06);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s;}
 .btn-secondary:hover{background:#e0f0fa;}
 .btn-ghost{background:transparent;color:#004b8d;border:1px solid transparent;padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:600;letter-spacing:.04em;cursor:pointer;}
 .btn-ghost:hover{color:#002f65;}
@@ -785,8 +788,8 @@ tr.tc-archived{opacity:.6;}
 .cal-chip.delivered{background:var(--ok);}.cal-chip.cancelled{background:var(--red);}
 .cal-chip.delivered_with_issue{background:#8a9a3a;color:var(--on-warn,#101A26);}.cal-chip.cancelled_late{background:var(--red);}  /* AUDIT-2026-08 G1: white was 3.10:1 -> 5.65:1 */
 .cal-chip.not_delivered{background:var(--lgrey);color:var(--on-warn,#101A26);}  /* G1: white was 2.03:1 -> 8.63:1 */
-.cal-chip.rescheduled{background:var(--warn);color:var(--on-warn,#101A26);}  /* G1: white was 3.35:1 -> 5.23:1 */
-.cal-chip.act{background:var(--warn);color:var(--on-warn,#101A26);}  /* G1: white was 3.35:1 -> 5.23:1 */
+.cal-chip.rescheduled{background:var(--warn);color:var(--on-warn-amber,#101A26);}  /* G1: uses --on-warn-amber → #ffe090 on #6a3800 (7.63:1) in HC */
+.cal-chip.act{background:var(--warn);color:var(--on-warn-amber,#101A26);}  /* G1: uses --on-warn-amber → #ffe090 on #6a3800 (7.63:1) in HC */
 
 /* ── VH-02: Activities page section dividers ── */
 .pg-sec-brk{display:flex;align-items:center;gap:10px;margin:24px 0 12px;padding-bottom:8px;border-bottom:1.5px solid var(--border-light);}
@@ -931,7 +934,7 @@ tr.tc-archived{opacity:.6;}
 #page-service-desk .sd-filter-bar button.active {
   background: var(--royal);    /* AUDIT-2026-08 G1: --blue gave #fff at 2.42:1 -> 8.78:1 */
   color: #fff;
-  border-color: var(--royal);
+  /* border inherits var(--border) from base rule — visible against the dark fill */
 }
 /* Option A (2026-08-23): the private two-pane layout is gone. The list is a
    shared .card + .tbl and a ticket opens in the standard modal, so Service Desk
@@ -963,7 +966,7 @@ tr.tc-archived{opacity:.6;}
   top: calc(100% + 2px);
   left: 0; right: 0;
   background: var(--surface);
-  border: 1.5px solid var(--blue);
+  border: 1.5px solid var(--royal);
   border-radius: var(--radius);
   box-shadow: var(--sh2);
   max-height: 180px;
@@ -1269,7 +1272,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 .faq-cat{margin-bottom:16px}
 .faq-cat:last-child{margin-bottom:0}
 .faq-cat-name{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
-.faq-cat-name::after{content:"";flex:1;height:1px;background:var(--border-light)}
+.faq-cat-name::after{content:"";flex:1;border-top:1px solid var(--border-light)}
 .faq-item{border:1px solid #7a929e;border-radius:6px;margin-bottom:6px;background:var(--surface)}
 .faq-item[open]{border-color:var(--border);box-shadow:var(--sh)}
 .faq-item > summary{
@@ -1297,7 +1300,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 }
 .rte-btn:hover{background:var(--surface);border-color:var(--border)}
 .rte-btn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
-.rte-btn[aria-pressed="true"]{background:var(--accent-light);border-color:var(--blue);color:var(--dark)}
+.rte-btn[aria-pressed="true"]{background:var(--accent-light);border-color:var(--royal);color:var(--dark)}
 .rte-area{
   border:1px solid var(--border);border-radius:0 0 6px 6px;background:var(--surface);
   padding:12px 14px;min-height:220px;max-height:46vh;overflow-y:auto;
