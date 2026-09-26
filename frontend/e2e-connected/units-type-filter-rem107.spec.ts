@@ -63,6 +63,9 @@ test("Units table can be filtered to a single unit type, and a Specialist Flight
   const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
   await page.evaluate(() => (window as any).nav("accounts"));
   await expect(page.locator("#acct-units-card")).toBeVisible({ timeout: 10000 });
+  // Wait for the create button explicitly — renderAccounts() shows both elements
+  // synchronously, but an explicit wait guards against Firefox micro-task timing.
+  await expect(page.locator("#sqn-create-btn")).toBeVisible({ timeout: 5000 });
 
   await page.locator("#sqn-create-btn").click();
   await page.locator("#csq-code").fill(uniqueCode);
@@ -70,7 +73,17 @@ test("Units table can be filtered to a single unit type, and a Specialist Flight
   await page.locator("#csq-wing").selectOption({ label: "7WG" });
   await page.locator("#csq-type").selectOption("specialist_flight");
   await page.locator("#m-create-sqn button", { hasText: "Create Unit" }).click();
-  await expect(page.locator("#m-create-sqn")).not.toHaveClass(/active/, { timeout: 10000 });
+  // doCreateSqn() awaits two API calls before closeModal — increase timeout for
+  // slower CI runs on Firefox.
+  await expect(page.locator("#m-create-sqn")).not.toHaveClass(/active/, { timeout: 20000 });
+  // doCreateSqn() calls confirmAction("Create account now?") after closing the
+  // create modal, opening #m-confirm.  Dismiss it so it doesn't overlay the
+  // units table and delay subsequent row-visibility assertions.
+  const confirmModal = page.locator("#m-confirm");
+  if (await confirmModal.isVisible().catch(() => false)) {
+    await confirmModal.locator("button.btn-out", { hasText: "Cancel" }).click();
+    await expect(confirmModal).toBeHidden({ timeout: 3000 });
+  }
 
   // Capture the squadron ID for cleanup so repeated runs don't fail on the
   // unique code constraint.

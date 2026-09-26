@@ -43,7 +43,11 @@ async function loginSquadron(page: Page, code = "ADMIN703") {
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
+  // Wait for Training Dashboard title so renderAll() + applyNavScope() have run
+  // before the test tries to evaluate page-context functions (S.equip, editEquip,
+  // openAddEquipModal). On WebKit, #app becomes visible before full boot
+  // completes, leaving S and friends in a partially-initialized state.
+  await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
 async function seedEquipment(page: Page, name: string): Promise<string> {

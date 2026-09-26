@@ -111,7 +111,10 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
 
   const className = `WP E2E Class ${suffix}`;
   const classRes = await page.request.post(`${base}/api/training-classes`, {
-    data: { training_year_id: yearId, training_stage_id: seniorStage!.phase_id, display_name: className },
+    // stage_code must be supplied so _wpPaint() can match this class to the
+    // Senior/Gold column via WP_STAGE_GROUPS codes:['SNR'].  Without it the
+    // class is stored with stage_code=null and never appears in the grid.
+    data: { training_year_id: yearId, training_stage_id: seniorStage!.phase_id, display_name: className, stage_code: "SNR" },
     headers: auth,
   });
   expect(classRes.ok()).toBe(true);

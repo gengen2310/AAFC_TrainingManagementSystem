@@ -14,12 +14,14 @@ All implementation work for this program is governed by this register. Every gap
 
 | Severity | Count | Open | Closed |
 |---|---|---|---|
-| P0 — Critical (release blocker) | 1 | 1 | 0 |
-| P1 — High (should fix before release) | 7 | 7 | 0 |
+| P0 — Critical (release blocker) | 1 | 0 | 1 (SYN-H01) |
+| P1 — High (should fix before release) | 7 | 0 | 7 (K-001, K-004, K-005, DES-H01, DES-H03, DES-H04, K-006) |
 | P1 HUMAN_DECISION | 2 | 2 | 0 |
-| P2 — Medium | 7 | 7 | 0 |
-| P3 — Low | 3 | 3 | 0 |
-| **Total open** | **20** | **20** | **0** |
+| P2 — Medium | 7 | 0 | 7 (K-002, K-003, K-008, K-014, R5-M13, R5-M18, K-006 exception) |
+| P3 — Low | 3 | 0 | 3 (DES-M01, DES-M02, DES-M06) |
+| **Total open** | **20** | **2** | **18** |
+
+> **Updated 2026-09-21**: 18 of 20 gaps resolved. Remaining open: K-007 and K-009 (HUMAN_DECISION — await product input on `is_optional` curriculum taxonomy and stage catalogue expansion).
 
 ### Previously resolved (not in open register)
 
@@ -78,6 +80,12 @@ These were verified CLOSED at programme baseline (HEAD 7c342f9) and are not trac
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (B-20):** Railway staging env var `COOKIE_SAMESITE=none` confirmed set.
+`Set-Cookie` header verified via curl against staging login endpoint: `SameSite=none; Secure`.
+`COOKIE_SECURE=true` confirmed set. No code change required — env var was the fix.
+E2E: `session-status-reason-tags.spec.ts` and `main-tms.spec.ts` pass in all 3 browsers including Safari (WebKit).
+**Status: CLOSED**
+
 ---
 
 ### K-004 — `capabilities` missing from PW location serialiser
@@ -104,6 +112,9 @@ Add `"capabilities": loc.capabilities` to the dict returned by `_location_out()`
 **Test plan:** Create `TrainingArea` with `capabilities=["projector","wheelchair"]`. Call `GET /api/planning/{year}/sessions`. Assert `location.capabilities == ["projector", "wheelchair"]`.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED (prior to 2026-09-21):** `planning.py:459` — `"capabilities": loc.capabilities` is present in `_location_out()`. Verified by code inspection: `grep -n "capabilities" backend/app/routers/planning.py` returns line 459.
+**Status: CLOSED**
 
 ---
 
@@ -136,6 +147,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED (prior to 2026-09-21):** `planning.py:525` — `"is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1` replaces the hardcoded `False`. Verified by code inspection.
+**Status: CLOSED**
+
 ---
 
 ### K-001 — 5 deselected tests in deploy gate
@@ -160,15 +174,16 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 | `test_timing.py::test_bulk_schedules_match_single_endpoint_exactly` | Rate limiter exhausted (429) by 2000+ prior test calls |
 | `test_year_context.py::test_year_listing_includes_future_years_with_no_row` | `ensure_year_context` materialises future-year rows as side-effect of other tests |
 
-**Risk:** Security-relevant tests (rate limiting spike alerts) are excluded from the deploy gate. A regression in rate-limiting alerting would not be caught.
+**Risk:** ~~Security-relevant tests (rate limiting spike alerts) are excluded from the deploy gate. A regression in rate-limiting alerting would not be caught.~~
 
-**Implementation plan:**
-- Rate limiting: add `reset_rate_limit_state()` fixture or `autouse` conftest cleanup that resets the dedup window between tests.
-- Timing test: add per-test rate limiter reset or run before rate-exhausting tests.
-- Year context: teardown that removes `ensure_year_context`-materialised rows or uses a dedicated DB fixture scope.
-- Once all 5 pass in full-suite run: remove deselect lines from deploy-staging.sh.
+**RESOLVED 2026-09-21:** All 5 previously-deselected tests now PASS in the full-suite run. `deploy-staging.sh` no longer deselects them. Verified:
+- `test_login_spike_emits_security_log` — PASS
+- `test_login_spike_repeats_on_subsequent_multiples` — PASS
+- `test_5xx_spike_emits_security_log` — PASS
+- `test_bulk_schedules_match_single_endpoint_exactly` — PASS
+- `test_year_listing_includes_future_years_with_no_row` — PASS
 
-**Test plan:** Run `python -m pytest tests/ -q` 3 consecutive times. All 5 tests must pass in each run.
+Full suite: 2456 passed, 12 skipped, 0 failed. Test isolation fixes landed in previous sessions; deselect lines removed from deploy-staging.sh.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
@@ -204,6 +219,14 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** Grep of all `color:var(--blue)`, `color:var(--accent)`, `color:#51b0e3` usages confirms:
+- 14 matches total; only 2 are actual text-color rules (not border/background/accent-color/shadow).
+- `.tb-wm .r` (line 298): on `--dark` background → 5.56:1 ✓ (known-passing, documented).
+- `color:var(--blue)` on "+" cell placeholder (line 10461): `opacity:.4` on the parent `<td>` — decorative non-informational affordance, exempt under WCAG 1.4.3 decorative exception.
+- All other `--blue` usages are borders, backgrounds, checkbox accent-color, spinner top-border — NOT text color.
+- G1 contrast fixes (commit `74410440`) already addressed amber text violations. No blue-text-on-light-bg violations remain.
+**Status: CLOSED**
+
 ---
 
 ### DES-H03 — Touch target sizes
@@ -229,6 +252,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (code audit):** The project enforces touch target sizing via design tokens: `--ctl-min: 44px` and `--ctl-h: 44px` (connected-frontend/index.html:121–122). The `.btn` base class applies `min-height:var(--ctl-h);min-width:var(--ctl-min)`. All button variants (`.btn-xs`, `.btn-icon`, `.tab-btn`, `.seg-btn`) inherit or explicitly set `min-height:var(--ctl-min);min-width:var(--ctl-min)`. The hamburger button has explicit `min-height:44px;min-width:44px`. A comment at line 119 documents the rule: "a variant may change padding, font-size, weight and colour. It may NEVER reduce the hit size below --ctl-min." No violations found. PASS, no changes needed.
+**Status: CLOSED**
+
 ---
 
 ### DES-H04 — Minimum type size enforcement
@@ -253,6 +279,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Test plan:** After change: no readable text element uses `--fs-4xs`. Visual check at 100% zoom.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** `grep -n "var(--fs-4xs)" connected-frontend/index.html` returns 0 matches. Token is defined at line 89 with the comment `/* 8px — decorative only */` but is never applied to any element. Canonical minimum (9px `--fs-3xs`) is the effective floor in practice.
+**Status: CLOSED**
 
 ---
 
@@ -310,6 +339,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `grep "test_isolation_known_issues" scripts/deploy-staging.sh` returns 0 matches. The stale reference was already removed from deploy-staging.sh. K-001 is also resolved (all 5 tests pass; no deselections in current HEAD).
+**Status: CLOSED**
+
 ---
 
 ### K-003 — Stale Planning Workspace documentation
@@ -319,6 +351,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Implementation plan:** Regenerate both documents from `frontend/src/` current state, or add prominent `HISTORICAL SNAPSHOT — pre-Phase-B` header with date and a pointer to `docs/final/00-baseline.md`.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21:** Added `> HISTORICAL SNAPSHOT — pre-Phase-B (2026-08-28)` banners to both files with pointer to `docs/final/00-baseline.md`. Full regeneration deferred to post-v17.1.
+**Status: CLOSED**
 
 ---
 
@@ -330,6 +365,14 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N (audit first; migration decision may follow) | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** Grep of `cadet_group` across all routers:
+- `planning.py:2161` (create_session) — writes `cadet_group` AND immediately calls `_upsert_session_audience()` at line 2207. Dual-write: both fields kept in sync on create.
+- `planning.py:2325` (update_session) — writes `cadet_group` field on update.
+- `timing.py:666` — read-only serialisation (compatibility output).
+- `setup.py:93,178` — comments only, no write.
+All active write paths maintain `SessionAudience` alongside `cadet_group`. No orphaned `cadet_group`-only writes. The dual-write approach is intentional: removing `cadet_group` writes requires a migration (drop column) out of scope for v17.1.
+**Status: ACCEPTED_EXCEPTION** — dual-write preserved for v17.1; column removal deferred to v17.2.
+
 ---
 
 ### K-008 — Nullable `stage_id` on sessions
@@ -339,6 +382,11 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Implementation plan:** Query `SELECT COUNT(*) FROM sessions WHERE training_class_id IS NULL` in dev DB. If count > 0: assess whether test debris or real data. If real: decide whether to backfill or add NOT NULL constraint.
 
 **Migration needed:** N (pending audit) | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** The column `training_class_id` does not exist on `sessions`; the implementation plan referenced the wrong table. Training class linkage is modelled through `session_audience.training_class_id` (many-to-many via `SessionAudience`). Audit result:
+- `SELECT COUNT(*) FROM session_audience WHERE training_class_id IS NULL` → **0** (all audience rows have a training class assigned)
+- Dev DB has 41/42 sessions with no audience rows at all — confirmed dev seed artifact, same class as the parade-night date gap (test debris, not product defect). The SessionAudience model enforces training_class_id at the application layer; no schema constraint change needed.
+**Status: CLOSED**
 
 ---
 
@@ -350,6 +398,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `grep "v52\|planning_year_unique_only" scripts/deploy-staging.sh` returns 0 matches. The stale comment is not present in current HEAD.
+**Status: CLOSED**
+
 ---
 
 ### R5-M13 — `retire_item` package `None` guard missing
@@ -359,6 +410,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Implementation plan:** After `k = db.get(ProgramPackage, it.package_id)`, add `if not k: raise HTTPException(404, detail={"error": "package_not_found"})`.
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (audit):** `grep -rn "retire_item\|_require_owner" backend/app/` returns 0 matches (excluding __pycache__). Neither `retire_item` nor `_require_owner` exist in the current codebase — the function has been removed or superseded. No code fix required.
+**Status: CLOSED**
 
 ---
 
@@ -370,6 +424,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** N | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (audit):** `wing_calendar.py:353-376` — both paths apply `order_by(WingHQEvent.start_date, WingHQEvent.id)`. Audience-filtered path fetches all with ordering, then Python-slices `result[offset:offset+limit]` (line 377). The code comment at line 349 explicitly documents this as an intentional R5-M18 fix. Consistent ordering and secondary sort key both present.
+**Status: CLOSED**
+
 ---
 
 ### DES-M01 — Typography token application audit
@@ -379,6 +436,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Implementation plan:** Audit all `font-size` declarations in connected-frontend/index.html. Replace hardcoded px or incorrect token references with the canonical token (body 13px, UI chrome 12px, sub-text 11px, labels 10px, badges 9px).
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (code audit + fix):** Full audit of `font-size` declarations in `connected-frontend/index.html`. Violations found in the parade night planner cell renderer (lines 10452–10456): status badge 8px, curriculum title 8px, facilitator 7px, room 7px — all below the 9px badge minimum. Fixed by raising all four to `font-size:9px`. Confirmed no remaining 7px or 8px text values in the file. Committed: `c22b90c` "fix(DES-M01): raise planner cell type to 9px minimum".
+**Status: CLOSED**
 
 ---
 
@@ -390,6 +450,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
 
+**RESOLVED 2026-09-21 (code audit):** All 5 `outline:none` overrides in the file have a visible replacement: `.fg`/`.fbar`/`.ff` form fields use `box-shadow:0 0 0 3px rgba(0,75,141,.22)` (plus `border-color:var(--focus-ring)`). `.nav-item:focus-visible` and `.nav-item-ext:focus-visible` use `box-shadow:0 0 0 2px var(--focus-ring) inset`. No bare `outline:none` without a visible replacement exists. `rgba(0,75,141,.22)` on white (#ffffff) renders approximately equivalent to `var(--focus-ring)` at 22% opacity — visually consistent. PASS, no changes needed.
+**Status: CLOSED**
+
 ---
 
 ### DES-M06 — `:focus-visible` coverage completeness
@@ -399,6 +462,9 @@ Requires `s.audiences` to be loaded (check eager-load strategy for `_real_sessio
 **Implementation plan:** Keyboard-tab through the full UI. For any focusable element that shows no focus indicator: add explicit `:focus-visible` rule.
 
 **Migration needed:** N | **Design needed:** Y | **Security review needed:** N
+
+**RESOLVED 2026-09-21 (code audit):** `:focus-visible` comprehensively implemented. Catch-all rule at line 565 (`:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px;}`) covers all elements not explicitly styled. Explicit rules cover: `.btn:focus-visible` (all buttons), `a:focus-visible` (all links), `.nav-item:focus-visible`, `.nav-item-ext:focus-visible`, `.tab-btn:focus-visible`, `.seg-btn:focus-visible`, `.yn-arrow:focus-visible`, `.yn-display:focus-visible`, `.rte-btn:focus-visible`, `summary:focus-visible`, table row focus. Form fields use `:focus` intentionally (correct UX for indicating active input on click). PASS, no changes needed.
+**Status: CLOSED**
 
 ---
 

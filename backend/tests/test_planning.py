@@ -5,8 +5,11 @@ term planner, parade night builder, scheduled sessions, locations,
 facilitators (planning view), conflict detection, weekly program,
 long-range view, decision guide, and RBAC enforcement.
 """
+import uuid
 import pytest
 from tests.conftest import login, next_test_year
+from app.database import SessionLocal
+from app.models import ParadeNight, Session as TrainingSession, SessionStatusHistory
 
 
 # ─────────────────────────────────────────────────────────────
@@ -153,6 +156,69 @@ def test_delete_empty_planning_year_succeeds(client):
     r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
     assert r.status_code == 200, r.text
     assert client.get(f"/api/planning/years/{yr_id}", headers=hdr).status_code == 404
+
+
+def test_delete_planning_year_with_archived_pn_and_session_children(client):
+    """Regression: permanently deleting a year that has archived parade nights
+    with session children must delete those children first.
+    SessionStatusHistory.session_id has no ondelete=CASCADE — PostgreSQL raises
+    ForeignKeyViolation without the explicit child-delete.  In SQLite (FK
+    enforcement off) the bug silently leaves orphaned rows; the assertion that
+    rows are gone catches that regression here too."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+
+    rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                     json={"parade_date": "2030-01-10"}, headers=hdr)
+    assert rp.status_code == 200, rp.text
+    pn_id = rp.json()["parade_night_id"]
+
+    # Archive the parade night and insert a session + SessionStatusHistory child
+    # directly via DB — the API blocks parade-night deletion while sessions exist,
+    # so direct manipulation reproduces the exact state delete_planning_year sees.
+    db = SessionLocal()
+    try:
+        pn = db.get(ParadeNight, pn_id)
+        pn.is_archived = True
+        sqn_id = pn.squadron_id
+
+        sess_id = str(uuid.uuid4())
+        sess = TrainingSession(
+            id=sess_id,
+            parade_night_id=pn_id,
+            squadron_id=sqn_id,
+            custom_title="fk-test session",
+        )
+        db.add(sess)
+        db.flush()
+
+        hist = SessionStatusHistory(
+            id=str(uuid.uuid4()),
+            session_id=sess_id,
+            old_status="draft",
+            new_status="confirmed",
+        )
+        db.add(hist)
+        db.commit()
+        hist_id = hist.id
+    finally:
+        db.close()
+
+    r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+
+    # Verify the child rows were explicitly deleted, not merely orphaned.
+    db2 = SessionLocal()
+    try:
+        assert db2.query(SessionStatusHistory).filter(
+            SessionStatusHistory.id == hist_id
+        ).count() == 0, "SessionStatusHistory row not deleted — FK child-delete logic is missing"
+        assert db2.query(TrainingSession).filter(
+            TrainingSession.id == sess_id
+        ).count() == 0, "TrainingSession row not deleted"
+    finally:
+        db2.close()
 
 
 def test_delete_planning_year_blocked_when_holiday_exists(client):
@@ -3116,5 +3182,97 @@ def test_add_parade_night_flow_creates_session_audience(client):
         tc = db.get(TrainingClass, rows[0].training_class_id)
         assert tc is not None
         assert tc.stage_code == "JNR"
+    finally:
+        db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# Issue #62 item 3 — Planner endpoint must supply timing_block_id
+# so sessions created from planner cells land in the correct
+# Weekly Program period instead of "Unlinked periods".
+# ─────────────────────────────────────────────────────────────
+
+def test_planner_instructional_periods_include_timing_block_id(client):
+    """GET /api/parade-nights/{id}/planner instructional_periods must carry
+    timing_block_id when the night has a timing template (no snapshot yet).
+
+    Regression guard for Issue #62 item 3: previously the planner endpoint
+    omitted timing_block_id from template-derived blocks, causing _pnCellSave
+    to always persist timing_block_id=null and sessions to fall in
+    'Unlinked periods' in the Weekly Program.
+    """
+    hdr = _sqn_admin_hdr(client)
+    # 703 SQN always gets a default timing template via seed_all; use a date
+    # that avoids collisions with other tests.
+    pn_r = client.post("/api/parade-nights",
+                       json={"date": "2027-09-03", "term": "T1"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+
+    r = client.get(f"/api/parade-nights/{pnid}/planner", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "timing" in d, "Planner response must include 'timing' key"
+    ips = d["timing"].get("instructional_periods", [])
+    assert len(ips) > 0, "Must have at least one instructional period"
+    for ip in ips:
+        assert "timing_block_id" in ip, (
+            f"Instructional period with period_number={ip.get('period_number')} "
+            f"is missing timing_block_id — sessions saved from this period will "
+            f"fall in 'Unlinked periods' in the Weekly Program"
+        )
+        assert ip["timing_block_id"] is not None, (
+            f"timing_block_id must not be null for period_number={ip.get('period_number')}"
+        )
+
+
+def test_session_created_from_planner_has_timing_block_id(client):
+    """A session created via PUT /api/sessions/{id} with timing_block_id from
+    the planner payload must persist that timing_block_id on the row.
+
+    This verifies the full path: planner supplies the FK, frontend resolves and
+    sends it, backend persists it, session detail reflects it.
+    """
+    from app.models import Session as TrainingSession
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights",
+                       json={"date": "2027-09-10", "term": "T1"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+
+    # Fetch planner payload to resolve timing_block_id for period 1
+    planner = client.get(f"/api/parade-nights/{pnid}/planner", headers=hdr).json()
+    ips = planner["timing"]["instructional_periods"]
+    ip1 = next((ip for ip in ips if ip["period_number"] == 1), None)
+    assert ip1 is not None, "Period 1 must be present in instructional_periods"
+    tb_id = ip1.get("timing_block_id")
+    assert tb_id, "Period 1 must have a non-null timing_block_id"
+
+    # Create a session then PUT it with timing_block_id (as _pnCellSave does)
+    sess_r = client.post("/api/sessions", json={
+        "parade_night_id": pnid,
+        "period_number": 1,
+        "cadet_group": "senior",
+    }, headers=hdr)
+    assert sess_r.status_code == 200, sess_r.text
+    sid = sess_r.json()["session_id"]
+
+    put_r = client.put(f"/api/sessions/{sid}", json={
+        "parade_night_id": pnid,
+        "period_number": 1,
+        "cadet_group": "senior",
+        "status": "planned",
+        "timing_block_id": tb_id,
+    }, headers=hdr)
+    assert put_r.status_code == 200, put_r.text
+
+    db = SessionLocal()
+    try:
+        s = db.get(TrainingSession, sid)
+        assert s is not None
+        assert s.timing_block_id == tb_id, (
+            f"Session timing_block_id should be {tb_id!r}, got {s.timing_block_id!r} — "
+            f"session will appear in 'Unlinked periods' in the Weekly Program"
+        )
     finally:
         db.close()

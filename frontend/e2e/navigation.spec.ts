@@ -39,9 +39,20 @@ test("Mission Backlog recommended terms keep the canonical T1-T4 form", async ({
   await page.getByRole("button", { name: "Mission Backlog" }).click();
   await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
 
-  const cells = page.locator("table td").filter({ hasText: /^T\d$|^TT\d$/ });
-  const count = await cells.count();
-  for (let i = 0; i < count; i++) {
-    await expect(cells.nth(i)).toHaveText(/^T[1-4]$/);
+  // Scope to the specific Mission Backlog table (which owns the "Rec. Term"
+  // header) to avoid false matches from other tables rendered in the canvas
+  // simultaneously (YearView, TermView etc.).
+  const backlogTable = page.locator("table", {
+    has: page.locator("th", { hasText: "Rec. Term" }),
+  });
+  // Wait for at least one data row so we don't snapshot an empty table.
+  await expect(backlogTable.locator("tbody tr").first()).toBeVisible({ timeout: 8000 });
+
+  // Snapshot all matching cells at once via .all() so the loop iterates stable
+  // references; a re-render between count() and nth(i) can otherwise yield
+  // unexpected elements on slower browsers.
+  const termCells = await backlogTable.locator("td").filter({ hasText: /^T\d$|^TT\d$/ }).all();
+  for (const cell of termCells) {
+    await expect(cell).toHaveText(/^T[1-4]$/);
   }
 });

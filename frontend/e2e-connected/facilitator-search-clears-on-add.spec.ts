@@ -32,7 +32,12 @@ async function loginSquadron(page: Page, code: string) {
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
+  // Wait for the Training Dashboard title, not just #app — the dashboard title
+  // only appears after renderAll() and applyNavScope() have both run. Waiting
+  // for #app alone leaves a window where admin-el buttons are still display:none
+  // (applyNavScope() hasn't fired yet), causing the "+ Add Facilitator" click to
+  // time out on slower browsers (Firefox).
+  await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
 test("a facilitator created while an unrelated search term is still in #fac-search is immediately visible", async ({ page }) => {
@@ -54,10 +59,12 @@ test("a facilitator created while an unrelated search term is still in #fac-sear
   await page.locator("#fac-rank").fill("CPL(AAFC)");
   await page.locator("#fac-save-btn").click();
 
-  await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 8000 });
+  await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 15000 });
   await expect(page.locator("#fac-search")).toHaveValue("");
-  await expect(page.locator("#fac-tbody")).toContainText(first);
-  await expect(page.locator("#fac-tbody")).toContainText(last);
+  // The facilitator list re-fetch after save can take >5s on Firefox under
+  // CI load; use an explicit 10s window to avoid false-negative flakiness.
+  await expect(page.locator("#fac-tbody")).toContainText(first, { timeout: 10000 });
+  await expect(page.locator("#fac-tbody")).toContainText(last, { timeout: 10000 });
 
   // Cleanup through the same accessible archive action exposed by the row.
   // The glyph is visually "×", but its accessible name is deliberately

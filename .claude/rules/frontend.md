@@ -135,6 +135,38 @@ default action.
 - Handle errors with `apiErr(e)` for user-visible messages
 - Do not hard-code API base URL — `API_BASE` is resolved at runtime
 
+## UI patterns — dialogs and error display
+
+**Never use native browser dialogs.** `alert()`, `confirm()`, `prompt()` are prohibited:
+they block page rendering, break browser automation (Playwright, Claude in Chrome), and are
+inaccessible to screen readers.
+
+### Replacements (prescriptive)
+
+| Native call | Replacement | When |
+|---|---|---|
+| `prompt('Enter…')` | `await promptText(title, label, opts)` | Any single text input |
+| `alert(msg)` | `showToast(msg, isErr)` | One-off notification; no user action needed |
+| `confirm('Sure?')` | `await promptText(title, label, {validate:…})` or a modal | When the action is reversible and the cost of a mistake is low |
+| `confirm('Delete…')` | `await promptText('Delete X', 'Type X to confirm', {validate:…, danger:true})` | Destructive operations |
+
+`promptText()` returns `Promise<string|null>` — `null` means the user cancelled. Always
+check `if (result === null) return;` after the await. Chain multiple prompts with `await`
+for sequential inputs (see `openAddCadetModal()` as the canonical example).
+
+For inline status within a form or panel, write to a named `<div id="...">` element
+(set `.textContent` and `.style.color`) rather than using a toast or alert — the user
+stays in context without the notification floating over the page.
+
+### Error display precedence
+
+1. **Inline in the originating form** — when the user is actively editing and the error
+   affects the form's submit action. Set a `statusEl.textContent = apiErr(e)` and
+   `statusEl.style.color = 'var(--red)'`.
+2. **`showToast(msg, true)`** — when the action was initiated from a button and the user
+   has already moved on (e.g. a background save, a bulk action, a nav-triggered load).
+3. **Never `alert()`** — see above.
+
 ## Visual review before packaging
 
 For every frontend change:

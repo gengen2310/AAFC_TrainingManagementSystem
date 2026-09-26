@@ -1,5 +1,9 @@
 # TMS ↔ Planning Workspace — Function Ownership Matrix
 
+> **HISTORICAL SNAPSHOT — pre-Phase-B (2026-08-28)**
+> This document was recorded at HEAD `6d45e22` before Phase B work. It does not reflect
+> the current Planning Workspace. For current state, see `docs/final/00-baseline.md`.
+
 **Branch:** main  
 **HEAD SHA:** 6d45e22  
 **Date recorded:** 2026-08-28  

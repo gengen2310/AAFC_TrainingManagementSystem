@@ -2,6 +2,12 @@
 
 **Date:** 2026-08-30 · **Harness:** `backend/scripts/rehearse_migrations.py`
 
+> **B-15 status 2026-09-21:** Release branch HEAD is now `2020c662`. Alembic head is
+> `7f61608fa538` — **unchanged** from the rehearsal run below (no new migrations since
+> `f2c8e51d7a93`). The 70/70 forward+rollback result remains valid for this release.
+> `deploy-staging.sh` step 10 re-runs the rehearsal harness before every staging/production
+> deploy as a hard gate, so drift is caught automatically before any actual deploy.
+
 ## What the programme assumed, and what is actually there
 
 The programme brief records "only 1 of 27 production-path migrations rehearsed".
