@@ -1929,25 +1929,30 @@ def create_cadet(body: CadetIn, db: DBSession = Depends(get_db), p: Principal = 
     require_can_write_squadron(p, s.id, s.wing_id)
 
     service_number = (body.service_number or "").strip()
-    first_name = (body.first_name or "").strip()
-    last_name = (body.last_name or "").strip()
-    if not service_number or not first_name or not last_name:
-        raise HTTPException(400, detail={"error": "invalid_cadet", "message": "service_number, first_name and last_name are required"})
-
-    existing = db.query(Cadet).filter(
-        Cadet.service_number == service_number,
-        Cadet.is_archived == False,
-        Cadet.active_status == True,
-    ).first()  # noqa: E712
+    if service_number:
+        existing = db.query(Cadet).filter(
+            Cadet.service_number == service_number,
+            Cadet.is_archived == False,  # noqa: E712
+            Cadet.active_status == True,
+        ).first()
+    else:
+        existing = None
     if existing:
-        raise HTTPException(409, detail={"error": "cadet_already_exists", "cadet_id": existing.id})
+        raise HTTPException(409, detail={"error": "duplicate_service_number", "cadet_id": existing.id})
+    foreign = db.query(Cadet).filter(
+        Cadet.service_number == service_number,
+        Cadet.squadron_id != sq_id,
+        Cadet.is_archived == False,
+    ).first() if service_number else None
+    if foreign:
+        raise HTTPException(409, detail={"error": "cross_squadron_identity_conflict"})
 
     cadet = Cadet(
         squadron_id=sq_id,
         service_number=service_number,
         rank=(body.rank or "").strip() or None,
-        first_name=first_name,
-        last_name=last_name,
+        first_name=(body.first_name or "").strip() or None,
+        last_name=(body.last_name or "").strip() or None,
         phase=(body.phase or "").strip() or None,
         flight=(body.flight or "").strip() or None,
         attendance_percentage=body.attendance_percentage,
@@ -1986,55 +1991,6 @@ def list_cadets(db: DBSession = Depends(get_db), p: Principal = Depends(get_prin
     if any(c.support_notes for c in rows) and can_sensitive:
         audit(db, p, object_type="cadet", object_id=sq_id, action="view_sensitive")
     return out
-
-
-class CadetIn(BaseModel):
-    service_number: Optional[str] = None
-    rank: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: str
-    phase: Optional[str] = None
-
-
-@router.post("/cadets", status_code=201)
-def create_cadet(body: CadetIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    """Add a cadet to the caller's squadron. Requires write access to the active squadron."""
-    sq_id = _active_squadron(p)
-    s = db.get(Squadron, sq_id) if sq_id else None
-    require_can_write_squadron(p, sq_id, s.wing_id if s else None)
-    # Cross-squadron identity fence: same service_number in another squadron is a conflict
-    if body.service_number:
-        foreign = db.query(Cadet).filter(
-            Cadet.service_number == body.service_number,
-            Cadet.squadron_id != sq_id,
-            Cadet.is_archived == False,  # noqa: E712
-        ).first()
-        if foreign:
-            raise HTTPException(409, detail={"error": "cross_squadron_identity_conflict"})
-        # Same-squadron duplicate check
-        existing = db.query(Cadet).filter(
-            Cadet.squadron_id == sq_id,
-            Cadet.service_number == body.service_number,
-            Cadet.is_archived == False,  # noqa: E712
-        ).first()
-        if existing:
-            raise HTTPException(409, detail={"error": "duplicate_service_number"})
-    cadet = Cadet(
-        squadron_id=sq_id,
-        service_number=body.service_number or None,
-        rank=body.rank or None,
-        first_name=body.first_name or None,
-        last_name=body.last_name,
-        phase=body.phase or None,
-        created_by=p.user_id,
-    )
-    db.add(cadet)
-    db.flush()
-    audit(db, p, object_type="cadet", object_id=cadet.id, action="create")
-    db.commit()
-    return {"cadet_id": cadet.id, "service_number": cadet.service_number,
-            "rank": cadet.rank, "first_name": cadet.first_name,
-            "last_name": cadet.last_name, "phase": cadet.phase}
 
 
 @router.get("/cadets/risk")
