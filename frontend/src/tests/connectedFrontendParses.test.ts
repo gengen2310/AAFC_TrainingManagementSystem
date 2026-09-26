@@ -47,4 +47,14 @@ describe("connected-frontend/index.html", () => {
         `${name} is declared but never called`).toBe(false);
     }
   });
+
+  it("has one outcome-entry workflow and no authorised Matrix shortcut", () => {
+    expect(source).not.toContain("Matrix ↗");
+    expect(source.match(/>Sessions Needing Outcome Entry</g)).toHaveLength(1);
+    expect(source).not.toContain("Outcome needed —");
+  });
+
+  it("passes the canonical timing block when creating a direct planner session", () => {
+    expect(source).toContain("timing_block_id:document.getElementById('sess-edit-id').dataset.timingBlockId||null");
+  });
 });
