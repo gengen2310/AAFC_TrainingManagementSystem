@@ -55,6 +55,9 @@ describe("connected-frontend/index.html", () => {
   });
 
   it("passes the canonical timing block when creating a direct planner session", () => {
-    expect(source).toContain("timing_block_id:document.getElementById('sess-edit-id').dataset.timingBlockId||null");
+    // _pnCellSave builds its PUT body via _sessBuildBody({…, timingBlockId:_tbId, …}).
+    // The doSaveSession/sess-edit-id path was removed in v17.1 when PW was decoupled;
+    // this guards the current equivalent so timing_block_id is never silently dropped.
+    expect(source).toContain("timingBlockId:_tbId");
   });
 });

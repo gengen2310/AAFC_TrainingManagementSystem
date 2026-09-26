@@ -1570,12 +1570,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </table></div>
         </div>
 
-        <!-- ══════════ A. TONIGHT ══════════ -->
-        <div class="dash-section dash-sec-hero">
-        <!-- E4: Quick Actions was the last card on a 12-screen page, so the
-             actions people come here to take sat below everything they came
-             here to read. Moved above section A. -->
-        <div class="card no-print">
+        <!-- Quick Actions — standalone card above sections for immediate access -->
+        <div class="card no-print" style="margin-bottom:var(--sp-lg)">
           <h3 class="ctitle">Quick Actions</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-dk" onclick="openAddPN()">+ Parade Night</button>
@@ -1586,6 +1582,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
           </div>
         </div>
+
+        <!-- ══════════ A. TONIGHT ══════════ -->
+        <div class="dash-section dash-sec-hero">
           <h2 class="dash-sec-hdr">A — Tonight &amp; This Week</h2>
           <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
           <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
@@ -2230,14 +2229,65 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="page-cadets" class="page">
         <div class="ph">
           <div><h1 class="ph-title">Cadet Management</h1><div class="ph-sub" id="cadets-sub">Select a Training Class to view or manage its roster.</div></div>
-          <div class="ph-actions no-print" style="gap:6px">
+          <div class="ph-actions no-print" style="gap:6px" id="cadets-roster-actions">
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
-            <button class="btn btn-out btn-sm plan-write-el" onclick="nav('cea-import')" title="Import cadet roster from the Cadet Enterprise Application">CEA Import</button>
           </div>
         </div>
-        <div id="cadets-roster-wrap">
-          <p class="muted" style="font-size:var(--fs-sm)">Select a Training Class above to view cadets.</p>
+        <!-- §20: Roster / CEA Import tab bar -->
+        <div class="tab-bar">
+          <button id="cadets-tab-roster-btn" class="tab-btn active" onclick="setCadetsTab('roster')" aria-selected="true">Roster</button>
+          <button id="cadets-tab-cea-btn" class="tab-btn plan-write-el" onclick="setCadetsTab('cea')" aria-selected="false">CEA Import</button>
+        </div>
+        <div id="cadets-tab-roster">
+          <div id="cadets-roster-wrap">
+            <p class="muted" style="font-size:var(--fs-sm)">Select a Training Class above to view cadets.</p>
+          </div>
+        </div>
+        <!-- §20 CEA Import tab panel (integrated — nav('cea-import') redirects here) -->
+        <div id="cadets-tab-cea" style="display:none">
+          <div class="card" style="margin-bottom:16px">
+            <h2 class="ctitle" style="margin-bottom:8px">Step 1 — Paste CSV</h2>
+            <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px">
+              Expected columns: <code>Id, Rank, Name, Family name</code> (plus any optional columns — Gender, Position, Unit, Scope, Access are ignored).
+            </p>
+            <textarea id="cea-csv-input" rows="8" style="width:100%;font-family:monospace;font-size:var(--fs-xs);border:1px solid var(--border);border-radius:4px;padding:8px;resize:vertical;box-sizing:border-box" placeholder="Id,Rank,Name,Family name,Position,Unit,Scope,Gender,Access&#10;12345,OCdt,Jane,Smith,..."></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="ceaPreview()">Preview</button>
+              <span id="cea-preview-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+            </div>
+          </div>
+          <div id="cea-preview-wrap" style="display:none">
+            <div class="card" style="margin-bottom:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                <h2 class="ctitle" style="margin:0">Step 2 — Review Preview</h2>
+                <div id="cea-summary-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+              </div>
+              <div class="tw" style="overflow-x:auto"><table>
+                <thead><tr>
+                  <th style="width:70px">Row</th><th style="width:100px">CEA Id</th>
+                  <th style="width:80px">Rank</th><th>Name</th>
+                  <th style="width:90px">Action</th><th>Details</th>
+                </tr></thead>
+                <tbody id="cea-preview-tbody"></tbody>
+              </table></div>
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                <button class="btn btn-primary btn-sm" id="cea-commit-btn" onclick="ceaCommit()">Commit Import</button>
+                <span id="cea-commit-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+              </div>
+            </div>
+          </div>
+          <div id="cea-result-wrap" style="display:none">
+            <div class="card">
+              <h2 class="ctitle" style="margin-bottom:8px">Step 3 — Result</h2>
+              <div id="cea-result-body"></div>
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                <button class="btn btn-danger btn-sm" id="cea-rollback-btn" style="display:none" onclick="ceaRollback()">Rollback This Import</button>
+                <button class="btn btn-out btn-sm" onclick="ceaReset()">Start New Import</button>
+                <span id="cea-rollback-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2257,62 +2307,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- CEA MEMBER IMPORT -->
       <div id="page-cea-import" class="page">
-        <div class="ph">
-          <div>
-            <h1 class="ph-title">CEA Member Import</h1>
-            <div class="ph-sub">Bulk upsert cadets from a CEA export. Preview before committing — new cadets are created, existing cadets (matched by CEA Id / Service Number) have their rank and name updated.</div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom:16px">
-          <h2 class="ctitle" style="margin-bottom:8px">Step 1 — Paste CSV</h2>
-          <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px">
-            Expected columns: <code>Id, Rank, Name, Family name</code> (plus any optional columns — Gender, Position, Unit, Scope, Access are ignored).
-          </p>
-          <textarea id="cea-csv-input" rows="8" style="width:100%;font-family:monospace;font-size:var(--fs-xs);border:1px solid var(--border);border-radius:4px;padding:8px;resize:vertical;box-sizing:border-box" placeholder="Id,Rank,Name,Family name,Position,Unit,Scope,Gender,Access&#10;12345,OCdt,Jane,Smith,..."></textarea>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-            <button class="btn btn-primary btn-sm" onclick="ceaPreview()">Preview</button>
-            <span id="cea-preview-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-          </div>
-        </div>
-
-        <div id="cea-preview-wrap" style="display:none">
-          <div class="card" style="margin-bottom:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <h2 class="ctitle" style="margin:0">Step 2 — Review Preview</h2>
-              <div id="cea-summary-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-            </div>
-            <div class="tw" style="overflow-x:auto"><table>
-              <thead><tr>
-                <th style="width:70px">Row</th>
-                <th style="width:100px">CEA Id</th>
-                <th style="width:80px">Rank</th>
-                <th>Name</th>
-                <th style="width:90px">Action</th>
-                <th>Details</th>
-              </tr></thead>
-              <tbody id="cea-preview-tbody"></tbody>
-            </table></div>
-            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-              <button class="btn btn-primary btn-sm" id="cea-commit-btn" onclick="ceaCommit()">Commit Import</button>
-              <span id="cea-commit-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-            </div>
-          </div>
-        </div>
-
-        <div id="cea-result-wrap" style="display:none">
-          <div class="card">
-            <h2 class="ctitle" style="margin-bottom:8px">Step 3 — Result</h2>
-            <div id="cea-result-body"></div>
-            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-              <button class="btn btn-danger btn-sm" id="cea-rollback-btn" style="display:none" onclick="ceaRollback()">Rollback This Import</button>
-              <button class="btn btn-out btn-sm" onclick="ceaReset()">Start New Import</button>
-              <span id="cea-rollback-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-            </div>
-          </div>
-        </div>
+        <div class="ph"><h1 class="ph-title">CEA Member Import</h1></div>
+        <div class="card"><p class="muted" style="font-size:var(--fs-sm)">CEA Member Import is now in <a href="#" onclick="nav('cadets');setCadetsTab('cea');return false;" style="color:var(--blue)">Cadet Management → CEA Import tab</a>.</p></div>
       </div>
-
       <!-- HELP & REFERENCE -->
       <div id="page-help" class="page">
         <div class="ph">
@@ -6346,6 +6343,7 @@ function nav(id){
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
+  if(id==='cea-import'){nav('cadets');setCadetsTab('cea');return;}
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.setAttribute('aria-hidden','true');});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg){pg.classList.add('active');pg.removeAttribute('aria-hidden');}
@@ -19348,7 +19346,32 @@ async function sessionReschedule(sessionId,btn){
 // ═══════════════════════════════════════════════════════════
 // CADETS — Roster management
 // ═══════════════════════════════════════════════════════════
+// §20: tab switcher for Cadet Management (Roster / CEA Import)
+let _cadetsActiveTab='roster';
+function setCadetsTab(tab){
+  _cadetsActiveTab=tab;
+  const rBtn=document.getElementById('cadets-tab-roster-btn');
+  const cBtn=document.getElementById('cadets-tab-cea-btn');
+  const rPanel=document.getElementById('cadets-tab-roster');
+  const cPanel=document.getElementById('cadets-tab-cea');
+  const rActions=document.getElementById('cadets-roster-actions');
+  if(!rBtn)return;
+  if(tab==='cea'){
+    rBtn.classList.remove('active');rBtn.setAttribute('aria-selected','false');
+    cBtn.classList.add('active');cBtn.setAttribute('aria-selected','true');
+    rPanel.style.display='none';cPanel.style.display='';
+    if(rActions)rActions.style.display='none';
+    initCeaImportPage();
+  }else{
+    if(cBtn){cBtn.classList.remove('active');cBtn.setAttribute('aria-selected','false');}
+    rBtn.classList.add('active');rBtn.setAttribute('aria-selected','true');
+    cPanel.style.display='none';rPanel.style.display='';
+    if(rActions)rActions.style.display='';
+  }
+}
+
 async function initCadetsPage(){
+  setCadetsTab('roster');
   // Populate class selector
   const sel=document.getElementById('cadets-class-select');
   if(!sel)return;
