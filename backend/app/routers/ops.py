@@ -722,6 +722,10 @@ def _parse_cea_csv(csv_text: str):
             "missing_columns": missing,
             "received_columns": [h for h in headers if h],
         }]
+    rows = []
+    for r in raw[1:]:
+        rows.append({h: (r[i].strip() if i < len(r) else "") for i, h in enumerate(headers)})
+    return headers, rows, []
 
 
 def _cea_field(row, *names):

@@ -774,7 +774,7 @@ def get_parade_night_schedule(
             "stage_code": training_class.stage_code,
         })
     return _shape_schedule(
-        pn_id, pn.timing_template_id, blocks, sessions, classes_by_session,
+        pn_id, template_id, blocks, sessions, classes_by_session,
     )
 
 

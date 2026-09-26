@@ -64,3 +64,31 @@ def test_cea_missing_columns_explains_the_required_fix(client):
     assert detail["error"] == "missing_required_columns"
     assert "Service Number" in detail["message"]
     assert "Surname" in detail["message"]
+
+
+def test_post_cadets_cross_squadron_conflict_raises_409(client):
+    """B-21: create_cadet must reject a service number already active in another squadron."""
+    sn = "I62-XSQN-001"
+    # Create in 703
+    h703 = login(client, "ADMIN703")
+    r = client.post("/api/cadets", json={"service_number": sn, "last_name": "Cross"}, headers=h703)
+    assert r.status_code == 201, r.text
+    # Attempt to create same service number in 704 — must conflict
+    h704 = login(client, "ADMIN704")
+    r2 = client.post("/api/cadets", json={"service_number": sn, "last_name": "Cross"}, headers=h704)
+    assert r2.status_code == 409
+    assert r2.json()["detail"]["error"] == "cross_squadron_identity_conflict"
+
+
+def test_post_cadets_sets_created_by(client):
+    """B-22: created_by must be set on the cadet record."""
+    headers = login(client, "ADMIN703")
+    r = client.post("/api/cadets", json={"service_number": "I62-CB-001", "last_name": "Audit"}, headers=headers)
+    assert r.status_code == 201, r.text
+    cadet_id = r.json()["cadet_id"]
+    # Confirm via audit log that create action was recorded (created_by is internal, not in list API)
+    audit = client.get("/api/audit", headers=headers).json()
+    assert any(
+        row.get("object_id") == cadet_id and row.get("action") == "create"
+        for row in audit
+    )

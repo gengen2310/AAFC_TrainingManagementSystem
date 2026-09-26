@@ -1904,7 +1904,7 @@ def resource_clashes(date: str, db: DBSession = Depends(get_db), p: Principal = 
 
 # ── CADETS (sensitive; sqn_general blocked) ──
 class CadetCreateIn(BaseModel):
-    service_number: str
+    service_number: str | None = None
     rank: str | None = None
     first_name: str | None = None
     last_name: str
@@ -1920,41 +1920,58 @@ def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
     This is the write half of the long-standing ``GET /cadets`` contract.  CEA
     import remains the bulk/upsert path; this endpoint is intentionally a
     single-record create and refuses an existing active service number.
+    service_number is optional; cadets without one are valid (e.g. prospect records).
     """
     sq_id = _active_squadron(p)
     squadron = db.get(Squadron, sq_id)
     if not squadron:
         raise HTTPException(404, detail={"error": "squadron_not_found"})
     require_can_write_squadron(p, squadron.id, squadron.wing_id)
-    service_number = body.service_number.strip()
+    service_number = body.service_number.strip() if body.service_number else None
     last_name = body.last_name.strip()
-    if not service_number or not last_name:
+    if not last_name:
         raise HTTPException(400, detail={
             "error": "missing_required_fields",
-            "message": "Service number and family name are required.",
+            "message": "Family name is required.",
         })
-    existing = db.query(Cadet).filter(
-        Cadet.squadron_id == sq_id,
-        Cadet.service_number == service_number,
-        Cadet.is_archived == False,  # noqa: E712
-    ).first()
-    if existing:
-        raise HTTPException(409, detail={
-            "error": "duplicate_service_number",
-            "message": "An active cadet with that service number already exists in this squadron.",
-        })
+    if service_number:
+        foreign = db.query(Cadet).filter(
+            Cadet.service_number == service_number,
+            Cadet.squadron_id != sq_id,
+            Cadet.is_archived == False,  # noqa: E712
+        ).first()
+        if foreign:
+            raise HTTPException(409, detail={
+                "error": "cross_squadron_identity_conflict",
+                "message": "An active cadet with that service number exists in another squadron.",
+            })
+        existing = db.query(Cadet).filter(
+            Cadet.squadron_id == sq_id,
+            Cadet.service_number == service_number,
+            Cadet.is_archived == False,  # noqa: E712
+        ).first()
+        if existing:
+            raise HTTPException(409, detail={
+                "error": "duplicate_service_number",
+                "message": "An active cadet with that service number already exists in this squadron.",
+            })
     cadet = Cadet(
         squadron_id=sq_id, service_number=service_number,
         rank=body.rank.strip() if body.rank else None,
         first_name=body.first_name.strip() if body.first_name else None,
         last_name=last_name, phase=body.phase.strip() if body.phase else None,
         flight=body.flight.strip() if body.flight else None,
+        created_by=p.user_id,
     )
     db.add(cadet)
     db.commit()
     audit(db, p, object_type="cadet", object_id=cadet.id, action="create",
           new={"service_number": service_number})
-    return {"ok": True, "cadet_id": cadet.id}
+    return {
+        "ok": True, "cadet_id": cadet.id,
+        "service_number": cadet.service_number,
+        "last_name": cadet.last_name,
+    }
 
 
 @router.get("/cadets")
