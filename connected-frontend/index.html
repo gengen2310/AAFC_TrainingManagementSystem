@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
-<meta name="aafc-api-base" content="http://localhost:8200">
+<meta name="aafc-api-base" content="http://localhost:8000">
 <meta name="aafc-pw-base" content="">
 <meta name="app-build" content="__APP_BUILD__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -64,6 +64,7 @@
   /* Status / semantic */
   --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
   --warn:        #c97a00;   --warn-bg: #fff3cd;   --warn-text: #7a5200; /* DES-H04: warn text that passes WCAG AA on --warn-bg (5.4:1) */
+  --on-warn-amber: #101A26; /* dark text on amber --warn bg in default context */
   --success-tint-bg: #e8f5ee; --danger-tint-bg: #fdecee; --warning-tint-bg: #fff3e0;
   --info-tint-bg: #ebf5ff; --holiday-bg: #fff3e0; --holiday-border: #ffb74d;
   --success-on-tint: #0f5a33; --danger-on-tint: #8a0f22;
@@ -225,6 +226,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
     --ok-text:  #003318;
     --warn:     #6a3800;
     --warn-bg:  #ffe090;
+    --on-warn-amber: #ffe090; /* light text needed on darkened amber #6a3800 in HC */
     --red:      #cc0011;
     --status-text-danger: #b00010;
     --accent-light: #c8e6ff;
@@ -252,6 +254,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   }
   /* Badges must be readable — darken muted variant */
   .badge.b-grey { color: #222 !important; background: #d0d0d0 !important; }
+  /* no scoped override needed — --on-warn-amber handles both contexts */
 }
 
 /* forced-colors: active — Windows High Contrast Mode; the OS enforces its own
@@ -290,8 +293,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-auth:disabled{background:#f4f8fc;color:#b0b7bb;border:1px solid var(--border);cursor:not-allowed;opacity:.7;box-shadow:none;}
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
-.auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);color:#8b1a1a;margin-top:10px;display:none;}
-.auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
+.auth-err{background:#fdeaea;border:1.5px solid var(--red);border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);color:#8b1a1a;margin-top:10px;display:none;}
+.auth-acct-banner{background:#f0f7ff;border:1.5px solid var(--royal);border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
 .auth-back-btn{display:block;background:none;border:none;color:#004b8d;font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em;cursor:pointer;padding:4px 0;margin-top:var(--sp-xs);text-decoration:none;width:100%;text-align:center;font-family:inherit;opacity:.9;transition:opacity .15s,color .15s;} /* DES-H01: was #51b0e3 (2.33:1 on white, fails AA); #004b8d=7.3:1 */
 .auth-back-btn:hover{opacity:1;color:#004b8d;}
 
@@ -335,7 +338,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* Planning sub-items — indented within Training section */
 .nav-subitem{padding-left:30px;font-size:var(--fs-sm);font-weight:500;color:var(--steel);}
 .nav-subitem:hover{background:var(--bg);color:var(--dark);}
-.nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
+.nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--royal);font-weight:700;}
 .nav-planning-hdr{font-size:var(--fs-2xs);font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
 .nav-item-ext{display:flex;align-items:center;padding:11px var(--sp-md);font-size:var(--fs-sm);font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;text-decoration:none;letter-spacing:.01em;}
 .nav-item-ext:hover{background:rgba(255,255,255,.07);color:#fff;}
@@ -449,7 +452,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   background:var(--surface);border:1px solid var(--border);
   border-left:4px solid var(--border);border-radius:8px;padding:11px 14px;
 }
-.yn-year-row.is-current{border-left-color:var(--blue);background:var(--accent-light);}
+.yn-year-row.is-current{border-left-color:var(--royal);background:var(--accent-light);}
 .yn-year-row.is-arch{background:var(--surface-2);}
 .yn-year-id{display:flex;align-items:baseline;gap:9px;min-width:118px;}
 .yn-year-num{
@@ -470,7 +473,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 @media(max-width:460px){.cp-date-pair{grid-template-columns:1fr;}}
 .yn-current-tag{
   font-size:var(--fs-3xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--royal);border:1px solid var(--blue);border-radius:10px;padding:2px 8px;
+  color:var(--royal);border:1px solid var(--royal);border-radius:10px;padding:2px 8px;
   background:var(--surface);white-space:nowrap;
 }
 .yn-empty{color:var(--muted);font-size:var(--fs-sm);padding:14px 0;}
@@ -523,10 +526,10 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-dk{background:var(--dark);color:white;}
 .btn-dk:hover{background:var(--royal);}
 .btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
-.btn-out:hover{background:var(--dark);color:white;}
+.btn-out:hover{background:var(--dark);color:white;border-color:var(--surface);}
 .btn-red-out{background:white;color:var(--red);border:1.5px solid var(--red);}
-.btn-red-out:hover{background:var(--red);color:white;}
-.btn-sky{background:var(--accent-light);color:var(--dark);border:1px solid var(--pale);}
+.btn-red-out:hover{background:var(--red);color:white;border-color:var(--surface);}
+.btn-sky{background:var(--accent-light);color:var(--dark);border:1px solid var(--royal);}
 .btn-sky:hover{background:#c4e4f5;color:var(--dark);}
 .btn-danger,.btn-red{background:var(--red);color:white;}
 .btn-danger:hover,.btn-red:hover{background:#c01530;}
@@ -562,7 +565,7 @@ label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:var(
 .btn-primary{background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s,box-shadow .12s;}
 .btn-primary:hover{background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
 .btn-primary:active{background:linear-gradient(180deg,#001e42 0%,#00183a 100%);transform:translateY(1px);}
-.btn-secondary{background:#f0f7ff;color:#002f65;border:1.5px solid #bee3f8;box-shadow:0 1px 2px rgba(0,47,101,.06);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s;}
+.btn-secondary{background:#f0f7ff;color:#002f65;border:1.5px solid var(--royal);box-shadow:0 1px 2px rgba(0,47,101,.06);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s;}
 .btn-secondary:hover{background:#e0f0fa;}
 .btn-ghost{background:transparent;color:#004b8d;border:1px solid transparent;padding:10px 16px;border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:600;letter-spacing:.04em;cursor:pointer;}
 .btn-ghost:hover{color:#002f65;}
@@ -762,14 +765,14 @@ tr.tc-archived{opacity:.6;}
 /* ── CALENDAR ── */
 .cal-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .cal-nbtn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;min-width:var(--ctl-min);min-height:var(--ctl-min);cursor:pointer;font-size:var(--fs-sm);transition:all .13s;}
-.cal-nbtn:hover{border-color:var(--blue);background:var(--accent-light);}
+.cal-nbtn:hover{border-color:var(--royal);background:var(--accent-light);}
 .cal-mo{font-size:var(--fs-lg);font-weight:900;color:var(--dark);}
 .cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px;}
 .cal-dn{text-align:center;font-size:var(--fs-3xs);font-weight:800;color:var(--muted);padding:4px 0;letter-spacing:.08em;text-transform:uppercase;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
 .cal-cell{min-height:76px;background:white;border:1px solid var(--border);border-radius:6px;padding:4px;cursor:pointer;transition:all .13s;overflow:hidden;}
 .cal-cell:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(81,176,227,.18);}
-.cal-cell.parade{background:#e6f3fc;border-color:var(--blue);}
+.cal-cell.parade{background:#e6f3fc;border-color:var(--royal);}
 .cal-cell.today{border-color:var(--dark);border-width:2px;}
 .cal-cell.other{background:var(--bg);}
 /* De-emphasised via an explicit accessible colour on the date text itself, not
@@ -785,8 +788,8 @@ tr.tc-archived{opacity:.6;}
 .cal-chip.delivered{background:var(--ok);}.cal-chip.cancelled{background:var(--red);}
 .cal-chip.delivered_with_issue{background:#8a9a3a;color:var(--on-warn,#101A26);}.cal-chip.cancelled_late{background:var(--red);}  /* AUDIT-2026-08 G1: white was 3.10:1 -> 5.65:1 */
 .cal-chip.not_delivered{background:var(--lgrey);color:var(--on-warn,#101A26);}  /* G1: white was 2.03:1 -> 8.63:1 */
-.cal-chip.rescheduled{background:var(--warn);color:var(--on-warn,#101A26);}  /* G1: white was 3.35:1 -> 5.23:1 */
-.cal-chip.act{background:var(--warn);color:var(--on-warn,#101A26);}  /* G1: white was 3.35:1 -> 5.23:1 */
+.cal-chip.rescheduled{background:var(--warn);color:var(--on-warn-amber,#101A26);}  /* G1: uses --on-warn-amber → #ffe090 on #6a3800 (7.63:1) in HC */
+.cal-chip.act{background:var(--warn);color:var(--on-warn-amber,#101A26);}  /* G1: uses --on-warn-amber → #ffe090 on #6a3800 (7.63:1) in HC */
 
 /* ── VH-02: Activities page section dividers ── */
 .pg-sec-brk{display:flex;align-items:center;gap:10px;margin:24px 0 12px;padding-bottom:8px;border-bottom:1.5px solid var(--border-light);}
@@ -815,7 +818,7 @@ tr.tc-archived{opacity:.6;}
 .sess-card.delivered{border-color:var(--ok);background:#f0faf5;}
 .sess-card.cancelled{border-color:var(--red);background:#fff5f5;}
 .sess-card.rescheduled{border-color:var(--warn);background:#fffbf0;}
-.sess-card.not_delivered{border-color:var(--lgrey);background:#f8f9fa;}
+.sess-card.not_delivered{border-color:#848f96;background:#f8f9fa;}
 .sess-card.unassigned{border-color:var(--warn);background:#fffbf0;}
 .sess-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .sess-num{font-size:var(--fs-2xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
@@ -931,7 +934,7 @@ tr.tc-archived{opacity:.6;}
 #page-service-desk .sd-filter-bar button.active {
   background: var(--royal);    /* AUDIT-2026-08 G1: --blue gave #fff at 2.42:1 -> 8.78:1 */
   color: #fff;
-  border-color: var(--royal);
+  /* border inherits var(--border) from base rule — visible against the dark fill */
 }
 /* Option A (2026-08-23): the private two-pane layout is gone. The list is a
    shared .card + .tbl and a ticket opens in the standard modal, so Service Desk
@@ -963,7 +966,7 @@ tr.tc-archived{opacity:.6;}
   top: calc(100% + 2px);
   left: 0; right: 0;
   background: var(--surface);
-  border: 1.5px solid var(--blue);
+  border: 1.5px solid var(--royal);
   border-radius: var(--radius);
   box-shadow: var(--sh2);
   max-height: 180px;
@@ -1033,7 +1036,7 @@ tr.tc-archived{opacity:.6;}
 .curr-body{padding:0 16px 12px;display:none;}
 .curr-body.open{display:block;}
 .exp-item{border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;transition:border-color .12s;cursor:pointer;}
-.exp-item:hover{border-color:var(--accent);background:#fafbff;}
+.exp-item:hover{border-color:var(--royal);background:#fafbff;}
 .exp-code{font-size:var(--fs-xs);font-weight:600;color:var(--muted);letter-spacing:.04em;margin-bottom:2px;}
 .exp-title{font-size:var(--fs-sm);font-weight:600;color:var(--text);margin-bottom:3px;}
 .exp-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
@@ -1044,8 +1047,8 @@ tr.tc-archived{opacity:.6;}
 /* ── RESOURCE CHIPS ── */
 .res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:8px;}
 .res-chip{border-radius:8px;padding:10px 12px;border:1px solid var(--border);background:white;}
-.res-chip.ok{border-color:#a8d5bc;background:var(--ok-bg);}
-.res-chip.busy{border-color:#f5b0b0;background:var(--red-bg);}
+.res-chip.ok{border-color:var(--ok);background:var(--ok-bg);}
+.res-chip.busy{border-color:var(--red);background:var(--red-bg);}
 .rc-name{font-size:var(--fs-sm);font-weight:600;color:var(--text);}
 .rc-status{font-size:var(--fs-2xs);color:var(--muted);margin-top:2px;}
 
@@ -1122,7 +1125,7 @@ tr.tc-archived{opacity:.6;}
 .qe-form{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
 .maint-banner{display:none;align-items:center;gap:10px;padding:7px var(--sp-lg);font-size:var(--fs-sm);font-weight:700;background:#c8102e;color:#fff;border-bottom:2px solid #9a0b22;}
 .maint-banner.show{display:flex;}
-.maint-banner.pending{background:#c97a00;border-bottom-color:#a06200;color:#111111;}  /* G1: white on #c97a00 = 3.29:1 (fail) -> #111111 = 6.02:1 (pass) */
+.maint-banner.pending{background:#c97a00;border-bottom-color:var(--dark);color:#111111;}  /* G1: white on #c97a00 = 3.29:1 (fail) -> #111111 = 6.02:1 (pass) */
 .maint-banner .maint-icon{font-size:var(--fs-lg);flex-shrink:0;}
 .maint-banner .maint-msg{flex:1;}
 
@@ -1269,8 +1272,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 .faq-cat{margin-bottom:16px}
 .faq-cat:last-child{margin-bottom:0}
 .faq-cat-name{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
-.faq-cat-name::after{content:"";flex:1;height:1px;background:var(--border-light)}
-.faq-item{border:1px solid var(--border-light);border-radius:6px;margin-bottom:6px;background:var(--surface)}
+.faq-cat-name::after{content:"";flex:1;border-top:1px solid var(--border-light)}
+.faq-item{border:1px solid #7a929e;border-radius:6px;margin-bottom:6px;background:var(--surface)}
 .faq-item[open]{border-color:var(--border);box-shadow:var(--sh)}
 .faq-item > summary{
   list-style:none;cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:9px;
@@ -1297,7 +1300,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 }
 .rte-btn:hover{background:var(--surface);border-color:var(--border)}
 .rte-btn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
-.rte-btn[aria-pressed="true"]{background:var(--accent-light);border-color:var(--blue);color:var(--dark)}
+.rte-btn[aria-pressed="true"]{background:var(--accent-light);border-color:var(--royal);color:var(--dark)}
 .rte-area{
   border:1px solid var(--border);border-radius:0 0 6px 6px;background:var(--surface);
   padding:12px 14px;min-height:220px;max-height:46vh;overflow-y:auto;
@@ -1567,12 +1570,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </table></div>
         </div>
 
-        <!-- ══════════ A. TONIGHT ══════════ -->
-        <div class="dash-section dash-sec-hero">
-        <!-- E4: Quick Actions was the last card on a 12-screen page, so the
-             actions people come here to take sat below everything they came
-             here to read. Moved above section A. -->
-        <div class="card no-print">
+        <!-- Quick Actions — standalone card above sections for immediate access -->
+        <div class="card no-print" style="margin-bottom:var(--sp-lg)">
           <h3 class="ctitle">Quick Actions</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-dk" onclick="openAddPN()">+ Parade Night</button>
@@ -1583,6 +1582,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
           </div>
         </div>
+
+        <!-- ══════════ A. TONIGHT ══════════ -->
+        <div class="dash-section dash-sec-hero">
           <h2 class="dash-sec-hdr">A — Tonight &amp; This Week</h2>
           <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
           <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
@@ -1989,44 +1991,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
 
         <!-- Holiday periods for the active planning year -->
-        <div class="card" id="act-holidays-wrap" style="margin-top:0">
+        <div class="card" id="act-holidays-wrap" style="margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
             <h2 class="ctitle" style="margin:0">Holiday Periods</h2>
           </div>
           <div id="py-holidays-body"><p class="muted" style="font-size:var(--fs-xs)">No holiday periods for this year.</p></div>
         </div>
 
-        <!-- REM-146: Class forecast card — squadron scope only; hidden by default,
-             shown and populated by _loadClassForecasts() when a year is selected.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed class forecast UI. -->
-        <div class="card" id="py-forecasts-card" style="display:none;margin-top:0">
-          <h2 class="ctitle">Class Forecasts</h2>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Planning status per training class — unplanned requirements, nights remaining, and available time blocks.</p>
-          <div id="fc-cards-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
-        </div>
-
-        <!-- Training Classes — shown when a year is selected; populated by _tcLoadForYear() -->
-        <div class="card" id="settings-training-classes-wrap" style="display:none;margin-top:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h2 class="ctitle" style="margin:0">Training Classes</h2>
-            <div style="display:flex;align-items:center;gap:10px">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
-            </div>
-          </div>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
-            A Training Class is a local group completing a Training Stage — for example, Senior 1
-            and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
-            Classes with a year.
-          </p>
-          <div id="py-classes-card" style="display:none">
-            <div id="py-classes-body"></div>
-          </div>
-        </div>
-
-        <!-- Wing HQ Events overlay — squadron scope; hidden until _loadAndRenderWingEventsOverlay()
-             populates it. USER-AUTHORISED CHANGE (2026-08-27): exposed wing events overlay UI. -->
-        <div class="card" id="py-wing-events-card" style="display:none;margin-top:0">
+        <!-- Inherited Activities — Wing/National events visible to squadron users as read-only overlay.
+             Hidden until _loadAndRenderWingEventsOverlay() populates it for the selected year. -->
+        <div class="card" id="py-wing-events-card" style="display:none;margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
             <h2 class="ctitle" style="margin:0">Inherited Activities</h2>
             <select id="py-we-imp-filter" aria-label="Filter by planning importance" onchange="_renderWingEventsOverlay()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
@@ -2042,47 +2016,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="py-wing-events-body"></div>
         </div>
 
-        <!-- Anchor Events — always visible; body shows "Select a year" until one is chosen.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed anchor events on Activities page. -->
-        <div class="card" style="margin-top:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="anch-show-archived" onchange="loadAnchors(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddAnchorModal()">+ Add Anchor</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-            <select id="anch-filter-importance" aria-label="Filter by importance" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Importance</option>
-              <option value="must_attend">Must Attend</option>
-              <option value="key_event">Key Event</option>
-              <option value="optional">Optional</option>
-            </select>
-            <select id="anch-filter-type" aria-label="Filter by event type" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Types</option>
-              <option value="ceremonial">Ceremonial</option>
-              <option value="fieldcraft">Fieldcraft</option>
-              <option value="adventure_training">Adventure Training</option>
-              <option value="dining_in">Dining In</option>
-              <option value="inspection">Inspection</option>
-              <option value="sport">Sport</option>
-              <option value="community">Community</option>
-              <option value="admin">Admin</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div id="anchors-body"><p class="muted" style="font-size:var(--fs-xs)">Select a year above.</p></div>
+        <!-- Class Forecasts data container — hidden here, populated by _loadClassForecasts().
+             UI is shown in the Training Dashboard. -->
+        <div id="py-forecasts-card" style="display:none" aria-hidden="true">
+          <div id="fc-cards-body"></div>
         </div>
+        <!-- Anchor event data container — not shown on Activities page (USER-AUTHORISED REMOVAL) -->
+        <div id="anchors-body" style="display:none" aria-hidden="true"></div>
 
-        <!-- Mission Backlog relocated to Needs Attention — USER-AUTHORISED CHANGE (2026-09-26) -->
-        <p class="muted" style="font-size:var(--fs-xs);margin-top:0"><a href="#" onclick="nav('action-items');return false;" style="color:var(--blue)">Mission Backlog</a> is now in Needs Attention.</p>
-
-        <!-- VH-02: section break before inherited activities -->
-        <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
-
-        <!-- Inherited Wing/National/CEA/Holiday activities (Phase 2) — read-only here;
-             edited at the owning scope. Kept as a separate section from the local-only
-             table above so existing Add/Edit/Delete Activity behaviour is unchanged. -->
+        <!-- Inherited Wing/National/CEA activities (Phase 2 tab container) -->
         <div id="act-tab-squadron"></div>
 
       </div>
@@ -2204,11 +2146,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Mission Backlog — missions-empty shown when no year; filter + table shown when loaded.
              USER-AUTHORISED CHANGE (2026-09-26): moved Mission Backlog from Activities to Needs Attention. -->
         <div id="missions-empty" style="margin-top:18px">
-          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to load the Mission Backlog.</p>
+          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to load Training Requirements.</p>
         </div>
         <div class="card" id="missions-filters-card" style="display:none;margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
+            <h2 class="ctitle" style="margin:0">Training Requirements<button class="ht" tabindex="0" aria-label="About Training Requirements" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
               <button class="btn btn-xs btn-out" onclick="exportPerClassDeliveryCSV()" aria-label="Export per-class delivery CSV">Per-Class CSV</button>
@@ -2287,14 +2229,65 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="page-cadets" class="page">
         <div class="ph">
           <div><h1 class="ph-title">Cadet Management</h1><div class="ph-sub" id="cadets-sub">Select a Training Class to view or manage its roster.</div></div>
-          <div class="ph-actions no-print" style="gap:6px">
+          <div class="ph-actions no-print" style="gap:6px" id="cadets-roster-actions">
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
-            <button class="btn btn-out btn-sm plan-write-el" onclick="nav('cea-import')" title="Import cadet roster from the Cadet Enterprise Application">CEA Import</button>
           </div>
         </div>
-        <div id="cadets-roster-wrap">
-          <p class="muted" style="font-size:var(--fs-sm)">Select a Training Class above to view cadets.</p>
+        <!-- §20: Roster / CEA Import tab bar -->
+        <div class="tab-bar">
+          <button id="cadets-tab-roster-btn" class="tab-btn active" onclick="setCadetsTab('roster')" aria-selected="true">Roster</button>
+          <button id="cadets-tab-cea-btn" class="tab-btn plan-write-el" onclick="setCadetsTab('cea')" aria-selected="false">CEA Import</button>
+        </div>
+        <div id="cadets-tab-roster">
+          <div id="cadets-roster-wrap">
+            <p class="muted" style="font-size:var(--fs-sm)">Select a Training Class above to view cadets.</p>
+          </div>
+        </div>
+        <!-- §20 CEA Import tab panel (integrated — nav('cea-import') redirects here) -->
+        <div id="cadets-tab-cea" style="display:none">
+          <div class="card" style="margin-bottom:16px">
+            <h2 class="ctitle" style="margin-bottom:8px">Step 1 — Paste CSV</h2>
+            <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px">
+              Expected columns: <code>Id, Rank, Name, Family name</code> (plus any optional columns — Gender, Position, Unit, Scope, Access are ignored).
+            </p>
+            <textarea id="cea-csv-input" rows="8" style="width:100%;font-family:monospace;font-size:var(--fs-xs);border:1px solid var(--border);border-radius:4px;padding:8px;resize:vertical;box-sizing:border-box" placeholder="Id,Rank,Name,Family name,Position,Unit,Scope,Gender,Access&#10;12345,OCdt,Jane,Smith,..."></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="ceaPreview()">Preview</button>
+              <span id="cea-preview-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+            </div>
+          </div>
+          <div id="cea-preview-wrap" style="display:none">
+            <div class="card" style="margin-bottom:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                <h2 class="ctitle" style="margin:0">Step 2 — Review Preview</h2>
+                <div id="cea-summary-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+              </div>
+              <div class="tw" style="overflow-x:auto"><table>
+                <thead><tr>
+                  <th style="width:70px">Row</th><th style="width:100px">CEA Id</th>
+                  <th style="width:80px">Rank</th><th>Name</th>
+                  <th style="width:90px">Action</th><th>Details</th>
+                </tr></thead>
+                <tbody id="cea-preview-tbody"></tbody>
+              </table></div>
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                <button class="btn btn-primary btn-sm" id="cea-commit-btn" onclick="ceaCommit()">Commit Import</button>
+                <span id="cea-commit-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+              </div>
+            </div>
+          </div>
+          <div id="cea-result-wrap" style="display:none">
+            <div class="card">
+              <h2 class="ctitle" style="margin-bottom:8px">Step 3 — Result</h2>
+              <div id="cea-result-body"></div>
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                <button class="btn btn-danger btn-sm" id="cea-rollback-btn" style="display:none" onclick="ceaRollback()">Rollback This Import</button>
+                <button class="btn btn-out btn-sm" onclick="ceaReset()">Start New Import</button>
+                <span id="cea-rollback-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2314,62 +2307,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- CEA MEMBER IMPORT -->
       <div id="page-cea-import" class="page">
-        <div class="ph">
-          <div>
-            <h1 class="ph-title">CEA Member Import</h1>
-            <div class="ph-sub">Bulk upsert cadets from a CEA export. Preview before committing — new cadets are created, existing cadets (matched by CEA Id / Service Number) have their rank and name updated.</div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom:16px">
-          <h2 class="ctitle" style="margin-bottom:8px">Step 1 — Paste CSV</h2>
-          <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px">
-            Expected columns: <code>Id, Rank, Name, Family name</code> (plus any optional columns — Gender, Position, Unit, Scope, Access are ignored).
-          </p>
-          <textarea id="cea-csv-input" rows="8" style="width:100%;font-family:monospace;font-size:var(--fs-xs);border:1px solid var(--border);border-radius:4px;padding:8px;resize:vertical;box-sizing:border-box" placeholder="Id,Rank,Name,Family name,Position,Unit,Scope,Gender,Access&#10;12345,OCdt,Jane,Smith,..."></textarea>
-          <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-            <button class="btn btn-primary btn-sm" onclick="ceaPreview()">Preview</button>
-            <span id="cea-preview-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-          </div>
-        </div>
-
-        <div id="cea-preview-wrap" style="display:none">
-          <div class="card" style="margin-bottom:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-              <h2 class="ctitle" style="margin:0">Step 2 — Review Preview</h2>
-              <div id="cea-summary-badges" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-            </div>
-            <div class="tw" style="overflow-x:auto"><table>
-              <thead><tr>
-                <th style="width:70px">Row</th>
-                <th style="width:100px">CEA Id</th>
-                <th style="width:80px">Rank</th>
-                <th>Name</th>
-                <th style="width:90px">Action</th>
-                <th>Details</th>
-              </tr></thead>
-              <tbody id="cea-preview-tbody"></tbody>
-            </table></div>
-            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-              <button class="btn btn-primary btn-sm" id="cea-commit-btn" onclick="ceaCommit()">Commit Import</button>
-              <span id="cea-commit-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-            </div>
-          </div>
-        </div>
-
-        <div id="cea-result-wrap" style="display:none">
-          <div class="card">
-            <h2 class="ctitle" style="margin-bottom:8px">Step 3 — Result</h2>
-            <div id="cea-result-body"></div>
-            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-              <button class="btn btn-danger btn-sm" id="cea-rollback-btn" style="display:none" onclick="ceaRollback()">Rollback This Import</button>
-              <button class="btn btn-out btn-sm" onclick="ceaReset()">Start New Import</button>
-              <span id="cea-rollback-status" style="font-size:var(--fs-sm);color:var(--muted)"></span>
-            </div>
-          </div>
-        </div>
+        <div class="ph"><h1 class="ph-title">CEA Member Import</h1></div>
+        <div class="card"><p class="muted" style="font-size:var(--fs-sm)">CEA Member Import is now in <a href="#" onclick="nav('cadets');setCadetsTab('cea');return false;" style="color:var(--blue)">Cadet Management → CEA Import tab</a>.</p></div>
       </div>
-
       <!-- HELP & REFERENCE -->
       <div id="page-help" class="page">
         <div class="ph">
@@ -2408,7 +2348,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
-        <div class="ph"><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
+        <div class="ph">
+          <div><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
+          <div class="ph-actions no-print" id="settings-pw-actions" style="display:none">
+            <button class="btn btn-sky btn-sm" onclick="openPlanningWorkspace()">Open Planning Workspace ↗</button>
+          </div>
+        </div>
         <div class="card">
           <h2 class="ctitle">Squadron Details</h2>
           <div class="form-row">
@@ -2496,7 +2441,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <!-- DENS-01: Display size preference -->
-        
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
@@ -2508,6 +2452,30 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
         </div>
+
+        <!-- Training Classes — sqn_admin only; populated by _loadSettingsTrainingClasses() + _tcLoadForYear() -->
+        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h2 class="ctitle" style="margin:0">Training Classes</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training on the same Parade Night. Associate
+            Training Classes with a year.
+          </p>
+          <div style="margin-bottom:10px">
+            <label for="tc-year-sel" style="font-size:var(--fs-xs);font-weight:600">Training Year</label>
+            <select id="tc-year-sel" onchange="_tcLoadForYear(this.value)" style="margin-left:8px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)"></select>
+          </div>
+          <div id="py-classes-card" style="display:none">
+            <div id="py-classes-body"></div>
+          </div>
+        </div>
+
         <!-- Custom Training Phases (Task 10) -->
         <div class="card admin-el" id="settings-custom-phases-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -5698,6 +5666,8 @@ async function loadData(){
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
       facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned',
       period_number:s.period_number||1,
+      // §10: 0..N assistant facilitators; user_id here is Facilitator.id (see _resolve_assistants)
+      assistant_facilitators:s.assistant_facilitators||[],
       // CLASS-06: which Training Class(es) this session targets (CLASS-03's
       // audience linkage, GET /api/parade-nights's own additive field).
       trainingClasses:s.training_classes||[]
@@ -6258,8 +6228,7 @@ function bootApp(){
       const tok=sessionStorage.getItem('aafc_token');
       if(tok){
         e.preventDefault();
-        const yr=P&&P.currentYearInt?'&y='+P.currentYearInt:'';
-        window.open(pwUrl+'#t='+encodeURIComponent(tok)+yr,'_blank','noopener');
+        openPlanningWorkspace();
       }
     },{once:false});
   }
@@ -6269,6 +6238,9 @@ function bootApp(){
   if(pwLink)pwLink.style.display=showPW?'flex':'none';
   if(pwUnconfigured)pwUnconfigured.style.display=showPWUnconfigured?'flex':'none';
   if(pwLbl)pwLbl.style.display=(showPW||showPWUnconfigured)?'block':'none';
+  // §33: show PW deep-link button in Unit Settings header when PW is configured
+  const settingsPwActions=document.getElementById('settings-pw-actions');
+  if(settingsPwActions)settingsPwActions.style.display=showPW?'':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
   // SET-1: this forced inline-flex onto every .admin-el, including whole
@@ -6343,6 +6315,13 @@ function bootApp(){
   renderAll();
   nav(SCOPE_LANDING[scope]||'dashboard');
 }
+function openPlanningWorkspace(){
+  const pwUrl=S&&S.pwUrl; if(!pwUrl)return;
+  const tok=sessionStorage.getItem('aafc_token');
+  const yr=P&&P.currentYearInt?'&y='+P.currentYearInt:'';
+  if(tok){window.open(pwUrl+'#t='+encodeURIComponent(tok)+yr,'_blank','noopener');}
+  else{window.open(pwUrl,'_blank','noopener');}
+}
 function renderAll(){
   const scope=effectiveScope();
   if(scope==='system_admin'){
@@ -6366,6 +6345,7 @@ function nav(id){
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
+  if(id==='cea-import'){nav('cadets');setCadetsTab('cea');return;}
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.setAttribute('aria-hidden','true');});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg){pg.classList.add('active');pg.removeAttribute('aria-hidden');}
@@ -7759,6 +7739,11 @@ async function openCreateAccountModal(preselectedSqnId){
   if(!Array.isArray(S.squadrons) || !S.squadrons.length){
     try{ S.squadrons = await api('/api/squadrons'); }catch(_){ S.squadrons = S.squadrons||[]; }
   }
+  // ACC-3: sqn_admin's session does not populate S.wings, so the wing dropdown
+  // rendered empty and the pre-select/lock for their own wing silently failed.
+  if(!Array.isArray(S.wings) || !S.wings.length){
+    try{ S.wings = await api('/api/wings'); }catch(_){ S.wings = S.wings||[]; }
+  }
   document.getElementById('ca-name').value='';
   document.getElementById('ca-role').value='';
   document.getElementById('ca-msg').textContent='';
@@ -8539,6 +8524,7 @@ async function renderSettings(){
   }
   renderUserDir();
   loadCustomPhases();
+  _loadSettingsTrainingClasses();
   // Load year list into the Training Years settings card. Uses the same
   // renderer as the Manage Training Years modal -- this block used to draw its
   // own 2-column read-only table, which is why the two surfaces looked like
@@ -9785,7 +9771,7 @@ async function openApplyTemplateModal(pnId){
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="btn btn-xs btn-primary" onclick="doApplyTemplate('${esc(t.id)}')">Apply</button>
-          <button class="btn btn-xs btn-red-out" title="Delete this template" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
+          <button class="btn btn-xs btn-red-out" title="Delete this template" aria-label="Delete template ${esc(t.name||t.id)}" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
         </div>
       </div>`).join('');
   }catch(e){ listEl.innerHTML=''; errEl.textContent=apiErr(e); errEl.style.display='block'; }
@@ -11049,11 +11035,19 @@ async function quickEdit(date,idx){
   const facOpts=S.facs.map(f=>`<option value="${f.id}" ${f.id===s.facId?'selected':''}>${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}" ${r.name===s.room?'selected':''}>${esc(r.name)}</option>`).join('');
   const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
+  const asstFacIds=new Set((s.assistant_facilitators||[]).map(a=>a.user_id));
+  const asstFacHtml=S.facs.length<2?'':S.facs.map(f=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-sm)">
+      <input type="checkbox" class="qe-asst-chk" value="${esc(f.id)}" ${asstFacIds.has(f.id)?'checked':''}>
+      ${esc(facDisplay(f))}</label>`).join('');
   document.getElementById('sess-edit-body').innerHTML=`
     <div class="ff"><label for="qe-st">Status</label><select id="qe-st" aria-label="Session status">${stOpts}</select></div>
     <div class="ff"><label for="qe-ex">Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
     <div class="ff"><label for="qe-fa">Facilitator</label><div id="fac-sugg-panel" style="display:none"></div><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
     <div class="ff"><label for="qe-rm">Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>
+    ${asstFacHtml?`<div class="ff" id="qe-asst-group">
+      <label>Assistant Facilitators</label>
+      <div id="qe-asst-list" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px">${asstFacHtml}</div>
+    </div>`:''}
     <div class="ff" id="qe-classes-group" style="display:none">
       <label>Training Classes</label>
       <p class="muted" style="font-size:var(--fs-xs);margin:0 0 6px">
@@ -11145,11 +11139,16 @@ async function saveSessEdit(){
     // printed Weekly Program. Two other copies of this object carried a comment
     // warning about exactly that; writing the warning twice did not stop the
     // third copy getting it wrong, which is why there is now only one.
+    const asstChecked=[...document.querySelectorAll('.qe-asst-chk:checked')].map(c=>c.value);
     const body=_sessBuildBody({
       __pnId:pn.id, period_number:s.period_number||editSessRef.idx+1,
       phase:s.phase, exp:expTitle, facId:facId, room:roomName,
       timingBlockId:s.timingBlockId,
-    }, (newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
+    }, Object.assign(
+      (newSt!==s.status) ? {status:newSt, reason:reason||null} : {},
+      // §10: always send assistant_facilitator_ids so clearing all is honoured
+      {assistant_facilitator_ids:asstChecked}
+    ));
     // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
     // previous separate PUT-then-POST(/status) two-call sequence.
     await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
@@ -13294,7 +13293,7 @@ const _GH_DEFAULT=`
   <li>Schedule curriculum sessions</li>
   <li>Assign facilitators and rooms</li>
   <li>Record training outcomes</li>
-  <li>Review Mission Backlog</li>
+  <li>Review Training Requirements</li>
 </ul>
 <p><strong>Use TMS</strong> to manage your organisation — accounts, facilities, activities.<br>
 <strong>Use Planning Workspace</strong> to do the planning — schedule nights, assign curriculum, track delivery.</p>
@@ -13314,9 +13313,9 @@ const _GH_DEFAULT=`
 <p>One training block within a parade night, linked to a curriculum item, time period, facilitator, room, and one or more Training Classes.</p>
 <p>A session can serve more than one Training Class. If Senior 1 and Senior 2 are doing the same module together, assign both classes to one session — they share the session, and the system records the delivery against each class separately.</p>
 <h3>Activity</h3>
-<p>A training event outside the standard parade night schedule — field days, camps, competitions, courses and similar. Activities appear in Planning Workspace as reference items and feed into Mission Backlog when they include curriculum delivery. Create and manage them in TMS under Activities. CEA (Cadet Enterprise Application) activities are imported from the national system.</p>
-<h3>Mission Backlog</h3>
-<p>A list of curriculum modules required for your active Training Classes that have not yet been scheduled. The backlog tells you what still needs planning and for which class. If a module is needed by Senior 1 but not Senior 2, the backlog shows that distinction.</p>
+<p>A training event outside the standard parade night schedule — field days, camps, competitions, courses and similar. Activities appear in Planning Workspace as reference items and feed into Training Requirements when they include curriculum delivery. Create and manage them in TMS under Activities. CEA (Cadet Enterprise Application) activities are imported from the national system.</p>
+<h3>Training Requirements</h3>
+<p>A list of curriculum modules required for your active Training Classes that have not yet been scheduled. Training Requirements tell you what still needs planning and for which class. If a module is needed by Senior 1 but not Senior 2, the distinction is shown here.</p>
 
 <h2>Setting up for the first time</h2>
 <p>Before using Planning Workspace, set the following up in TMS:</p>
@@ -13801,9 +13800,14 @@ async function clearActivityLocalOverride(){
   confirmAction('Remove this local adjustment and revert to the source activity\'s own date/time/notes?',async()=>{
     try{
       await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
+      // Patch S.acts immediately so renderActs() reflects the cleared state before
+      // the modal closes — a full reloadAndRender() can fail and leave stale data.
+      const _clearedAct=S.acts.find(a=>a.id===_actOverrideId);
+      if(_clearedAct) _clearedAct.localOverride=null;
+      renderActs();
       closeModal('m-act-override');
-      await reloadAndRender();
       showToast('Local adjustment cleared.');
+      reloadAndRender(); // background refresh for all other data, no await
     }catch(e){ showToast(apiErr(e),true); }
   });
 }
@@ -15110,10 +15114,10 @@ function _ttBlockRow(b,i){
   const dur=_ttDur(b);
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
-    <td style="padding:2px 3px"><input class="tt-block-name" value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input class="tt-block-name" value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" aria-label="Block name for period ${i+1}" style="width:100%;min-width:95px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value);_ttBSet(${i},'is_instructional_period',this.value==='training_period');ttSyncBlockType(this)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:var(--fs-xs)">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" aria-label="Start time for period ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" aria-label="End time for period ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted)">${dur!=null?dur:''}</td>
     <td style="padding:2px 4px;text-align:center"><input class="tt-block-ip" type="checkbox"${b.is_instructional_period?' checked':''}${b.block_type==='training_period'?' disabled':''} onchange="_ttBSet(${i},'is_instructional_period',this.checked)" aria-label="Instructional period for ${esc(b.block_name||'period '+(i+1))}"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_ttBSet(${i},'is_optional',this.checked)" aria-label="Optional for ${esc(b.block_name||'period '+(i+1))}"></td>
@@ -15251,10 +15255,10 @@ function _pnCbBlockRow(b, i) {
   })() : '';
   return `<tr>
     <td style="padding:2px 4px;color:var(--muted);font-size:var(--fs-xs)">${i+1}</td>
-    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:var(--fs-xs)" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='training_period');renderPNCbBlocks()">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" aria-label="Block name for block ${i+1}" style="width:100px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><select aria-label="Block type for block ${i+1}" style="font-size:var(--fs-xs)" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='training_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" aria-label="Start time for block ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" aria-label="End time for block ${i+1}" style="width:82px;font-size:var(--fs-xs)"></td>
     <td style="padding:2px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted)">${sh}</td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_pnCbSet(${i},'is_instructional_period',this.checked)" aria-label="Instructional period for ${esc(b.block_name||'block '+(i+1))}"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_pnCbSet(${i},'is_optional',this.checked)" aria-label="Optional for ${esc(b.block_name||'block '+(i+1))}"></td>
@@ -15345,8 +15349,10 @@ function statusBadge(row){
   return '<span class="badge b-amber">No data</span>';
 }
 function readinessDot(v){
-  if(v===null||v===undefined)return '<span class="dot n"></span>—';
-  const c=v>=80?'g':v>=60?'a':'r'; return `<span class="dot ${c}"></span>${v}`;
+  if(v===null||v===undefined)return '<span class="dot n" aria-hidden="true"></span><span class="sr-only">No data</span>—';
+  const c=v>=80?'g':v>=60?'a':'r';
+  const label=v>=80?'On track':v>=60?'At risk':'Critical';
+  return `<span class="dot ${c}" aria-hidden="true"></span><span class="sr-only">${label}:</span>${v}`;
 }
 function heatColor(p){ p=+p||0; return p>=67?'#1a7f4b':p>=34?'#c97a00':p>0?'#e51937':'#c2ccd6'; }
 
@@ -16122,9 +16128,10 @@ async function doDeletePlanningYear(){
 // ── Hook into nav() so planning-adjacent pages auto-load on first visit ──
 const _origNav = nav;
 nav = function(pg) {
-  _origNav(pg);
+  const r = _origNav(pg);
   if(pg === 'wing-calendar') { loadWingCalendar(); }
   if(pg === 'action-items') { loadPlanningChecks(P.currentYearId||null); loadMissions(P.currentYearId||null); }
+  return r;
 };
 
 function _autoSelectFirstDate(selId, loadFnName) {
@@ -16361,7 +16368,7 @@ function renderMissions() {
 function exportPerClassDeliveryCSV() {
   const missions = _missionState && _missionState.missions;
   if (!missions || !missions.length) {
-    showToast('Open the Mission Backlog tab first, then try the export again.', true);
+    showToast('Open Training Requirements in Needs Attention first, then try the export again.', true);
     return;
   }
   // Collect all unique Training Classes across all missions.
@@ -17392,8 +17399,8 @@ async function loadAnchors(yearId){
 
 function renderAnchors(){
   const el = document.getElementById('anchors-body');
-  const imp = document.getElementById('anch-filter-importance').value;
-  const typ = document.getElementById('anch-filter-type').value;
+  const imp = (document.getElementById('anch-filter-importance')||{}).value||'';
+  const typ = (document.getElementById('anch-filter-type')||{}).value||'';
   const showArchived=(document.getElementById('anch-show-archived')||{}).checked;
   let rows = P.anchors;
   if(!showArchived) rows = rows.filter(a=>!a.is_archived);
@@ -19343,12 +19350,12 @@ async function sessionReschedule(sessionId,btn){
   }catch(e){showToast(apiErr(e),true);return;}
   if(nights.length===0){showToast('No upcoming Parade Nights found. Please create a Parade Night first.',true);return;}
   const opts=nights.map((pn,i)=>`${i+1}: ${pn.date}${pn.term?' ('+pn.term+')':''}`).join('\n');
-  const choice=await promptText('Reschedule Session',`Select a Parade Night (enter number):\n${opts}`);
+  const choice=await promptText('Reschedule Session',`Select a Parade Night (enter number):\n${opts}`,{okLabel:'Select'});
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
   if(isNaN(idx)||idx<0||idx>=nights.length){showToast('Invalid selection.',true);return;}
   const pnid=nights[idx].id||nights[idx].parade_night_id;
-  const period=await promptText('Reschedule Session','Period number',{defaultValue:'1'});
+  const period=await promptText('Reschedule Session','Period number',{defaultValue:'1',okLabel:'Confirm'});
   if(period===null)return;
   btn.disabled=true;
   try{
@@ -19360,7 +19367,32 @@ async function sessionReschedule(sessionId,btn){
 // ═══════════════════════════════════════════════════════════
 // CADETS — Roster management
 // ═══════════════════════════════════════════════════════════
+// §20: tab switcher for Cadet Management (Roster / CEA Import)
+let _cadetsActiveTab='roster';
+function setCadetsTab(tab){
+  _cadetsActiveTab=tab;
+  const rBtn=document.getElementById('cadets-tab-roster-btn');
+  const cBtn=document.getElementById('cadets-tab-cea-btn');
+  const rPanel=document.getElementById('cadets-tab-roster');
+  const cPanel=document.getElementById('cadets-tab-cea');
+  const rActions=document.getElementById('cadets-roster-actions');
+  if(!rBtn)return;
+  if(tab==='cea'){
+    rBtn.classList.remove('active');rBtn.setAttribute('aria-selected','false');
+    cBtn.classList.add('active');cBtn.setAttribute('aria-selected','true');
+    rPanel.style.display='none';cPanel.style.display='';
+    if(rActions)rActions.style.display='none';
+    initCeaImportPage();
+  }else{
+    if(cBtn){cBtn.classList.remove('active');cBtn.setAttribute('aria-selected','false');}
+    rBtn.classList.add('active');rBtn.setAttribute('aria-selected','true');
+    cPanel.style.display='none';rPanel.style.display='';
+    if(rActions)rActions.style.display='';
+  }
+}
+
 async function initCadetsPage(){
+  setCadetsTab('roster');
   // Populate class selector
   const sel=document.getElementById('cadets-class-select');
   if(!sel)return;
@@ -19469,7 +19501,7 @@ async function moveCadetsToClass(fromClassId){
   if(classes.length===0){showToast('No other Training Classes available to move to.',true);return;}
 
   const opts=classes.map((c,i)=>`${i+1}: ${c.display_name}`).join('\n');
-  const choice=await promptText('Move Cadets',`Select a target Training Class (enter number):\n${opts}`);
+  const choice=await promptText('Move Cadets',`Select a target Training Class (enter number):\n${opts}`,{okLabel:'Select'});
   if(!choice)return;
   const idx=parseInt(choice,10)-1;
   if(isNaN(idx)||idx<0||idx>=classes.length){showToast('Invalid selection.',true);return;}
