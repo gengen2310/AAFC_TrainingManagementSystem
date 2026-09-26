@@ -1072,21 +1072,6 @@ tr.tc-archived{opacity:.6;}
 .data-conf-bar .dcb-issue{background:rgba(0,0,0,.06);border-radius:4px;padding:1px 6px;}
 .data-conf-bar.ok{background:var(--ok-bg);border-color:var(--ok);}
 .data-conf-bar.ok .dcb-label{color:var(--ok-text);}
-/* CLASS-MATRIX-01 */
-#cm-table-wrap table{border-collapse:collapse;font-size:var(--fs-sm);min-width:max-content;}
-#cm-table-wrap th,#cm-table-wrap td{border:1px solid var(--border);padding:5px 8px;white-space:nowrap;}
-#cm-table-wrap th{background:var(--surface-2);font-weight:700;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;}
-#cm-table-wrap tr:nth-child(even) td{background:var(--surface-2);}
-#cm-table-wrap .cm-sticky{position:sticky;left:0;background:var(--surface);z-index:2;min-width:220px;max-width:300px;white-space:normal;}
-#cm-table-wrap .cm-stage-row td{background:var(--accent-light);font-weight:700;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.04em;padding:4px 8px;}
-.cm-cell-delivered{background:#d4f0e3;color:#145f38;font-weight:700;}
-.cm-cell-planned{background:#e0f0fa;color:#004b8d;}
-.cm-cell-not_delivered{background:#f0f0f0;color:#455560;}
-.cm-cell-cancelled{background:#f8f0f0;color:#b5002b;}
-.cm-cell-not_started{color:var(--muted);}
-/* AUDIT-2026-08 G1: was amber #c97a00 on the GREEN delivered fill - 2.77:1, and the
-   colour contradicted the status. Now a warn-tinted fill with warn-toned text. */
-.cm-cell-delivered_with_issue{background:#fdf2d8;color:#7a4a00;font-weight:700;}
 /* FAC-SUG-01 */
 .fac-sugg-panel{border:1px solid var(--border);border-radius:7px;background:var(--surface-2);padding:8px 10px;margin-bottom:8px;font-size:var(--fs-xs);}
 .fac-sugg-title{font-weight:700;color:var(--text-2);font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
@@ -1922,21 +1907,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <button class="tab-btn" onclick="setCurrTab('I. Bronze',this)">Bronze CLP</button>
           <button class="tab-btn" onclick="setCurrTab('J. Silver',this)">Silver CLP</button>
           <button class="tab-btn" onclick="setCurrTab('K. Gold',this)">Gold CLP</button>
-          <button class="tab-btn sqn-el" id="tab-matrix" onclick="openCurrMatrix(this)" style="display:none">Matrix ↗</button>
-        </div>
-        <!-- CLASS-MATRIX-01: matrix view container (toggled by Matrix tab) -->
-        <div id="curr-matrix-view" style="display:none">
-          <div class="fbar no-print" style="gap:8px;flex-wrap:wrap">
-            <select id="cm-stage-filter" aria-label="Filter matrix by stage" onchange="_renderCurrMatrix()">
-              <option value="all">All Stages</option>
-            </select>
-            <input id="cm-search" placeholder="Search items…" oninput="_renderCurrMatrix()" style="min-width:160px" aria-label="Search items">
-            <label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);white-space:nowrap">
-              <input type="checkbox" id="cm-action-only" onchange="_renderCurrMatrix()"> Action required only
-            </label>
-            <span id="cm-load-status" style="font-size:var(--fs-xs);color:var(--muted)"></span>
-          </div>
-          <div id="cm-table-wrap" class="tw" style="overflow-x:auto;max-height:70vh;overflow-y:auto"></div>
         </div>
         <div class="fbar no-print" id="curr-fbar">
           <select id="curr-f-el" onchange="renderCurr()" aria-label="Filter curriculum by element">
@@ -2575,7 +2545,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Account Management tabs. Reference Data used to sit ~935px down this
              page, so it was something you scrolled to; it is now one click.
              NOTE: setAcctTab scopes its querySelectorAll to #acct-tabs. The older
-             setCurrTab/openCurrMatrix pattern clears .active on EVERY .tab-btn in
+             setCurrTab pattern clears .active on EVERY .tab-btn in
              the document, which would fight these buttons across pages. -->
         <div class="tabs no-print" id="acct-tabs" role="tablist" aria-label="Account Management sections" style="display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px">
           <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="acct-pane-accounts" id="acct-tab-accounts" onclick="setAcctTab('accounts',this)">Accounts</button>
@@ -6428,9 +6398,6 @@ function nav(id){
   if(id==='facilitators')loadFacilitatorStats();
   if(id==='curriculum'){
     _loadCurriculumClassBreakdown();
-    // Show Matrix tab for squadron scope (where Training Classes are defined)
-    const matTab=document.getElementById('tab-matrix');
-    if(matTab)matTab.style.display=(effectiveScope()==='squadron')?'':'none';
   }
   if(id==='parade-nights'){reloadAndRender();}
   if(id==='dashboard')renderDash();
@@ -7151,7 +7118,7 @@ const _REFDATA_TYPES=[
    restoreUrl:id=>`/api/training-area-capability-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
-// Account Management tabs. Scoped deliberately: setCurrTab/openCurrMatrix clear
+// Account Management tabs. Scoped deliberately: setCurrTab clears
 // .active on every .tab-btn in the document, so an unscoped copy here would make
 // the Curriculum tabs and these fight each other.
 function setAcctTab(key,btn){
@@ -11643,9 +11610,6 @@ function setCurrTab(ph,btn){
   currTabFilter=ph;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  // Hide matrix view, show normal list view
-  const mv=document.getElementById('curr-matrix-view');
-  if(mv)mv.style.display='none';
   const fbar=document.getElementById('curr-fbar');
   if(fbar)fbar.style.display='';
   const cl=document.getElementById('curr-list');
@@ -11653,115 +11617,6 @@ function setCurrTab(ph,btn){
   renderCurr();
 }
 
-// CLASS-MATRIX-01: Training Class × Curriculum Item matrix
-let _cmData=null; // cached matrix API response
-
-async function openCurrMatrix(btn){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  // Show matrix, hide normal list view
-  const mv=document.getElementById('curr-matrix-view');if(mv)mv.style.display='';
-  const fbar=document.getElementById('curr-fbar');if(fbar)fbar.style.display='none';
-  const cl=document.getElementById('curr-list');if(cl)cl.style.display='none';
-  // Load if not already cached
-  if(_cmData){_renderCurrMatrix();return;}
-  const status=document.getElementById('cm-load-status');
-  if(status)status.textContent='Loading…';
-  try{
-    // Resolve planning year for current squadron
-    const sqnId=(S.session&&S.session.squadron_id)||(typeof saBrowseSquadronId==='function'?saBrowseSquadronId():null);
-    if(!sqnId){if(status)status.textContent='No squadron selected.';return;}
-    let yearId=null;
-    const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
-    const active=(years||[]).find(y=>y.active_status);
-    yearId=active?active.planning_year_id:(years&&years[0]?years[0].planning_year_id:null);
-    if(!yearId){if(status)status.textContent='No year found.';return;}
-    _cmData=await api('/api/curriculum/class-matrix?year_id='+encodeURIComponent(yearId));
-    // Populate stage filter
-    const sf=document.getElementById('cm-stage-filter');
-    if(sf){
-      sf.innerHTML='<option value="all">All Stages</option>';
-      (_cmData.stages||[]).forEach(s=>{
-        const opt=document.createElement('option');
-        opt.value=s.stage_id;opt.textContent=s.stage_name;
-        sf.appendChild(opt);
-      });
-    }
-    if(status)status.textContent='';
-    _renderCurrMatrix();
-  }catch(e){
-    if(status)status.textContent='Could not load matrix — '+apiErr(e);
-  }
-}
-
-const _CM_STATUS_LABEL={
-  delivered:'Delivered',delivered_with_issue:'Delivered (issue)',planned:'Planned',
-  not_delivered:'Not Delivered',cancelled:'Cancelled',not_started:'—',rescheduled:'Rescheduled'
-};
-
-function _renderCurrMatrix(){
-  const wrap=document.getElementById('cm-table-wrap');
-  if(!wrap||!_cmData)return;
-  const stageFilter=document.getElementById('cm-stage-filter')?.value||'all';
-  const search=(document.getElementById('cm-search')?.value||'').toLowerCase();
-  const actionOnly=document.getElementById('cm-action-only')?.checked||false;
-
-  const classes=_cmData.classes||[];
-  const stages=(_cmData.stages||[]).filter(s=>stageFilter==='all'||s.stage_id===stageFilter);
-
-  if(!classes.length){
-    wrap.innerHTML='<div class="empty"><div class="et">No Training Classes</div><div class="es">Create Training Classes in the Parade Nights section to use the matrix view.</div></div>';
-    return;
-  }
-
-  // Build header row — one TH per class
-  const hdrCells=classes.map(c=>`<th style="min-width:100px;text-align:center">${esc(c.display_name)}<br><span style="font-weight:400;font-size:var(--fs-2xs);color:var(--muted)">${esc(c.stage_name)}</span></th>`).join('');
-
-  let rows='';
-  let totalShown=0;
-  for(const stage of stages){
-    const stageClasses=classes.filter(c=>stage.class_ids.includes(c.class_id));
-    let stageRows='';
-    for(const item of (stage.items||[])){
-      if(search&&!item.code.toLowerCase().includes(search)&&!item.title.toLowerCase().includes(search))continue;
-      const cells=stageClasses.map(tc=>{
-        const cell=item.cells[tc.class_id]||{status:'not_started',session_ids:[],elements_delivered:0,elements_total:0};
-        const cls='cm-cell-'+(cell.status||'not_started');
-        const label=_CM_STATUS_LABEL[cell.status]||cell.status||'—';
-        const tip=cell.elements_total?`${cell.elements_delivered}/${cell.elements_total} sessions`:'';
-        return `<td class="${cls}" style="text-align:center;font-size:var(--fs-xs)" title="${esc(tip)}">${esc(label)}</td>`;
-      });
-      // Pad with empty cells for classes not in this stage
-      const padded=classes.map(tc=>{
-        if(stage.class_ids.includes(tc.class_id)){
-          const cell=item.cells[tc.class_id]||{status:'not_started',session_ids:[],elements_delivered:0,elements_total:0};
-          if(actionOnly&&cell.status!=='not_started'&&cell.status!=='not_delivered')return null;
-          const cls='cm-cell-'+(cell.status||'not_started');
-          const label=_CM_STATUS_LABEL[cell.status]||cell.status||'—';
-          const tip=cell.elements_total?`${cell.elements_delivered}/${cell.elements_total} sessions`:'';
-          return `<td class="${cls}" style="text-align:center;font-size:var(--fs-xs)" title="${esc(tip)}">${esc(label)}</td>`;
-        }
-        return '<td style="background:var(--surface-2);color:var(--muted);text-align:center">—</td>';
-      });
-      if(actionOnly&&!padded.some(c=>c&&c.includes('not_started')||c&&c.includes('not_delivered')))continue;
-      stageRows+=`<tr><td class="cm-sticky"><span style="font-weight:700;font-size:var(--fs-xs)">${esc(item.code)}</span><br><span style="font-size:var(--fs-xs);color:var(--text-2)">${esc(item.title)}</span></td>${padded.join('')}</tr>`;
-      totalShown++;
-    }
-    if(stageRows){
-      rows+=`<tr class="cm-stage-row"><td class="cm-sticky" colspan="${classes.length+1}">${esc(stage.stage_name)}</td></tr>${stageRows}`;
-    }
-  }
-
-  if(!totalShown){
-    wrap.innerHTML='<div class="empty"><div class="et">No items match your filters</div></div>';
-    return;
-  }
-
-  wrap.innerHTML=`<table role="grid" aria-label="Curriculum item × Training Class matrix">
-    <thead><tr><th class="cm-sticky">Curriculum Item</th>${hdrCells}</tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
 function deriveProgress(code){
   const arr=allSess().filter(s=>s.code===code).map(s=>s.status);
   if(!arr.length)return 'unscheduled';
