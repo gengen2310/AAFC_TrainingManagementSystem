@@ -2024,6 +2024,25 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Anchor event data container — not shown on Activities page (USER-AUTHORISED REMOVAL) -->
         <div id="anchors-body" style="display:none" aria-hidden="true"></div>
 
+        <!-- Training Classes — sqn_admin only; shown by _tcLoadForYear() when a year is selected via the year bar -->
+        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none;margin-top:var(--sp-lg)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h2 class="ctitle" style="margin:0">Training Classes</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training on the same Parade Night. Associate
+            Training Classes with a year.
+          </p>
+          <div id="py-classes-card" style="display:none">
+            <div id="py-classes-body"></div>
+          </div>
+        </div>
+
         <!-- Inherited Wing/National/CEA activities (Phase 2 tab container) -->
         <div id="act-tab-squadron"></div>
 
@@ -2451,29 +2470,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </p>
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
-        </div>
-
-        <!-- Training Classes — sqn_admin only; populated by _loadSettingsTrainingClasses() + _tcLoadForYear() -->
-        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h2 class="ctitle" style="margin:0">Training Classes</h2>
-            <div style="display:flex;align-items:center;gap:10px">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
-            </div>
-          </div>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
-            A Training Class is a local group completing a Training Stage — for example, Senior 1
-            and Senior 2 can both complete Senior training on the same Parade Night. Associate
-            Training Classes with a year.
-          </p>
-          <div style="margin-bottom:10px">
-            <label for="tc-year-sel" style="font-size:var(--fs-xs);font-weight:600">Training Year</label>
-            <select id="tc-year-sel" onchange="_tcLoadForYear(this.value)" style="margin-left:8px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)"></select>
-          </div>
-          <div id="py-classes-card" style="display:none">
-            <div id="py-classes-body"></div>
-          </div>
         </div>
 
         <!-- Custom Training Phases (Task 10) -->
@@ -8524,7 +8520,6 @@ async function renderSettings(){
   }
   renderUserDir();
   loadCustomPhases();
-  _loadSettingsTrainingClasses();
   // Load year list into the Training Years settings card. Uses the same
   // renderer as the Manage Training Years modal -- this block used to draw its
   // own 2-column read-only table, which is why the two surfaces looked like
@@ -13810,6 +13805,10 @@ async function clearActivityLocalOverride(){
       reloadAndRender(); // background refresh for all other data, no await
     }catch(e){ showToast(apiErr(e),true); }
   });
+  // Prevent closeModal('m-confirm') from restoring focus to this button.
+  // Firefox/WebKit fire a spurious click on re-focused buttons, which would
+  // re-invoke this function and loop (m-act-override never closes).
+  _modalReturnFocus=null;
 }
 
 // ═══════════════════════════════════════════════════════════
