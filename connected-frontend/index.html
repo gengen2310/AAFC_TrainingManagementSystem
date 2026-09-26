@@ -2351,7 +2351,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
-        <div class="ph"><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
+        <div class="ph">
+          <div><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
+          <div class="ph-actions no-print" id="settings-pw-actions" style="display:none">
+            <button class="btn btn-sky btn-sm" onclick="openPlanningWorkspace()">Open Planning Workspace ↗</button>
+          </div>
+        </div>
         <div class="card">
           <h2 class="ctitle">Squadron Details</h2>
           <div class="form-row">
@@ -2439,7 +2444,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <!-- DENS-01: Display size preference -->
-        
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
@@ -6225,8 +6229,7 @@ function bootApp(){
       const tok=sessionStorage.getItem('aafc_token');
       if(tok){
         e.preventDefault();
-        const yr=P&&P.currentYearInt?'&y='+P.currentYearInt:'';
-        window.open(pwUrl+'#t='+encodeURIComponent(tok)+yr,'_blank','noopener');
+        openPlanningWorkspace();
       }
     },{once:false});
   }
@@ -6236,6 +6239,9 @@ function bootApp(){
   if(pwLink)pwLink.style.display=showPW?'flex':'none';
   if(pwUnconfigured)pwUnconfigured.style.display=showPWUnconfigured?'flex':'none';
   if(pwLbl)pwLbl.style.display=(showPW||showPWUnconfigured)?'block':'none';
+  // §33: show PW deep-link button in Unit Settings header when PW is configured
+  const settingsPwActions=document.getElementById('settings-pw-actions');
+  if(settingsPwActions)settingsPwActions.style.display=showPW?'':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
   // SET-1: this forced inline-flex onto every .admin-el, including whole
@@ -6309,6 +6315,13 @@ function bootApp(){
   _restoreMissionFilters();
   renderAll();
   nav(SCOPE_LANDING[scope]||'dashboard');
+}
+function openPlanningWorkspace(){
+  const pwUrl=S&&S.pwUrl; if(!pwUrl)return;
+  const tok=sessionStorage.getItem('aafc_token');
+  const yr=P&&P.currentYearInt?'&y='+P.currentYearInt:'';
+  if(tok){window.open(pwUrl+'#t='+encodeURIComponent(tok)+yr,'_blank','noopener');}
+  else{window.open(pwUrl,'_blank','noopener');}
 }
 function renderAll(){
   const scope=effectiveScope();
@@ -15318,8 +15331,10 @@ function statusBadge(row){
   return '<span class="badge b-amber">No data</span>';
 }
 function readinessDot(v){
-  if(v===null||v===undefined)return '<span class="dot n"></span>—';
-  const c=v>=80?'g':v>=60?'a':'r'; return `<span class="dot ${c}"></span>${v}`;
+  if(v===null||v===undefined)return '<span class="dot n" aria-hidden="true"></span><span class="sr-only">No data</span>—';
+  const c=v>=80?'g':v>=60?'a':'r';
+  const label=v>=80?'On track':v>=60?'At risk':'Critical';
+  return `<span class="dot ${c}" aria-hidden="true"></span><span class="sr-only">${label}:</span>${v}`;
 }
 function heatColor(p){ p=+p||0; return p>=67?'#1a7f4b':p>=34?'#c97a00':p>0?'#e51937':'#c2ccd6'; }
 
