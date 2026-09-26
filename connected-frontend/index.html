@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
-<meta name="aafc-api-base" content="http://localhost:8200">
+<meta name="aafc-api-base" content="http://localhost:8000">
 <meta name="aafc-pw-base" content="">
 <meta name="app-build" content="__APP_BUILD__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1992,44 +1992,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
 
         <!-- Holiday periods for the active planning year -->
-        <div class="card" id="act-holidays-wrap" style="margin-top:0">
+        <div class="card" id="act-holidays-wrap" style="margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
             <h2 class="ctitle" style="margin:0">Holiday Periods</h2>
           </div>
           <div id="py-holidays-body"><p class="muted" style="font-size:var(--fs-xs)">No holiday periods for this year.</p></div>
         </div>
 
-        <!-- REM-146: Class forecast card — squadron scope only; hidden by default,
-             shown and populated by _loadClassForecasts() when a year is selected.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed class forecast UI. -->
-        <div class="card" id="py-forecasts-card" style="display:none;margin-top:0">
-          <h2 class="ctitle">Class Forecasts</h2>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Planning status per training class — unplanned requirements, nights remaining, and available time blocks.</p>
-          <div id="fc-cards-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
-        </div>
-
-        <!-- Training Classes — shown when a year is selected; populated by _tcLoadForYear() -->
-        <div class="card" id="settings-training-classes-wrap" style="display:none;margin-top:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h2 class="ctitle" style="margin:0">Training Classes</h2>
-            <div style="display:flex;align-items:center;gap:10px">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
-            </div>
-          </div>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
-            A Training Class is a local group completing a Training Stage — for example, Senior 1
-            and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
-            Classes with a year.
-          </p>
-          <div id="py-classes-card" style="display:none">
-            <div id="py-classes-body"></div>
-          </div>
-        </div>
-
-        <!-- Wing HQ Events overlay — squadron scope; hidden until _loadAndRenderWingEventsOverlay()
-             populates it. USER-AUTHORISED CHANGE (2026-08-27): exposed wing events overlay UI. -->
-        <div class="card" id="py-wing-events-card" style="display:none;margin-top:0">
+        <!-- Inherited Activities — Wing/National events visible to squadron users as read-only overlay.
+             Hidden until _loadAndRenderWingEventsOverlay() populates it for the selected year. -->
+        <div class="card" id="py-wing-events-card" style="display:none;margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
             <h2 class="ctitle" style="margin:0">Inherited Activities</h2>
             <select id="py-we-imp-filter" aria-label="Filter by planning importance" onchange="_renderWingEventsOverlay()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
@@ -2045,47 +2017,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="py-wing-events-body"></div>
         </div>
 
-        <!-- Anchor Events — always visible; body shows "Select a year" until one is chosen.
-             USER-AUTHORISED CHANGE (2026-08-27): exposed anchor events on Activities page. -->
-        <div class="card" style="margin-top:0">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="anch-show-archived" onchange="loadAnchors(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddAnchorModal()">+ Add Anchor</button>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-            <select id="anch-filter-importance" aria-label="Filter by importance" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Importance</option>
-              <option value="must_attend">Must Attend</option>
-              <option value="key_event">Key Event</option>
-              <option value="optional">Optional</option>
-            </select>
-            <select id="anch-filter-type" aria-label="Filter by event type" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">All Types</option>
-              <option value="ceremonial">Ceremonial</option>
-              <option value="fieldcraft">Fieldcraft</option>
-              <option value="adventure_training">Adventure Training</option>
-              <option value="dining_in">Dining In</option>
-              <option value="inspection">Inspection</option>
-              <option value="sport">Sport</option>
-              <option value="community">Community</option>
-              <option value="admin">Admin</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div id="anchors-body"><p class="muted" style="font-size:var(--fs-xs)">Select a year above.</p></div>
+        <!-- Class Forecasts data container — hidden here, populated by _loadClassForecasts().
+             UI is shown in the Training Dashboard. -->
+        <div id="py-forecasts-card" style="display:none" aria-hidden="true">
+          <div id="fc-cards-body"></div>
         </div>
+        <!-- Anchor event data container — not shown on Activities page (USER-AUTHORISED REMOVAL) -->
+        <div id="anchors-body" style="display:none" aria-hidden="true"></div>
 
-        <!-- Mission Backlog relocated to Needs Attention — USER-AUTHORISED CHANGE (2026-09-26) -->
-        <p class="muted" style="font-size:var(--fs-xs);margin-top:0"><a href="#" onclick="nav('action-items');return false;" style="color:var(--blue)">Mission Backlog</a> is now in Needs Attention.</p>
-
-        <!-- VH-02: section break before inherited activities -->
-        <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
-
-        <!-- Inherited Wing/National/CEA/Holiday activities (Phase 2) — read-only here;
-             edited at the owning scope. Kept as a separate section from the local-only
-             table above so existing Add/Edit/Delete Activity behaviour is unchanged. -->
+        <!-- Inherited Wing/National/CEA activities (Phase 2 tab container) -->
         <div id="act-tab-squadron"></div>
 
       </div>
@@ -2207,11 +2147,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Mission Backlog — missions-empty shown when no year; filter + table shown when loaded.
              USER-AUTHORISED CHANGE (2026-09-26): moved Mission Backlog from Activities to Needs Attention. -->
         <div id="missions-empty" style="margin-top:18px">
-          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to load the Mission Backlog.</p>
+          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to load Training Requirements.</p>
         </div>
         <div class="card" id="missions-filters-card" style="display:none;margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
+            <h2 class="ctitle" style="margin:0">Training Requirements<button class="ht" tabindex="0" aria-label="About Training Requirements" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
               <button class="btn btn-xs btn-out" onclick="exportPerClassDeliveryCSV()" aria-label="Export per-class delivery CSV">Per-Class CSV</button>
@@ -2511,6 +2451,30 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
         </div>
+
+        <!-- Training Classes — sqn_admin only; populated by _loadSettingsTrainingClasses() + _tcLoadForYear() -->
+        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h2 class="ctitle" style="margin:0">Training Classes</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training on the same Parade Night. Associate
+            Training Classes with a year.
+          </p>
+          <div style="margin-bottom:10px">
+            <label for="tc-year-sel" style="font-size:var(--fs-xs);font-weight:600">Training Year</label>
+            <select id="tc-year-sel" onchange="_tcLoadForYear(this.value)" style="margin-left:8px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)"></select>
+          </div>
+          <div id="py-classes-card" style="display:none">
+            <div id="py-classes-body"></div>
+          </div>
+        </div>
+
         <!-- Custom Training Phases (Task 10) -->
         <div class="card admin-el" id="settings-custom-phases-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -7762,6 +7726,11 @@ async function openCreateAccountModal(preselectedSqnId){
   if(!Array.isArray(S.squadrons) || !S.squadrons.length){
     try{ S.squadrons = await api('/api/squadrons'); }catch(_){ S.squadrons = S.squadrons||[]; }
   }
+  // ACC-3: sqn_admin's session does not populate S.wings, so the wing dropdown
+  // rendered empty and the pre-select/lock for their own wing silently failed.
+  if(!Array.isArray(S.wings) || !S.wings.length){
+    try{ S.wings = await api('/api/wings'); }catch(_){ S.wings = S.wings||[]; }
+  }
   document.getElementById('ca-name').value='';
   document.getElementById('ca-role').value='';
   document.getElementById('ca-msg').textContent='';
@@ -8542,6 +8511,7 @@ async function renderSettings(){
   }
   renderUserDir();
   loadCustomPhases();
+  _loadSettingsTrainingClasses();
   // Load year list into the Training Years settings card. Uses the same
   // renderer as the Manage Training Years modal -- this block used to draw its
   // own 2-column read-only table, which is why the two surfaces looked like
@@ -13297,7 +13267,7 @@ const _GH_DEFAULT=`
   <li>Schedule curriculum sessions</li>
   <li>Assign facilitators and rooms</li>
   <li>Record training outcomes</li>
-  <li>Review Mission Backlog</li>
+  <li>Review Training Requirements</li>
 </ul>
 <p><strong>Use TMS</strong> to manage your organisation — accounts, facilities, activities.<br>
 <strong>Use Planning Workspace</strong> to do the planning — schedule nights, assign curriculum, track delivery.</p>
@@ -13317,9 +13287,9 @@ const _GH_DEFAULT=`
 <p>One training block within a parade night, linked to a curriculum item, time period, facilitator, room, and one or more Training Classes.</p>
 <p>A session can serve more than one Training Class. If Senior 1 and Senior 2 are doing the same module together, assign both classes to one session — they share the session, and the system records the delivery against each class separately.</p>
 <h3>Activity</h3>
-<p>A training event outside the standard parade night schedule — field days, camps, competitions, courses and similar. Activities appear in Planning Workspace as reference items and feed into Mission Backlog when they include curriculum delivery. Create and manage them in TMS under Activities. CEA (Cadet Enterprise Application) activities are imported from the national system.</p>
-<h3>Mission Backlog</h3>
-<p>A list of curriculum modules required for your active Training Classes that have not yet been scheduled. The backlog tells you what still needs planning and for which class. If a module is needed by Senior 1 but not Senior 2, the backlog shows that distinction.</p>
+<p>A training event outside the standard parade night schedule — field days, camps, competitions, courses and similar. Activities appear in Planning Workspace as reference items and feed into Training Requirements when they include curriculum delivery. Create and manage them in TMS under Activities. CEA (Cadet Enterprise Application) activities are imported from the national system.</p>
+<h3>Training Requirements</h3>
+<p>A list of curriculum modules required for your active Training Classes that have not yet been scheduled. Training Requirements tell you what still needs planning and for which class. If a module is needed by Senior 1 but not Senior 2, the distinction is shown here.</p>
 
 <h2>Setting up for the first time</h2>
 <p>Before using Planning Workspace, set the following up in TMS:</p>
@@ -16364,7 +16334,7 @@ function renderMissions() {
 function exportPerClassDeliveryCSV() {
   const missions = _missionState && _missionState.missions;
   if (!missions || !missions.length) {
-    showToast('Open the Mission Backlog tab first, then try the export again.', true);
+    showToast('Open Training Requirements in Needs Attention first, then try the export again.', true);
     return;
   }
   // Collect all unique Training Classes across all missions.
@@ -17395,8 +17365,8 @@ async function loadAnchors(yearId){
 
 function renderAnchors(){
   const el = document.getElementById('anchors-body');
-  const imp = document.getElementById('anch-filter-importance').value;
-  const typ = document.getElementById('anch-filter-type').value;
+  const imp = (document.getElementById('anch-filter-importance')||{}).value||'';
+  const typ = (document.getElementById('anch-filter-type')||{}).value||'';
   const showArchived=(document.getElementById('anch-show-archived')||{}).checked;
   let rows = P.anchors;
   if(!showArchived) rows = rows.filter(a=>!a.is_archived);
