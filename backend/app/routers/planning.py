@@ -40,7 +40,7 @@ from ..models.planning import (
 # here.
 from ..models.training import (
     TimingTemplate, TimingBlock, Activity, ParadeNightTimingSnapshot,
-    SessionCustomPhaseAudience,
+    SessionCustomPhaseAudience, SessionStatusHistory,
 )
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
@@ -918,11 +918,11 @@ def delete_planning_year(
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
     dependents = {
-        # Archived parade nights retain sessions, audiences, outcomes, notices,
-        # and audit history. They therefore block permanent year deletion too;
-        # callers must retain the year rather than orphaning historical rows.
+        # Only non-archived parade nights block deletion — archived PNs are
+        # cascade-deleted explicitly below (SessionStatusHistory has no ondelete=CASCADE).
         "parade_dates": db.query(ParadeNight).filter(
             ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_archived == False,  # noqa: E712
         ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
@@ -940,6 +940,23 @@ def delete_planning_year(
             "error": "has_dependents", "dependents": blockers,
             "message": "This Training Year has linked records and cannot be permanently deleted. Archive it instead.",
         })
+
+    # Cascade-delete archived parade nights and their FK children explicitly.
+    archived_pns = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+    ).all()
+    for pn in archived_pns:
+        session_ids = [s.id for s in db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id == pn.id
+        ).all()]
+        if session_ids:
+            db.query(SessionStatusHistory).filter(
+                SessionStatusHistory.session_id.in_(session_ids)
+            ).delete(synchronize_session=False)
+            db.query(TrainingSession).filter(
+                TrainingSession.parade_night_id == pn.id
+            ).delete(synchronize_session=False)
+        db.delete(pn)
 
     name, year_num = py.name, py.year
     db.delete(py)
