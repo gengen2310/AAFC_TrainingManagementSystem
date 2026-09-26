@@ -13800,9 +13800,14 @@ async function clearActivityLocalOverride(){
   confirmAction('Remove this local adjustment and revert to the source activity\'s own date/time/notes?',async()=>{
     try{
       await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
+      // Patch S.acts immediately so renderActs() reflects the cleared state before
+      // the modal closes — a full reloadAndRender() can fail and leave stale data.
+      const _clearedAct=S.acts.find(a=>a.id===_actOverrideId);
+      if(_clearedAct) _clearedAct.localOverride=null;
+      renderActs();
       closeModal('m-act-override');
-      await reloadAndRender();
       showToast('Local adjustment cleared.');
+      reloadAndRender(); // background refresh for all other data, no await
     }catch(e){ showToast(apiErr(e),true); }
   });
 }
