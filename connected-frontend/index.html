@@ -5666,6 +5666,8 @@ async function loadData(){
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
       facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned',
       period_number:s.period_number||1,
+      // §10: 0..N assistant facilitators; user_id here is Facilitator.id (see _resolve_assistants)
+      assistant_facilitators:s.assistant_facilitators||[],
       // CLASS-06: which Training Class(es) this session targets (CLASS-03's
       // audience linkage, GET /api/parade-nights's own additive field).
       trainingClasses:s.training_classes||[]
@@ -11033,11 +11035,19 @@ async function quickEdit(date,idx){
   const facOpts=S.facs.map(f=>`<option value="${f.id}" ${f.id===s.facId?'selected':''}>${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}" ${r.name===s.room?'selected':''}>${esc(r.name)}</option>`).join('');
   const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
+  const asstFacIds=new Set((s.assistant_facilitators||[]).map(a=>a.user_id));
+  const asstFacHtml=S.facs.length<2?'':S.facs.map(f=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:var(--fs-sm)">
+      <input type="checkbox" class="qe-asst-chk" value="${esc(f.id)}" ${asstFacIds.has(f.id)?'checked':''}>
+      ${esc(facDisplay(f))}</label>`).join('');
   document.getElementById('sess-edit-body').innerHTML=`
     <div class="ff"><label for="qe-st">Status</label><select id="qe-st" aria-label="Session status">${stOpts}</select></div>
     <div class="ff"><label for="qe-ex">Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
     <div class="ff"><label for="qe-fa">Facilitator</label><div id="fac-sugg-panel" style="display:none"></div><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
     <div class="ff"><label for="qe-rm">Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>
+    ${asstFacHtml?`<div class="ff" id="qe-asst-group">
+      <label>Assistant Facilitators</label>
+      <div id="qe-asst-list" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px">${asstFacHtml}</div>
+    </div>`:''}
     <div class="ff" id="qe-classes-group" style="display:none">
       <label>Training Classes</label>
       <p class="muted" style="font-size:var(--fs-xs);margin:0 0 6px">
@@ -11129,11 +11139,16 @@ async function saveSessEdit(){
     // printed Weekly Program. Two other copies of this object carried a comment
     // warning about exactly that; writing the warning twice did not stop the
     // third copy getting it wrong, which is why there is now only one.
+    const asstChecked=[...document.querySelectorAll('.qe-asst-chk:checked')].map(c=>c.value);
     const body=_sessBuildBody({
       __pnId:pn.id, period_number:s.period_number||editSessRef.idx+1,
       phase:s.phase, exp:expTitle, facId:facId, room:roomName,
       timingBlockId:s.timingBlockId,
-    }, (newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
+    }, Object.assign(
+      (newSt!==s.status) ? {status:newSt, reason:reason||null} : {},
+      // §10: always send assistant_facilitator_ids so clearing all is honoured
+      {assistant_facilitator_ids:asstChecked}
+    ));
     // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
     // previous separate PUT-then-POST(/status) two-call sequence.
     await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
@@ -16108,9 +16123,10 @@ async function doDeletePlanningYear(){
 // ── Hook into nav() so planning-adjacent pages auto-load on first visit ──
 const _origNav = nav;
 nav = function(pg) {
-  _origNav(pg);
+  const r = _origNav(pg);
   if(pg === 'wing-calendar') { loadWingCalendar(); }
   if(pg === 'action-items') { loadPlanningChecks(P.currentYearId||null); loadMissions(P.currentYearId||null); }
+  return r;
 };
 
 function _autoSelectFirstDate(selId, loadFnName) {
