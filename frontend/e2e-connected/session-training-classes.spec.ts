@@ -172,23 +172,15 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
 }
 
 async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
-  // nav('parade-nights') triggers its own internal, fire-and-forget
-  // reloadAndRender() (connected-frontend/index.html's nav()). This helper
-  // used to *also* call reloadAndRender() explicitly both before and after
-  // nav(), stacking three concurrent loadData() cycles per call. Each cycle
-  // fans out to dozens of parallel GETs, and under CI's shared-backend load
-  // (multiple browser projects hitting one backend) that volume tripped the
-  // per-IP API rate limiter; loadData()'s _apiT() helper silently falls
-  // back to an empty list on a failed fetch, so whichever of the three
-  // overlapping cycles happened to resolve *last* -- even one that 429'd --
-  // clobbered S.pns last, hiding the just-created marker card with no
-  // visible error. Firing nav() alone (its single internal reload) and
-  // waiting for the network to go idle removes the extra overlapping
-  // cycles and the resulting last-write-wins race.
-  await page.evaluate(() => {
-    (window as any).nav("parade-nights");
-  });
-  await page.waitForLoadState("networkidle");
+  // nav('parade-nights') is async and awaits its own single reloadAndRender()
+  // (loadData + renderAll, serialised through _reloadRenderPromise). Return its
+  // promise so evaluate() waits for the load AND render to finish. The previous
+  // version discarded the promise and waited on networkidle, which never waits
+  // in this SPA (no navigation happens): the in-flight reload could re-render the
+  // Parade Night list mid-click, so the "Edit Session 1" click never landed and
+  // #m-sess-edit stayed hidden (CI Firefox, 2026-09-28). Do not add extra
+  // reloadAndRender() calls here -- overlapping cycles trip the rate limiter.
+  await page.evaluate(() => (window as any).nav("parade-nights"));
   await page.evaluate(() => {
     for (const [id, value] of [["pn-f-term", "all"], ["pn-f-status", "all"], ["pn-search", ""]] as const) {
       const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
