@@ -40,7 +40,7 @@ interface Props {
 
 const TABS: { key: BottomTab; label: string }[] = [
   { key: "activities", label: "Activities" },
-  { key: "backlog", label: "Mission Backlog" },
+  { key: "backlog", label: "Needs Attention" },
   { key: "facilitators", label: "Facilitators" },
   { key: "schedule", label: "Schedule" },
   { key: "rooms", label: "Rooms" },
@@ -1944,7 +1944,7 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
       {filtered.length === 0 ? (
         <div className="pw-empty" style={{ padding: "24px" }}>
           {unified.length === 0
-            ? "No activities yet. Import a CEA file, add anchor events, or create a manual activity."
+            ? "No activities yet. Import a CEA file or create a manual activity."
             : "No activities match your filters."}
         </div>
       ) : (

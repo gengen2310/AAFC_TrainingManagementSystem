@@ -1923,6 +1923,9 @@ def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
     service_number is optional; cadets without one are valid (e.g. prospect records).
     """
     sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
     squadron = db.get(Squadron, sq_id)
     if not squadron:
         raise HTTPException(404, detail={"error": "squadron_not_found"})
@@ -1970,7 +1973,10 @@ def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
     return {
         "ok": True, "cadet_id": cadet.id,
         "service_number": cadet.service_number,
+        "rank": cadet.rank,
+        "first_name": cadet.first_name,
         "last_name": cadet.last_name,
+        "phase": cadet.phase,
     }
 
 
@@ -2264,18 +2270,30 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
         .order_by(ParadeNightTimingSnapshot.display_order)
         .all()
     )
-    tmpl_name = None
+    # A parade night created before its squadron ever had a timing template
+    # (or one whose template was never explicitly set) carries
+    # timing_template_id == None forever -- nothing back-fills it. Falling
+    # straight to "Bare legacy" in that case ignored any timing template that
+    # is actually date-effective for the night, so a squadron that set up its
+    # timing template AFTER creating parade nights (a common bootstrap order)
+    # saw every one of those older nights synthesise placeholder periods with
+    # no timing_block_id, rather than the real template that governs them.
+    # Resolve the same way create_session (planning.py) and parade_night_builder
+    # already do: explicit template first, else the date-effective one.
+    _tmpl = None
     if pn.timing_template_id:
         _tmpl = db.get(TimingTemplate, pn.timing_template_id)
-        tmpl_name = _tmpl.name if _tmpl else None
+    if not _tmpl and pn.squadron_id:
+        _tmpl = _effective_template(db, pn.squadron_id, pn.date)
+    tmpl_name = _tmpl.name if _tmpl else None
 
     # Resolve timing_block_id from the live template for both snapshot and template paths.
     # Snapshots freeze display data but not the FK; look it up by period_number from the
     # live template so _pnCellSave can persist timing_block_id on newly created sessions.
     timing_block_id_by_period: dict[int, str] = {}
-    if pn.timing_template_id:
+    if _tmpl:
         for _tb in db.query(TimingBlock).filter_by(
-            timing_template_id=pn.timing_template_id
+            timing_template_id=_tmpl.id
         ).all():
             if _tb.is_instructional_period and _tb.period_number is not None:
                 timing_block_id_by_period[_tb.period_number] = _tb.id
@@ -2293,33 +2311,30 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
             }
             for s in snaps
         ]
-    elif pn.timing_template_id:
-        # No snapshot yet — derive from template blocks
-        _tmpl = db.get(TimingTemplate, pn.timing_template_id)
-        if _tmpl:
-            raw = db.query(TimingBlock).filter_by(
-                timing_template_id=_tmpl.id
-            ).order_by(TimingBlock.display_order).all()
-            ip_idx = 0
-            blocks = []
-            for b in raw:
-                pnum = None
-                if b.is_instructional_period:
-                    ip_idx += 1
-                    pnum = ip_idx
-                blocks.append({
-                    "timing_block_id": b.id,
-                    "period_number": pnum,
-                    "block_label": b.block_name,
-                    "start_time": b.start_time,
-                    "end_time": b.end_time,
-                    "is_instructional": b.is_instructional_period,
-                    "display_order": b.display_order,
-                })
-        else:
-            blocks = []
+    elif _tmpl:
+        # No snapshot yet — derive from the resolved template's blocks
+        raw = db.query(TimingBlock).filter_by(
+            timing_template_id=_tmpl.id
+        ).order_by(TimingBlock.display_order).all()
+        ip_idx = 0
+        blocks = []
+        for b in raw:
+            pnum = None
+            if b.is_instructional_period:
+                ip_idx += 1
+                pnum = ip_idx
+            blocks.append({
+                "timing_block_id": b.id,
+                "period_number": pnum,
+                "block_label": b.block_name,
+                "start_time": b.start_time,
+                "end_time": b.end_time,
+                "is_instructional": b.is_instructional_period,
+                "display_order": b.display_order,
+            })
     else:
-        # Bare legacy: synthesise from session_count
+        # Bare legacy: no template at all, explicit or date-effective —
+        # synthesise from session_count
         blocks = [
             {
                 "period_number": i + 1, "block_label": f"Period {i + 1}",

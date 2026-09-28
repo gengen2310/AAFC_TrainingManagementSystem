@@ -69,6 +69,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("cadet_member_import_batches")
     op.drop_table("cadet_session_outcomes")
+    index_name = "ix_sessions_rescheduled_to_session_id"
+    index_exists = any(
+        index["name"] == index_name
+        for index in sa.inspect(op.get_bind()).get_indexes("sessions")
+    )
     with op.batch_alter_table("sessions") as batch_op:
-        batch_op.drop_index("ix_sessions_rescheduled_to_session_id")
+        if index_exists:
+            batch_op.drop_index(index_name)
         batch_op.drop_column("rescheduled_to_session_id")

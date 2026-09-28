@@ -370,14 +370,23 @@ export function PlanningWorkspace() {
       );
     }
     if (view === "setup") {
+      const unitSetupUrl = new URL(TMS_BASE, window.location.href);
+      unitSetupUrl.searchParams.set("aafc_page", "settings");
+      if (selectedYear) {
+        unitSetupUrl.searchParams.set("aafc_training_year", String(selectedYear.year));
+      }
       return (
         <div className="pw-empty" data-testid="tms-year-setup-handoff">
           <strong>Set up this Training Year in TMS Unit Setup.</strong>
           <span>Planning Year and Training Class records are managed in TMS and appear here automatically.</span>
           <span style={{ fontSize: 'var(--fs-xs)' }}>After creating the year in TMS, reopen Planning Workspace using the TMS link to keep the selected year.</span>
-          <a href={TMS_BASE} className="btn btn-primary btn-sm" style={{ marginTop: 8 }} rel="noopener noreferrer">
-            Open TMS Unit Setup ↗
-          </a>
+          {canWriteSquadron(session) ? (
+            <a href={unitSetupUrl.toString()} className="btn btn-primary btn-sm" style={{ marginTop: 8 }} rel="noopener noreferrer">
+              Open TMS Unit Setup ↗
+            </a>
+          ) : (
+            <span style={{ fontSize: 'var(--fs-xs)' }}>Ask a Squadron administrator to set up this year in TMS Unit Setup.</span>
+          )}
         </div>
       );
     }
@@ -604,13 +613,6 @@ export function PlanningWorkspace() {
               <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />
             </>
           )}
-          <button
-            className="btn sm out"
-            style={{ fontSize: 'var(--fs-xs)', padding: "3px 10px" }}
-            onClick={() => setDrawerItem({ type: "new-anchor", yearId: selectedYearId })}
-          >
-            + Anchor event
-          </button>
           {canWriteSquadron(session) && (
             <button
               className="btn sm out"

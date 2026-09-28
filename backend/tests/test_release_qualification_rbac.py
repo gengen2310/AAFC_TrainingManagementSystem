@@ -70,15 +70,16 @@ def test_facilitators_readable_by_all_roles(client, role):
     assert r.status_code == 200, f"{role} cannot read facilitators: {r.text}"
 
 
+# sqn_general reads its own squadron's audit rows (2026-09-28 product decision).
 _AUDIT_READ_ROLES = frozenset({
-    "auditor", "sqn_admin", "wing_admin", "national_admin", "national_viewer", "system_admin"
+    "auditor", "sqn_admin", "sqn_general", "wing_admin", "national_admin", "national_viewer", "system_admin"
 })
-_AUDIT_BLOCKED_ROLES = frozenset({"sqn_general", "wing_viewer"})
+_AUDIT_BLOCKED_ROLES = frozenset({"wing_viewer"})
 
 
 @pytest.mark.parametrize("role", list(ROLES))
 def test_audit_log_access_by_role(client, role):
-    """Audit log (/api/audit) enforces scoped read: admin/viewer/auditor allowed; sqn_general and wing_viewer blocked."""
+    """Audit log (/api/audit) enforces scoped read: admin/viewer/auditor and sqn_general allowed; wing_viewer blocked."""
     r = client.get("/api/audit", headers=hdr(client, role))
     if role in _AUDIT_READ_ROLES:
         assert r.status_code == 200, f"{role} should be able to read audit log: {r.text}"

@@ -36,7 +36,8 @@ test("authenticated retired full-app routes cannot resurrect the old React shell
 test("Mission Backlog recommended terms keep the canonical T1-T4 form", async ({ page }) => {
   await loginPW(page, "ADMIN703");
   await page.getByText("Planning Tools ▲").click();
-  await page.getByRole("button", { name: "Mission Backlog" }).click();
+  // Drawer tab renamed "Mission Backlog" -> "Needs Attention" (key "backlog").
+  await page.getByRole("button", { name: "Needs Attention", exact: true }).click();
   await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
 
   // Scope to the specific Mission Backlog table (which owns the "Rec. Term"

@@ -704,7 +704,7 @@ def _parse_cea_csv(csv_text: str):
         return [], [], ["no_rows"]
     aliases = {
         "cea id": "id", "member id": "id", "service number": "id",
-        "service no": "id", "service no.": "id",
+        "service no": "id", "service no.": "id", "service #": "id",
         "first name": "name", "given name": "name",
         "surname": "family name", "last name": "family name",
     }

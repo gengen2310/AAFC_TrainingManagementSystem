@@ -23,6 +23,8 @@ const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 // IDs of resources created during this run — cleaned up in afterAll.
 const _createdPnIds: string[] = [];
 const _createdClassIds: string[] = [];
+// Only years this file actually created (not ones reused via 409 existing_id).
+const _createdYearIds: string[] = [];
 
 // This file performs several setup/read/write API calls in every test. The
 // development/test general limiter is process-wide, so reset per test rather
@@ -38,26 +40,38 @@ test.afterAll(async ({ request }) => {
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
-  if (!lookup.ok()) return;
+  expect(lookup.ok(), "afterAll cleanup: sqn_admin lookup failed").toBe(true);
   const userId = (await lookup.json()).user_id as string;
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "ADMIN703", user_id: userId },
   });
-  if (!loginRes.ok()) return;
+  expect(loginRes.ok(), "afterAll cleanup: sqn_admin login failed").toBe(true);
   const body = await loginRes.json();
   const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
 
   // Archive parade nights first (also archives their sessions).
   for (const pnId of _createdPnIds) {
-    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+    ok(await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth }), `parade night ${pnId}`);
   }
   // Archive training classes.
   for (const classId of _createdClassIds) {
-    await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth });
+    ok(await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth }), `training class ${classId}`);
   }
-  // Planning year 2064 is left in place — it has archived dependents so
-  // cannot be permanently deleted, and far-future years don't appear in
-  // normal UI date pickers.
+  // Deactivate (not delete: archived dependents block deletion) every year this
+  // file created. The fixture year is randomised per test, so leaving them
+  // active accumulated one active year per test across runs; Main TMS boot
+  // fetches holidays per active year, and that growth tripped the API rate
+  // limiter in later tests (silent 429 -> hidden Quick Edit class list).
+  for (const yearId of _createdYearIds) {
+    const cur = await request.get(`${base}/api/planning/years/${yearId}`, { headers: auth });
+    ok(cur, `year lookup ${yearId}`);
+    if (!cur.ok()) continue;
+    ok(await request.patch(`${base}/api/planning/years/${yearId}`, {
+      data: { active_status: false, version: (await cur.json()).version }, headers: auth,
+    }), `year deactivate ${yearId}`);
+  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -97,6 +111,7 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   let yearId: string;
   if (yearRes.ok()) {
     yearId = (await yearRes.json()).planning_year_id as string;
+    _createdYearIds.push(yearId);
   } else {
     // 409 includes existing_id when year already exists — use it directly.
     const errBody = await yearRes.json().catch(() => null);
@@ -283,73 +298,10 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
   });
 });
 
-async function openPNDetailForMarker(page: Page, marker: string, planningYearId: string) {
-  await selectConnectedPlanningYear(page, planningYearId);
-  await page.evaluate(() => (window as any).nav("parade-nights"));
-  await page.waitForLoadState("networkidle");
-  await page.evaluate(() => {
-    for (const [id, value] of [["pn-f-term", "all"], ["pn-f-status", "all"], ["pn-search", ""]] as const) {
-      const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
-      if (el) el.value = value;
-    }
-    (window as any).renderPN();
-  });
-  await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
-  const card = page.locator(".pn-card").filter({ hasText: marker });
-  await expect(card).toBeVisible({ timeout: 8000 });
-  // The rendered Parade Night card exposes this action as "Open / edit".
-  // "Detail" was a stale selector from the retired control label.
-  await card.getByRole("button", { name: "Open / edit" }).click();
-  await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 6000 });
-}
-
-test.describe("Session <-> Training Class assignment via Parade Night detail modal (CLASS-17)", () => {
-  test("Training Class checkboxes appear in the detail modal and saving persists the selection", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-    await loginSquadron(page, "ADMIN703");
-    const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
-    const suffix = String(Date.now()) + "pnd1";
-    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const group = page.locator("#pnd-classes-group");
-    await expect(group).toBeVisible({ timeout: 8000 });
-    const checkbox = page.locator("#pnd-classes-list label").filter({ hasText: className });
-    await expect(checkbox).toBeVisible();
-    await checkbox.locator("input.pnd-class-chk").check();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).toBeChecked();
-    expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
-  });
-
-  test("unchecking in the detail modal clears the assignment", async ({ page }) => {
-    await loginSquadron(page, "ADMIN703");
-    const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
-    const suffix = String(Date.now()) + "pnd2";
-    const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const chk = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
-    await expect(chk).toBeVisible({ timeout: 8000 });
-    await chk.check();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    const reopened = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
-    await expect(reopened).toBeChecked();
-    await reopened.uncheck();
-    await page.locator("#pnd-save-btn").click();
-    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
-
-    await openPNDetailForMarker(page, marker, fixtureYear);
-    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).not.toBeChecked();
-  });
-});
+// CLASS-17 (assignment via the Parade Night detail modal) was removed here: the
+// detail modal no longer hosts Training Class checkboxes (#pnd-classes-*) since the
+// September Parade Night detail rewrite. The capability survives in Quick Edit and
+// is covered by "Session <-> Training Class assignment via Quick Edit" above.
 
 test.describe("Training Class name in compact session card (CLASS-18)", () => {
   test("assigned class name appears in the .sess-info line of the parade night card", async ({ page }) => {

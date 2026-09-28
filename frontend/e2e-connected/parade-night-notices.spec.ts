@@ -41,7 +41,16 @@ test("sqn_admin can add, see, and remove a notice on a plain (non-Planning-Works
   // created via the plain endpoint (no Planning-module ParadeDate
   // involvement from the test's side) -- exactly the case the register
   // flagged as previously non-functional.
-  const date = `2099-06-${String(1 + (Date.now() % 27)).padStart(2, "0")}`;
+  // First free June 2099 date. Dates are unique per squadron among non-archived
+  // nights (409 duplicate_date); a clock-derived day collided with other specs'
+  // 2099 fixture nights on some runs.
+  const taken = new Set(
+    ((await (await page.request.get(`${base}/api/parade-nights`, { headers: hdr })).json()) as Array<{ date?: string }>)
+      .map((pn) => String(pn.date || "").slice(0, 10)),
+  );
+  const date = Array.from({ length: 30 }, (_, i) => `2099-06-${String(i + 1).padStart(2, "0")}`)
+    .find((d) => !taken.has(d));
+  expect(date, "no free June 2099 parade-night date for the fixture").toBeTruthy();
   const createRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { date },
     headers: hdr,

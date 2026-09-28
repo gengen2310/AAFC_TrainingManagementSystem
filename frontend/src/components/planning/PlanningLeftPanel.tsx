@@ -404,7 +404,7 @@ export function PlanningLeftPanel({
             )}
             {unscheduled.length > 5 && (
               <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", padding: "2px 4px" }}>
-                +{unscheduled.length - 5} more — open Mission Backlog below
+                +{unscheduled.length - 5} more — open Needs Attention below
               </div>
             )}
           </>

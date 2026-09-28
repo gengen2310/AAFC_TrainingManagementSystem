@@ -133,7 +133,8 @@ def test_only_system_admin_can_enable_maintenance(client):
 
 
 # ── Audit log: only the documented read-roles reach it, everyone else 403s ─────────
-_AUDIT_READ_ROLES = {"auditor", "sqn_admin", "wing_admin", "national_admin", "national_viewer", "system_admin"}
+# sqn_general reads its own squadron's audit rows (2026-09-28 product decision).
+_AUDIT_READ_ROLES = {"auditor", "sqn_admin", "sqn_general", "wing_admin", "national_admin", "national_viewer", "system_admin"}
 
 
 def test_audit_log_read_access_matches_documented_role_set(client):

@@ -207,7 +207,7 @@ export function EightWeekView({
             notices={night?.notices ?? []}
             periods={row.instructional_periods}
             sessions={displaySessions}
-            sessionCount={row.session_count}
+            sessionCount={row.instructional_periods.length}
             filledSlots={row.filled_slots}
             conflictCount={unresolvedCount}
             inHoliday={false}

@@ -91,9 +91,8 @@ test.describe("Activities page", () => {
     await expect(page.locator("#page-activities .ph-title")).toHaveText("Activities");
     await expect(page.locator("#page-activities")).not.toContainText("Events and activities");
     await expect(page.getByRole("button", { name: "+ Add Holiday" })).toBeVisible();
-    // DEFECT-005: connected-frontend's legacy CEA import was retired in favour
-    // of Planning Workspace's single reviewed pipeline -- the button, modal,
-    // and backing endpoint (now 410 Gone) were removed together.
+    // CEA Member Import belongs in Cadet Management; Activities must not offer
+    // a second import entry point.
     await expect(page.getByRole("button", { name: "Import CEA" })).toHaveCount(0);
     await expect(page.getByText("Import Review", { exact: false })).toHaveCount(0);
   });
@@ -113,6 +112,27 @@ test.describe("Activities page", () => {
     await page.evaluate(() => (window as any).nav("help"));
     await expect(page.locator("#gh-content-display")).toBeVisible();
     await expect(page.locator("#gh-edit-btn")).toBeHidden();
+  });
+});
+
+test.describe("Cadet Management CEA Import", () => {
+  test("the legacy route opens the import subview within Cadet Management", async ({ page }) => {
+    await loginSquadron(page, "ADMIN703");
+    await page.evaluate(() => (window as any).nav("cea-import"));
+
+    await expect(page.locator("#page-cadets")).toHaveClass(/active/);
+    await expect(page.locator("#page-cadets .ph-title").first()).toHaveText("Cadet Management");
+    await expect(page.locator("#cadets-tab-cea")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#cadets-cea-wrap")).toBeVisible();
+    await expect(page.locator("#cadets-cea-wrap")).toContainText("CEA Member Import");
+    await expect(page.locator("#page-cea-import")).not.toHaveClass(/active/);
+
+    await page.locator("#cadets-tab-roster").click();
+    await expect(page.locator("#cadets-roster-wrap")).toBeVisible();
+    await expect(page.locator("#cadets-cea-wrap")).toBeHidden();
+    await page.locator("#cadets-tab-cea").click();
+    await expect(page.locator("#cadets-cea-wrap")).toBeVisible();
+    await expect(page.locator("#cadets-tab-cea")).toHaveAttribute("aria-selected", "true");
   });
 });
 
@@ -399,14 +419,18 @@ test.describe("Facilitator statistics", () => {
     const beforeMergeStatusTotal = statusTotal(afterDeltaAdd);
     const charlieId = await facIdByName(charlieName);
     const deltaId = await facIdByName(deltaName);
+    async function sourceWasArchived() {
+      return page.evaluate(async (id) => {
+        const rows = (await (window as any).api("/api/facilitators?include_archived=true")) as
+          { facilitator_id: string; is_archived: boolean }[];
+        return rows.some((facilitator) => facilitator.facilitator_id === id && facilitator.is_archived);
+      }, deltaId);
+    }
     const afterMerge = await waitForFreshCharts(async () => {
       await page.evaluate((id) => (window as any).openMergeFac(id), deltaId);
       await page.locator("#fac-merge-target").selectOption(charlieId);
-      // The merge POST may fail with kind=network on a DB with many accumulated
-      // facilitators (backend TCP accept-queue overflow after sequential
-      // reloadAndRender() cycles). doMergeFac()'s catch block re-enables the
-      // button and leaves the <select> value intact — a single retry is safe
-      // because kind=network means the POST never reached the backend.
+      // A network error is ambiguous: the server may have committed the merge
+      // before the response was lost. Check the source state before retrying.
       await page.locator("#fac-merge-btn").click();
       const closedOnFirst = await page
         .locator("#m-fac-merge")
@@ -415,7 +439,24 @@ test.describe("Facilitator statistics", () => {
         .catch(() => false);
       if (!closedOnFirst) {
         await page.waitForTimeout(3000); // let backend drain
-        await page.locator("#fac-merge-btn").click(); // retry
+        if (await sourceWasArchived()) {
+          await page.evaluate(() => (window as any).closeModal("m-fac-merge"));
+          await page.evaluate(() => (window as any).reloadAndRender());
+        } else {
+          await page.locator("#fac-merge-btn").click();
+          const closedOnRetry = await page
+            .locator("#m-fac-merge")
+            .waitFor({ state: "hidden", timeout: 8000 })
+            .then(() => true)
+            .catch(() => false);
+          if (!closedOnRetry) {
+            if (!(await sourceWasArchived())) {
+              throw new Error("Facilitator merge failed and the source remains active.");
+            }
+            await page.evaluate(() => (window as any).closeModal("m-fac-merge"));
+            await page.evaluate(() => (window as any).reloadAndRender());
+          }
+        }
       }
       // reloadAndRender() is slow on a DB with many accumulated facilitators —
       // use an extended timeout so the assertion doesn't race the backend.
@@ -497,12 +538,15 @@ test.describe("Mobile navigation", () => {
 });
 
 test.describe("Read-only role", () => {
-  test("sqn_general cannot edit but can view Planning Workspace link", async ({ page }) => {
+  test("sqn_general is read-only and gets no Planning Workspace entry even when PW is configured", async ({ page }) => {
+    // Product decision 2026-09-28: sqn_general has no Planning Workspace access.
+    // PW is configured here so the link is hidden by role, not by missing config.
     await page.route("**/api/health/ui-config", route =>
       route.fulfill({ json: { planning_workspace_url: "http://localhost:5173", training_year: 2026, environment: "development" } })
     );
     await loginSquadron(page, "703SQN2026", "sqn_general");
     await expect(page.locator("body")).toHaveClass(/readonly/);
-    await expect(page.locator("#nav-pw-link")).toBeVisible();
+    await expect(page.locator("#nav-pw-link")).toBeHidden();
+    await expect(page.locator("#nav-pw-unconfigured")).toBeHidden();
   });
 });

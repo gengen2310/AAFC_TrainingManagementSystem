@@ -167,13 +167,16 @@ def _validate_block_times(blocks) -> list[str]:
 
 def _replace_blocks(db: DBSession, template: TimingTemplate,
                     block_data: list, created_by: str | None) -> None:
-    """Delete all existing blocks for template and insert new ones from block_data."""
-    db.query(TimingBlock).filter(
-        TimingBlock.timing_template_id == template.id
-    ).delete(synchronize_session="fetch")
-    db.flush()
+    """Delete all existing blocks for template and insert new ones from block_data.
 
+    Validates the whole incoming block_data list -- block_type and
+    period_number -- BEFORE deleting anything, so a rejected replacement
+    leaves the template's current blocks untouched rather than being torn
+    down partway through a failed save.
+    """
     ip_counter = 0
+    resolved: list[tuple[int, "BlockIn", bool, int | None]] = []
+    seen_period_numbers: set[int] = set()
     for i, bd in enumerate(block_data):
         # Validate block type against new taxonomy
         if bd.block_type not in BLOCK_TYPES:
@@ -188,15 +191,37 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
         if is_ip and pnum is None:
             ip_counter += 1
             pnum = ip_counter
+        if is_ip and pnum is not None:
+            # Two training-period blocks sharing a period_number are
+            # ambiguous downstream: session placement (planning.py
+            # create_session) and the planner's timing_block_id_by_period
+            # lookup (training.py get_parade_night_planner) both key off
+            # period_number and would silently pick whichever block query
+            # order happened to return first/last.
+            if pnum in seen_period_numbers:
+                raise HTTPException(400, detail={
+                    "error": "duplicate_period_number",
+                    "message": f"Period number {pnum} is assigned to more than "
+                               "one training period block. Each instructional "
+                               "period must have a unique period_number.",
+                })
+            seen_period_numbers.add(pnum)
+        resolved.append((i, bd, is_ip, pnum))
+
+    db.query(TimingBlock).filter(
+        TimingBlock.timing_template_id == template.id
+    ).delete(synchronize_session="fetch")
+    db.flush()
+
+    for i, bd, is_ip, pnum in resolved:
         dur = bd.duration_minutes
         if dur is None:
             dur = _calc_duration(bd.start_time, bd.end_time)
-        btype = bd.block_type
         blk = TimingBlock(
             timing_template_id=template.id,
             display_order=bd.display_order if bd.display_order else i,
             block_name=bd.block_name,
-            block_type=btype,
+            block_type=bd.block_type,
             start_time=bd.start_time,
             end_time=bd.end_time,
             duration_minutes=dur,
@@ -764,7 +789,6 @@ def get_parade_night_schedule(
         TrainingClass, TrainingClass.id == SessionAudience.training_class_id,
     ).filter(
         SessionAudience.session_id.in_([s.id for s in sessions]),
-        TrainingClass.is_archived == False,  # noqa: E712
     ).all() if sessions else []
     classes_by_session: dict[str, list] = {}
     for audience, training_class in audience_rows:
@@ -872,7 +896,6 @@ def list_parade_night_schedules(
             TrainingClass, TrainingClass.id == SessionAudience.training_class_id,
         ).filter(
             SessionAudience.session_id.in_(session_ids),
-            TrainingClass.is_archived == False,  # noqa: E712
         ).all()
         for audience, training_class in audience_rows:
             classes_by_session.setdefault(audience.session_id, []).append({

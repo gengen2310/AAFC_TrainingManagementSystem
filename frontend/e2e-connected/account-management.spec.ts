@@ -19,6 +19,62 @@ async function signInSysadmin(page: Page) {
   await expect(page.locator("#acct-show-archived")).toBeVisible({ timeout: 10000 });
 }
 
+async function signInSquadronAdmin(page: Page) {
+  await page.addInitScript((b) => { (window as any).AAFC_API_BASE = b; }, B);
+  await page.goto("/");
+  await page.locator("#auth-type").selectOption("squadron");
+  await page.locator("#auth-wing-select").selectOption("7WG");
+  await page.locator("#auth-sqn-select").selectOption("703");
+  await page.locator("#auth-role").selectOption("sqn_admin");
+  await page.locator("#auth-continue-btn").click();
+  await page.locator("#auth-code").fill("ADMIN703");
+  await page.locator("#auth-btn").click();
+  await expect(page.locator(".page.active .ph-title").first()).toBeVisible({ timeout: 15000 });
+  await page.evaluate("nav('accounts')");
+  await expect(page.locator("#acct-create-btn")).toBeVisible({ timeout: 10000 });
+}
+
+test("Add Account follows role scope and cascades Wing to Squadron", async ({ page }) => {
+  await signInSysadmin(page);
+  await page.locator("#acct-create-btn").click();
+  await page.locator("#ca-role").selectOption("sqn_admin");
+  await expect(page.locator("#ca-wing-row")).toBeVisible();
+  await expect(page.locator("#ca-sqn-row")).toBeVisible();
+
+  const wingId = await page.locator("#ca-wing option").filter({ hasText: "7WG" }).getAttribute("value");
+  expect(wingId).toBeTruthy();
+  await page.locator("#ca-wing").selectOption(wingId!);
+  const squadronOptions = (await page.locator("#ca-sqn option").allTextContents())
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .filter((name) => name !== "— select squadron —");
+  expect(squadronOptions.length).toBeGreaterThan(0);
+  expect(squadronOptions.every((name) => /^7\d{2}/.test(name))).toBe(true);
+
+  await page.locator("#ca-role").selectOption("wing_admin");
+  await expect(page.locator("#ca-wing-row")).toBeVisible();
+  await expect(page.locator("#ca-sqn-row")).toBeHidden();
+  await page.locator("#ca-role").selectOption("national_admin");
+  await expect(page.locator("#ca-wing-row")).toBeHidden();
+  await expect(page.locator("#ca-sqn-row")).toBeHidden();
+
+  await page.locator('input[name="ca-code-mode"][value="manual"]').check();
+  await page.locator("#ca-manual-code").fill("TEMPORARY-CODE");
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.locator("#acct-create-btn").click();
+  await expect(page.locator("#ca-manual-code")).toHaveValue("");
+});
+
+test("Squadron admins get a fixed own-squadron scope", async ({ page }) => {
+  await signInSquadronAdmin(page);
+  await page.locator("#acct-create-btn").click();
+  await page.locator("#ca-role").selectOption("sqn_general");
+  await expect(page.locator("#ca-fixed-scope")).toBeVisible();
+  await expect(page.locator("#ca-fixed-scope")).toContainText("703");
+  await expect(page.locator("#ca-wing-row")).toBeHidden();
+  await expect(page.locator("#ca-sqn-row")).toBeHidden();
+});
+
 test("an active account offers Archive, never a button called Delete", async ({ page }) => {
   // "Delete" on an active row archived it, while archived rows carry a real
   // "Delete Permanently…". One word meant two different things depending on

@@ -16,9 +16,8 @@ export type DrawerItem =
   | { type: "session-by-id"; sessionId: string; dateId: string; date: string }
   | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string; trainingClassId?: string }
   | { type: "wing-event"; event: WingHQEvent }
-  | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
-  | { type: "new-anchor"; yearId: string }
   | { type: "anchor"; anchor: AnchorEvent; yearId: string }
+  | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
   | { type: "new-location"; location?: PlanningLocation };
 
 const CADET_GROUPS = ["orientation", "initial", "junior", "intermediate", "senior"] as const;
@@ -73,9 +72,9 @@ function SessionForm({
   );
   const [partNumber, setPartNumber] = useState(existing?.part_number?.toString() ?? "");
   const [facilitatorId, setFacilitatorId] = useState(existing?.facilitator_id ?? "");
-  const [asstFacId, setAsstFacId] = useState(existing?.assistant_facilitator_id ?? "");
-  // Task 6: multi-assistant facilitator list (edit mode).
-  // Seeded from session.assistant_facilitators; mutated immediately via API.
+  const asstFacId = existing?.assistant_facilitator_id ?? "";
+  // Multi-assistant facilitator list. Existing sessions are seeded from the
+  // persisted relationship; create mode keeps the same list locally until save.
   const [assistants, setAssistants] = useState<AssistantFacilitator[]>(
     existing?.assistant_facilitators ?? [],
   );
@@ -116,6 +115,10 @@ function SessionForm({
   // Task 6: immediate-mutation handlers for multi-assistant facilitators.
   async function handleAddAssistant() {
     if (!addAsstId || !sessionId) return;
+    if (addAsstId === facilitatorId) {
+      setAsstErr("The lead facilitator cannot also be an assistant.");
+      return;
+    }
     setAsstAdding(true);
     setAsstErr(null);
     try {
@@ -296,6 +299,7 @@ function SessionForm({
           // dropped before the request left the browser. The backend discarded
           // it too until 2026-09-02; both halves are needed for the field to work.
           assistant_facilitator_id: asstFacId || undefined,
+          assistant_facilitator_ids: assistants.map(a => a.user_id),
           location_id: locationId || undefined,
           part_number: partNumber ? Number(partNumber) : undefined,
           notes: notes || undefined,
@@ -595,13 +599,17 @@ function SessionForm({
         </div>
         <label>
           Lead facilitator
-          <select value={facilitatorId} onChange={e => setFacilitatorId(e.target.value)}>
+          <select value={facilitatorId} onChange={e => {
+            const next = e.target.value;
+            setFacilitatorId(next);
+            setAssistants(prev => prev.filter(a => a.user_id !== next));
+          }}>
             <option value="">— None —</option>
             {facilitators.map(f => <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>)}
           </select>
         </label>
-        {/* Task 6: multi-assistant facilitators (edit mode) / legacy single-select (create mode) */}
-        {isEdit ? (
+        {/* A session has one lead and zero or more assistants. */}
+        {(
           <div>
             <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, marginBottom: 4 }}>
               Assistant facilitators
@@ -627,7 +635,10 @@ function SessionForm({
                       type="button"
                       aria-label={`Remove ${a.display_name}`}
                       disabled={asstRemoving === a.user_id}
-                      onClick={() => handleRemoveAssistant(a.user_id)}
+                      onClick={() => {
+                        if (isEdit) void handleRemoveAssistant(a.user_id);
+                        else setAssistants(prev => prev.filter(x => x.user_id !== a.user_id));
+                      }}
                       style={{
                         background: "none",
                         border: "none",
@@ -652,7 +663,7 @@ function SessionForm({
               >
                 <option value="">— Add assistant —</option>
                 {facilitators
-                  .filter(f => !assistants.some(a => a.user_id === f.facilitator_id))
+                  .filter(f => f.facilitator_id !== facilitatorId && !assistants.some(a => a.user_id === f.facilitator_id))
                   .map(f => (
                     <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>
                   ))
@@ -661,7 +672,14 @@ function SessionForm({
               <button
                 type="button"
                 className="btn sm primary"
-                onClick={handleAddAssistant}
+                onClick={() => {
+                  if (isEdit) void handleAddAssistant();
+                  else if (addAsstId && addAsstId !== facilitatorId) {
+                    const added = facilitators.find(f => f.facilitator_id === addAsstId);
+                    if (added) setAssistants(prev => [...prev, { user_id: added.facilitator_id, display_name: added.display_name }]);
+                    setAddAsstId("");
+                  }
+                }}
                 disabled={!addAsstId || asstAdding}
                 style={{ whiteSpace: "nowrap" }}
               >
@@ -670,14 +688,6 @@ function SessionForm({
             </div>
             {asstErr && <div className="pw-err" style={{ marginTop: 4, fontSize: 'var(--fs-xs)' }}>{asstErr}</div>}
           </div>
-        ) : (
-          <label>
-            Assistant facilitator
-            <select value={asstFacId} onChange={e => setAsstFacId(e.target.value)}>
-              <option value="">— None —</option>
-              {facilitators.map(f => <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>)}
-            </select>
-          </label>
         )}
         <label>
           Room / Location
@@ -844,98 +854,6 @@ function WingEventPanel({ event, onClose }: { event: WingHQEvent; onClose: () =>
         <button className="btn sm primary" onClick={() => review("acknowledged")} disabled={saving}>Acknowledged</button>
         <button className="btn sm out" onClick={() => review("planning")} disabled={saving}>Planning</button>
         <button className="btn sm out" onClick={() => review("not_relevant")} disabled={saving}>Not Relevant</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Create anchor event form ─────────────────────────────────────────────────
-const ANCHOR_TYPES = ["inspection", "competition", "training_weekend", "ceremonial", "admin", "other"] as const;
-const ANCHOR_IMPORTANCE = ["mandatory", "key_event", "recommended", "optional"] as const;
-const AUDIENCE_FIELDS: { key: string; label: string }[] = [
-  { key: "audience_orientation", label: "Orientation" },
-  { key: "audience_initial", label: "Initial" },
-  { key: "audience_junior", label: "Junior" },
-  { key: "audience_intermediate", label: "Intermediate" },
-  { key: "audience_senior", label: "Senior" },
-];
-
-function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => void }) {
-  const qc = useQueryClient();
-  const { toast } = useToast();
-  const [eventName, setEventName] = useState("");
-  const [eventType, setEventType] = useState<string>("other");
-  const [importance, setImportance] = useState<string>("key_event");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [audience, setAudience] = useState({ audience_orientation: true, audience_initial: true, audience_junior: true, audience_intermediate: true, audience_senior: true });
-  const [planningImpact, setPlanningImpact] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function handleSave() {
-    if (!eventName.trim()) { setErr("Event name is required."); return; }
-    if (!startDate) { setErr("Start date is required."); return; }
-    setSaving(true); setErr(null);
-    try {
-      await planningApi.createAnchor(yearId, {
-        event_name: eventName.trim(),
-        event_type: eventType,
-        importance,
-        start_date: startDate,
-        end_date: endDate || undefined,
-        ...audience,
-        planning_impact: planningImpact || undefined,
-        notes: notes || undefined,
-      });
-      await qc.invalidateQueries({ queryKey: ["planning-annual"] });
-      await qc.invalidateQueries({ queryKey: ["planning-cc"] });
-      await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
-      toast("Anchor event created.");
-      onClose();
-    } catch (e: unknown) {
-      setErr(friendlyMessage(e, "Save failed"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="pw-drawer-form">
-      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" /></label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <label>Type
-          <select value={eventType} onChange={e => setEventType(e.target.value)}>
-            {ANCHOR_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
-          </select>
-        </label>
-        <label>Importance
-          <select value={importance} onChange={e => setImportance(e.target.value)}>
-            {ANCHOR_IMPORTANCE.map(i => <option key={i} value={i}>{i.replace(/_/g, " ")}</option>)}
-          </select>
-        </label>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <label>Start date *<input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
-        <label>End date<input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></label>
-      </div>
-      <div>
-        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)", marginBottom: 6 }}>Audience</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {AUDIENCE_FIELDS.map(({ key, label }) => (
-            <label key={key} style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 'var(--fs-sm)', fontWeight: 400 }}>
-              <input type="checkbox" checked={audience[key as keyof typeof audience]} onChange={e => setAudience(prev => ({ ...prev, [key]: e.target.checked }))} />
-              {label}
-            </label>
-          ))}
-        </div>
-      </div>
-      <label>Planning impact<input value={planningImpact} onChange={e => setPlanningImpact(e.target.value)} placeholder="e.g. No parade night that week" /></label>
-      <label>Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional context" /></label>
-      {err && <div className="pw-err">{err}</div>}
-      <div className="pw-drawer-actions" style={{ marginTop: 14 }}>
-        <button className="btn primary" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Add anchor event"}</button>
       </div>
     </div>
   );
@@ -1271,7 +1189,6 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
     : item.type === "session-by-id" ? "Session"
     : item.type === "new-session" ? "Add Session"
     : item.type === "wing-event" ? item.event.title
-    : item.type === "new-anchor" ? "New Anchor Event"
     : item.type === "anchor" ? item.anchor.event_name
     : item.type === "new-location" ? (item.location ? `Edit: ${item.location.name}` : "Add Location")
     : `${item.curriculum.code} — ${item.curriculum.title}`;
@@ -1292,9 +1209,6 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
         )}
         {item.type === "wing-event" && (
           <WingEventPanel event={item.event} onClose={onClose} />
-        )}
-        {item.type === "new-anchor" && (
-          <CreateAnchorForm yearId={item.yearId} onClose={onClose} />
         )}
         {item.type === "anchor" && (
           <ActivityFullDetail activity={anchorToDisplay(item.anchor)} />

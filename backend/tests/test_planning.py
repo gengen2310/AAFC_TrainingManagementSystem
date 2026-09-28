@@ -9,7 +9,12 @@ import uuid
 import pytest
 from tests.conftest import login, next_test_year
 from app.database import SessionLocal
-from app.models import ParadeNight, Session as TrainingSession, SessionStatusHistory
+from app.models import (
+    Cadet, CadetClassMembership, CadetSessionOutcome, ParadeNight,
+    Session as TrainingSession, SessionAssistantFacilitator, SessionAudience,
+    SessionStatusHistory, TrainingClass,
+)
+from app.models.training import ParadeNightTimingOverride
 
 
 # ─────────────────────────────────────────────────────────────
@@ -39,8 +44,17 @@ def _auditor_hdr(client):
 def _make_year(client, hdr, year=None):
     # REM-134: was a fixed 2026 -- the year the seed already gives 703 -- so this
     # collided with the seed on its first call and with itself on every one after.
-    year = next_test_year() if year is None else year
-    r = client.post("/api/planning/years", json={"year": year, "name": f"{year} Training Year"}, headers=hdr)
+    generated = year is None
+    year = next_test_year() if generated else year
+    for _ in range(100):
+        r = client.post("/api/planning/years", json={"year": year, "name": f"{year} Training Year"}, headers=hdr)
+        if not (
+            generated
+            and r.status_code == 409
+            and r.json().get("detail", {}).get("error") == "planning_year_already_exists"
+        ):
+            break
+        year += 1
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -160,14 +174,15 @@ def test_delete_empty_planning_year_succeeds(client):
 
 def test_delete_planning_year_with_archived_pn_and_session_children(client):
     """Regression: permanently deleting a year that has archived parade nights
-    with session children must delete those children first.
-    SessionStatusHistory.session_id has no ondelete=CASCADE — PostgreSQL raises
+    with session children must delete every child first.
+    Several session-child FKs have no ondelete=CASCADE — PostgreSQL raises
     ForeignKeyViolation without the explicit child-delete.  In SQLite (FK
     enforcement off) the bug silently leaves orphaned rows; the assertion that
     rows are gone catches that regression here too."""
     hdr = _sqn_admin_hdr(client)
     year = _make_year(client, hdr)
     yr_id = year["planning_year_id"]
+    audience_year = _make_year(client, hdr)
 
     rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
                      json={"parade_date": "2030-01-10"}, headers=hdr)
@@ -183,6 +198,18 @@ def test_delete_planning_year_with_archived_pn_and_session_children(client):
         pn.is_archived = True
         sqn_id = pn.squadron_id
 
+        audience_classes = db.query(TrainingClass).filter(
+            TrainingClass.squadron_id == sqn_id,
+            TrainingClass.training_year_id == audience_year["planning_year_id"],
+        ).all()
+        training_class = TrainingClass(
+            id=str(uuid.uuid4()),
+            squadron_id=sqn_id,
+            training_year_id=audience_year["planning_year_id"],
+            display_name="FK test audience",
+            class_number=max((tc.class_number for tc in audience_classes), default=0) + 1,
+        )
+        cadet = Cadet(id=str(uuid.uuid4()), squadron_id=sqn_id)
         sess_id = str(uuid.uuid4())
         sess = TrainingSession(
             id=sess_id,
@@ -190,7 +217,7 @@ def test_delete_planning_year_with_archived_pn_and_session_children(client):
             squadron_id=sqn_id,
             custom_title="fk-test session",
         )
-        db.add(sess)
+        db.add_all([training_class, cadet, sess])
         db.flush()
 
         hist = SessionStatusHistory(
@@ -199,9 +226,30 @@ def test_delete_planning_year_with_archived_pn_and_session_children(client):
             old_status="draft",
             new_status="confirmed",
         )
-        db.add(hist)
+        audience = SessionAudience(
+            id=str(uuid.uuid4()),
+            session_id=sess_id,
+            training_class_id=training_class.id,
+        )
+        outcome = CadetSessionOutcome(
+            id=str(uuid.uuid4()),
+            cadet_id=cadet.id,
+            session_id=sess_id,
+            status="completed",
+        )
+        assistant = SessionAssistantFacilitator(
+            id=str(uuid.uuid4()),
+            session_id=sess_id,
+            user_id=str(uuid.uuid4()),
+        )
+        db.add_all([hist, audience, outcome, assistant])
         db.commit()
-        hist_id = hist.id
+        child_ids = {
+            SessionStatusHistory: hist.id,
+            SessionAudience: audience.id,
+            CadetSessionOutcome: outcome.id,
+            SessionAssistantFacilitator: assistant.id,
+        }
     finally:
         db.close()
 
@@ -211,14 +259,60 @@ def test_delete_planning_year_with_archived_pn_and_session_children(client):
     # Verify the child rows were explicitly deleted, not merely orphaned.
     db2 = SessionLocal()
     try:
-        assert db2.query(SessionStatusHistory).filter(
-            SessionStatusHistory.id == hist_id
-        ).count() == 0, "SessionStatusHistory row not deleted — FK child-delete logic is missing"
+        for child_model, child_id in child_ids.items():
+            assert db2.query(child_model).filter(
+                child_model.id == child_id
+            ).count() == 0, f"{child_model.__name__} row not deleted — FK child-delete logic is missing"
         assert db2.query(TrainingSession).filter(
             TrainingSession.id == sess_id
         ).count() == 0, "TrainingSession row not deleted"
+        assert db2.query(TrainingClass).filter(
+            TrainingClass.training_year_id == yr_id
+        ).count() == 0, "TrainingClass rows for the deleted year were not deleted"
     finally:
         db2.close()
+
+
+def test_delete_planning_year_blocked_by_class_history_and_timing_overrides(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                     json={"parade_date": "2031-02-20"}, headers=hdr)
+    assert rp.status_code == 200, rp.text
+    pn_id = rp.json()["parade_night_id"]
+
+    db = SessionLocal()
+    try:
+        pn = db.get(ParadeNight, pn_id)
+        pn.is_archived = True
+        year_classes = db.query(TrainingClass).filter(
+            TrainingClass.squadron_id == pn.squadron_id,
+            TrainingClass.training_year_id == yr_id,
+        ).all()
+        cadet = Cadet(id=str(uuid.uuid4()), squadron_id=pn.squadron_id)
+        db.add(cadet)
+        db.add(CadetClassMembership(
+            id=str(uuid.uuid4()),
+            cadet_id=cadet.id,
+            training_class_id=year_classes[0].id,
+            start_date="2031-02-20",
+        ))
+        db.add(ParadeNightTimingOverride(
+            id=str(uuid.uuid4()),
+            parade_night_id=pn_id,
+            timing_template_id=None,
+            reason="Retain archived override history",
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
+    assert response.status_code == 409, response.text
+    blockers = response.json()["detail"]["dependents"]
+    assert blockers["cadet_class_memberships"] == 1
+    assert blockers["timing_overrides"] == 1
 
 
 def test_delete_planning_year_blocked_when_holiday_exists(client):

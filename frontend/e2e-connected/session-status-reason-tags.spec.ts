@@ -16,51 +16,40 @@ import { selectConnectedPlanningYear } from "./year-context-helper";
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
 const _createdPnIds: string[] = [];
-// Track fixture planning years created by seedSession() so afterAll can
-// delete them. Accumulated fixture years (3000+) cause loadData() to fire
-// one /api/planning/years/:id/holidays request per year, exhausting the
-// 300 req/60s rate limit budget within a single reloadAndRender() call.
+// Only years this file actually created (not ones reused via 409 existing_id).
 const _createdYearIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
-async function _authHeadersSsr(request: any): Promise<Record<string, string> | null> {
+test.afterAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
-  if (!lookup.ok()) return null;
+  expect(lookup.ok(), "afterAll cleanup: sqn_admin lookup failed").toBe(true);
   const userId = (await lookup.json()).user_id as string;
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "ADMIN703", user_id: userId },
   });
-  if (!loginRes.ok()) return null;
+  expect(loginRes.ok(), "afterAll cleanup: sqn_admin login failed").toBe(true);
   const body = await loginRes.json();
-  return { Authorization: `Bearer ${body.token || body.access_token}` };
-}
-
-test.beforeAll(async ({ request }) => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
-  const hdr = await _authHeadersSsr(request);
-  if (!hdr) return;
-  const yearsRes = await request.get(`${base}/api/planning/years`, { headers: hdr });
-  if (!yearsRes.ok()) return;
-  const allYears = await yearsRes.json().catch(() => []);
-  for (const y of (allYears as any[]).filter((y: any) => y.year >= 3000)) {
-    await request.delete(`${base}/api/planning/years/${y.planning_year_id}`, { headers: hdr });
-  }
-});
-
-test.afterAll(async ({ request }) => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
-  const hdr = await _authHeadersSsr(request);
-  if (!hdr) return;
+  const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
   for (const pnId of _createdPnIds) {
-    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+    ok(await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr }), `parade night ${pnId}`);
   }
+  // Deactivate (not delete: dependents block deletion) every fixture year this
+  // file created -- exact IDs only, never a broad "year >= N" sweep.
   for (const yearId of _createdYearIds) {
-    await request.delete(`${base}/api/planning/years/${yearId}`, { headers: hdr });
+    const cur = await request.get(`${base}/api/planning/years/${yearId}`, { headers: hdr });
+    ok(cur, `year lookup ${yearId}`);
+    if (!cur.ok()) continue;
+    ok(await request.patch(`${base}/api/planning/years/${yearId}`, {
+      data: { active_status: false, version: (await cur.json()).version }, headers: hdr,
+    }), `year deactivate ${yearId}`);
   }
 });
 
@@ -89,10 +78,7 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   expect(yearRes.ok() || yearRes.status() === 409).toBe(true);
   const yearBody = await yearRes.json().catch(() => ({}));
   const planningYearId = (yearBody.planning_year_id || yearBody.existing_id) as string;
-  // Track for cleanup in afterAll -- prevents holiday-fetch accumulation.
-  if (yearRes.ok() && yearBody.planning_year_id) {
-    _createdYearIds.push(yearBody.planning_year_id);
-  }
+  if (yearRes.ok()) _createdYearIds.push(planningYearId);
   const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {

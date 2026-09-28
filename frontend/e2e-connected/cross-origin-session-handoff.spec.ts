@@ -113,7 +113,7 @@ test("Logging out of TMS invalidates the Planning Workspace session", async ({ p
   await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
   // Log out from TMS — this calls POST /api/auth/logout which clears the aafc_session cookie.
-  await page.goto("http://localhost:8080");
+  await page.goto("/"); // TMS origin via config baseURL (localhost:8080 in the standard config)
   const signOut = page.getByRole("button", { name: /sign out/i })
     .or(page.locator("#btn-logout"))
     .first();
