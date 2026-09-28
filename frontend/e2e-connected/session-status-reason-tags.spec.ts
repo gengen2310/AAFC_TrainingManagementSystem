@@ -16,6 +16,11 @@ import { selectConnectedPlanningYear } from "./year-context-helper";
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
 const _createdPnIds: string[] = [];
+// Track fixture planning years created by seedSession() so afterAll can
+// delete them. Accumulated fixture years (3000+) cause loadData() to fire
+// one /api/planning/years/:id/holidays request per year, exhausting the
+// 300 req/60s rate limit budget within a single reloadAndRender() call.
+const _createdYearIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
@@ -36,6 +41,12 @@ test.afterAll(async ({ request }) => {
   const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
   for (const pnId of _createdPnIds) {
     await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+  }
+  // Clean up fixture planning years to prevent holiday-fetch fan-out from
+  // accumulating across test runs (each year triggers one extra API request
+  // in loadData()'s p_holidays Promise.all batch).
+  for (const yearId of _createdYearIds) {
+    await request.delete(`${base}/api/planning/years/${yearId}`, { headers: hdr });
   }
 });
 
@@ -64,6 +75,10 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   expect(yearRes.ok() || yearRes.status() === 409).toBe(true);
   const yearBody = await yearRes.json().catch(() => ({}));
   const planningYearId = (yearBody.planning_year_id || yearBody.existing_id) as string;
+  // Track for cleanup in afterAll -- prevents holiday-fetch accumulation.
+  if (yearRes.ok() && yearBody.planning_year_id) {
+    _createdYearIds.push(yearBody.planning_year_id);
+  }
   const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
@@ -82,8 +97,14 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 }
 
 async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
+  const backendBase = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
   await page.evaluate(() => (window as any).reloadAndRender());
   await selectConnectedPlanningYear(page, planningYearId);
+  // Reset between the two reloadAndRender() calls: each call fires 26 base
+  // API requests plus one /holidays request per active non-past planning year.
+  // With accumulated fixture years the combined burst exceeds the 300 req/60s
+  // limit, causing p_pns to return [] and renderPN() to show 0 cards.
+  await resetBackendRateLimits(backendBase);
   await page.evaluate("nav('parade-nights')");
   await page.evaluate("reloadAndRender()");
   await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
@@ -103,6 +124,11 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
     const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()));
+
+    // seedSession makes 5+ direct API calls and loginSquadron makes several more.
+    // Reset here so loadData()'s /api/session-status-reason-tags request succeeds
+    // inside openQuickEditForFirstSession's reloadAndRender() calls.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("cancelled");
@@ -131,6 +157,10 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
     const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "b");
+
+    // Same budget exhaustion risk as the Cancelled test above -- reset so
+    // loadData() can populate S.sessionStatusReasonTags successfully.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("not_delivered");

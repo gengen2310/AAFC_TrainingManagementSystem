@@ -54,6 +54,10 @@ test.describe("Training Classes panel on the Activities page", () => {
     await loginSquadron(page, "ADMIN703");
     await selectConnectedPlanningYear(page);
 
+    // loginSquadron + selectConnectedPlanningYear exhaust the rate limit budget
+    // before the Add/Archive API calls fire. Reset here so modal mutations succeed.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
     const modal = page.locator("#m-add-training-class");
     await expect(modal).toBeVisible();
@@ -94,6 +98,10 @@ test.describe("Training Classes panel on the Activities page", () => {
     await loginSquadron(page, "ADMIN703");
     await selectConnectedPlanningYear(page);
 
+    // Same rate-limit budget concern as the create test — reset before any
+    // modal Add/Save calls so mutations don't hit 429.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+
     const originalName = `Playwright Edit Class ${Date.now()}`;
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
     await page.locator("#tc-name-inp").fill(originalName);
@@ -133,6 +141,12 @@ test.describe("Training Classes panel on the Activities page", () => {
     await page.locator("#auth-code").fill("703SQN2026");
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
+
+    // loginSquadron's loadData() fires 26 base calls + one holiday call per
+    // active non-past planning year. With accumulated fixture years this exhausts
+    // the 300 req/60s budget before selectConnectedPlanningYear() can load the
+    // activities page data that makes #py-classes-card visible.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await selectConnectedPlanningYear(page);
     await expect(page.locator("#py-classes-card")).toBeVisible();
