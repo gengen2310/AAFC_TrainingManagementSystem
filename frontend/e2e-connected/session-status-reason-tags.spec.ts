@@ -26,25 +26,39 @@ test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
-test.afterAll(async ({ request }) => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+async function _authHeadersSsr(request: any): Promise<Record<string, string> | null> {
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
-  if (!lookup.ok()) return;
+  if (!lookup.ok()) return null;
   const userId = (await lookup.json()).user_id as string;
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "ADMIN703", user_id: userId },
   });
-  if (!loginRes.ok()) return;
+  if (!loginRes.ok()) return null;
   const body = await loginRes.json();
-  const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  return { Authorization: `Bearer ${body.token || body.access_token}` };
+}
+
+test.beforeAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  const hdr = await _authHeadersSsr(request);
+  if (!hdr) return;
+  const yearsRes = await request.get(`${base}/api/planning/years`, { headers: hdr });
+  if (!yearsRes.ok()) return;
+  const allYears = await yearsRes.json().catch(() => []);
+  for (const y of (allYears as any[]).filter((y: any) => y.year >= 3000)) {
+    await request.delete(`${base}/api/planning/years/${y.planning_year_id}`, { headers: hdr });
+  }
+});
+
+test.afterAll(async ({ request }) => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  const hdr = await _authHeadersSsr(request);
+  if (!hdr) return;
   for (const pnId of _createdPnIds) {
     await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
   }
-  // Clean up fixture planning years to prevent holiday-fetch fan-out from
-  // accumulating across test runs (each year triggers one extra API request
-  // in loadData()'s p_holidays Promise.all batch).
   for (const yearId of _createdYearIds) {
     await request.delete(`${base}/api/planning/years/${yearId}`, { headers: hdr });
   }

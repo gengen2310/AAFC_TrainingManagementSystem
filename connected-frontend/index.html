@@ -2024,7 +2024,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Anchor event data container — not shown on Activities page (USER-AUTHORISED REMOVAL) -->
         <div id="anchors-body" style="display:none" aria-hidden="true"></div>
 
-        <!-- Training Classes — sqn_admin only; shown by _tcLoadForYear() when a year is selected via the year bar -->
+        <!-- Training Classes — all squadron-scope users; loadYearMap() shows for sqn_general (read-only) and sqn_admin+ (write); Add button gated by canWriteSquadron() -->
         <div class="card admin-el" id="settings-training-classes-wrap" style="display:none;margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Classes</h2>
@@ -16571,11 +16571,12 @@ async function loadYearMap(yearId){
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
   const classesCard = document.getElementById('py-classes-card');
+  const classesWrap = document.getElementById('settings-training-classes-wrap');
   const missionsCard = document.getElementById('py-missions-card');
   const ctxLbl = document.getElementById('py-ctx-label-sqn');
   if(!yearId){
     body.innerHTML='<p class="muted">Select a year above.</p>';
-    datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none';
+    datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none'; if(classesWrap) classesWrap.style.display='none';
     if(missionsCard) missionsCard.style.display='none';
     const fcCard=document.getElementById('py-forecasts-card');
     if(fcCard) fcCard.style.display='none';
@@ -16611,6 +16612,7 @@ async function loadYearMap(yearId){
     body.innerHTML = annualHtml;
     P.annualProgramLoaded = true;
     datesCard.style.display=''; holCard.style.display=''; classesCard.style.display='';
+    if(classesWrap){classesWrap.style.display='';const addBtn=classesWrap.querySelector('.plan-write-el');if(addBtn)addBtn.style.display=canWriteSquadron()?'inline-flex':'none';}
     if(missionsCard) missionsCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId), _renderTrainingClasses(yearId)]);
     loadMissions(yearId);
