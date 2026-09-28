@@ -114,13 +114,13 @@ async function openQuickEditForFirstSession(page: Page, marker: string, planning
   const backendBase = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
   await page.evaluate(() => (window as any).reloadAndRender());
   await selectConnectedPlanningYear(page, planningYearId);
-  // Reset between the two reloadAndRender() calls: each call fires 26 base
-  // API requests plus one /holidays request per active non-past planning year.
-  // With accumulated fixture years the combined burst exceeds the 300 req/60s
-  // limit, causing p_pns to return [] and renderPN() to show 0 cards.
+  // Reset before nav('parade-nights'): nav() calls reloadAndRender() for this
+  // page (index.html line 6358), so a separate explicit reloadAndRender() after
+  // it would double the burst. Reset here to give the single nav-reload a fresh
+  // budget, keeping the combined count well under the 300 req/60s ceiling.
   await resetBackendRateLimits(backendBase);
   await page.evaluate("nav('parade-nights')");
-  await page.evaluate("reloadAndRender()");
+  // nav('parade-nights') already calls reloadAndRender() — no second call needed.
   await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
   await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
@@ -129,6 +129,9 @@ async function openQuickEditForFirstSession(page: Page, marker: string, planning
   await expect(editBtn).toBeVisible();
   await editBtn.click();
   await expect(page.locator("#m-sess-edit")).toBeVisible();
+  // Reset after loadSessEdit() so the test's save/create API calls
+  // (saveSessEdit PATCH, POST session-status-reason-tags) have a fresh budget.
+  await resetBackendRateLimits(backendBase);
 }
 
 test.describe("Session Status Reason tags (REM-23 continuation)", () => {

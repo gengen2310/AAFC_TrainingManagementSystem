@@ -2024,8 +2024,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Anchor event data container — not shown on Activities page (USER-AUTHORISED REMOVAL) -->
         <div id="anchors-body" style="display:none" aria-hidden="true"></div>
 
-        <!-- Training Classes — all squadron-scope users; loadYearMap() shows for sqn_general (read-only) and sqn_admin+ (write); Add button gated by canWriteSquadron() -->
-        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none;margin-top:var(--sp-lg)">
+        <!-- Training Classes — all squadron-scope users; _tcLoadForYear() shows when a year is selected; Add button gated by plan-write-el (canWritePlan) -->
+        <div class="card" id="settings-training-classes-wrap" style="display:none;margin-top:var(--sp-lg)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Classes</h2>
             <div style="display:flex;align-items:center;gap:10px">
