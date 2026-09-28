@@ -13793,22 +13793,16 @@ async function saveActivityLocalOverride(){
 }
 async function clearActivityLocalOverride(){
   confirmAction('Remove this local adjustment and revert to the source activity\'s own date/time/notes?',async()=>{
+    closeModal('m-act-override'); // Optimistic close: decouple dismiss from API latency/failure.
     try{
       await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
-      // Patch S.acts immediately so renderActs() reflects the cleared state before
-      // the modal closes — a full reloadAndRender() can fail and leave stale data.
       const _clearedAct=S.acts.find(a=>a.id===_actOverrideId);
       if(_clearedAct) _clearedAct.localOverride=null;
       renderActs();
-      closeModal('m-act-override');
       showToast('Local adjustment cleared.');
       reloadAndRender(); // background refresh for all other data, no await
     }catch(e){ showToast(apiErr(e),true); }
   });
-  // Prevent closeModal('m-confirm') from restoring focus to this button.
-  // Firefox/WebKit fire a spurious click on re-focused buttons, which would
-  // re-invoke this function and loop (m-act-override never closes).
-  _modalReturnFocus=null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -15872,7 +15866,15 @@ function closeModal(id){
   // before the current call stack unwinds, which would re-open a promptText() modal.
   if(_modalReturnFocus&&_modalReturnFocus.focus){
     const el=_modalReturnFocus; _modalReturnFocus=null;
-    setTimeout(()=>{try{el.focus();}catch(_){}},0);
+    // Skip focus restoration if the target is still inside an active modal — e.g.
+    // #act-override-clear-btn inside still-active #m-act-override when
+    // closeModal('m-confirm') fires. Firefox/WebKit trigger a spurious synthetic
+    // click on a re-focused button inside a visible modal, which re-invokes the
+    // caller (clearActivityLocalOverride) and loops without ever closing the parent.
+    const parentBg=el.closest&&el.closest('.modal-bg');
+    if(!parentBg||!parentBg.classList.contains('active')){
+      setTimeout(()=>{try{el.focus();}catch(_){}},0);
+    }
   }else{
     _modalReturnFocus=null;
   }

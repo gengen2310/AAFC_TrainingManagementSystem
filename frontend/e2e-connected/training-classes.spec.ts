@@ -8,7 +8,7 @@ import { selectConnectedPlanningYear } from "./year-context-helper";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
