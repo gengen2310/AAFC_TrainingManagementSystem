@@ -778,7 +778,7 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
     audit(db, p, object_type="user", object_id=uid, action="recovery_email_changed",
           old={"had_address": bool(old_addr)}, new={"verified": False})
     return {"ok": True, "recovery_email": mask_email(addr),
-            "verified": False, "email_sent": sent}
+            "verified": False, "email_sent": sent, "verification_sent": sent}
 
 
 @router.post("/accounts/{uid}/disable")
