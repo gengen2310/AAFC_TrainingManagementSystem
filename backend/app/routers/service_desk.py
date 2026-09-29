@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, field_validator
-from sqlalchemy import or_\nfrom sqlalchemy.orm import Session as DBSession
+from sqlalchemy import or_
+from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import Squadron, Wing, User, ServiceTicket, ServiceDeskEmailConfig
