@@ -403,6 +403,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     target.token_version = (target.token_version or 0) + 1
+    target.must_change_code = not is_self
     db.commit()
     action = "change_own_code" if is_self else "reset_access"
     new_info = {} if is_self else {"target_display_name": target.display_name, "target_role": target.role}
@@ -455,6 +456,7 @@ def _me(user: User, db: DBSession | None = None) -> dict:
             "wing_id": user.wing_id, "wing_code": wing_code, "wing_name": wing_name,
             "squadron_id": user.squadron_id, "squadron_code": squadron_code,
             "national_id": user.national_id,
+            "must_change_code": bool(getattr(user, "must_change_code", False)),
             "is_wing": user.role in ("wing_viewer", "wing_admin"),
             "is_national": user.role in ("national_viewer", "national_admin", "system_admin", "auditor")}
 
@@ -576,6 +578,9 @@ def reset_code_by_token(body: ResetByTokenIn, db: DBSession = Depends(get_db)):
 
     # Every live JWT dies here: dependencies.py rejects a tv mismatch.
     u.token_version = (u.token_version or 0) + 1
+    # Recovery already proves mailbox possession and asks the holder to choose
+    # the replacement credential, so no second forced rotation is necessary.
+    u.must_change_code = False
     db.commit()
     audit(db, None, object_type="user", object_id=u.id, action="recovery_completed")
     return {"ok": True, "message": "Your access code has been changed. Sign in with it now."}
