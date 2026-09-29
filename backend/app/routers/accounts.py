@@ -227,6 +227,32 @@ class AccountCreateIn(BaseModel):
     squadron_id: str | None = None
     flight_id: str | None = None
     new_code: str | None = None   # if omitted, auto-generated
+    recovery_email: str | None = None
+
+
+
+def _normalise_recovery_email(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    addr = raw.strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", addr) or len(addr) > 254:
+        raise HTTPException(400, detail={
+            "error": "invalid_email", "message": "Enter a valid email address."})
+    return addr
+
+
+def _ensure_recovery_email_available(
+    db: DBSession, addr: str, *, exclude_user_id: str | None = None
+) -> None:
+    """Prevent ambiguous recovery routing without disclosing another account."""
+    q = db.query(User).filter(User.recovery_email == addr)
+    if exclude_user_id:
+        q = q.filter(User.id != exclude_user_id)
+    if q.first() is not None:
+        raise HTTPException(409, detail={
+            "error": "recovery_email_in_use",
+            "message": "That recovery email is already assigned to another account.",
+        })
 
 
 class AccountUpdateIn(BaseModel):
@@ -317,6 +343,17 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     # Validate actor authority and scope
     _validate_create_scope(p, body.role, body.national_id, body.wing_id, body.squadron_id, db)
 
+    recovery_email = _normalise_recovery_email(body.recovery_email)
+    if body.role == "system_admin" and not recovery_email:
+        raise HTTPException(422, detail={
+            "error": "recovery_email_required",
+            "message": "System Administrator accounts require a recovery email.",
+        })
+    if recovery_email:
+        if body.role not in RECOVERY_ROLES:
+            raise HTTPException(422, detail={"error": "role_not_recoverable"})
+        _ensure_recovery_email_available(db, recovery_email)
+
     # Flight assignment: only valid for squadron-scoped accounts, and must belong to correct SQN
     flight_id = None
     if body.flight_id:
@@ -344,7 +381,11 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
 
     u = User(display_name=name, role=body.role,
              national_id=nat_id, wing_id=wing_id, squadron_id=sqn_id,
-             flight_id=flight_id, active_status=True, created_by=p.user_id)
+             flight_id=flight_id, active_status=True, created_by=p.user_id,
+             recovery_email=recovery_email,
+             recovery_email_verified_at=None,
+             recovery_email_updated_at=utcnow() if recovery_email else None,
+             recovery_email_updated_by=p.user_id if recovery_email else None)
     db.add(u)
     db.flush()  # get u.id
 
@@ -364,7 +405,22 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
                     active_status=True, created_by=p.user_id,
                     updated_by=p.user_id, updated_at=utcnow())
     db.add(ac)
+    verification_raw = None
+    if recovery_email:
+        verification_raw = mint_token(
+            db, u, "verify_email", VERIFY_TTL_MINUTES, None
+        )
     db.commit()
+
+    verification_sent = False
+    if recovery_email and verification_raw:
+        verification_sent = send_mail(
+            recovery_email,
+            "Verify your AAFC TMS recovery email",
+            "Confirm this address so it can be used to recover your access code.\n\n"
+            f"Verification code: {verification_raw}\n\n"
+            "It expires in 24 hours. If you did not request this, ignore this email.",
+        )
 
     audit(db, p, object_type="account", object_id=u.id, action="account_created",
           new={"role": body.role, "display_name": body.display_name})
@@ -374,6 +430,10 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     # Return new code once only — it will not be retrievable again
     out["new_code"] = plain
     out["new_code_notice"] = "This code will not be shown again. Copy it now."
+    if recovery_email:
+        out["recovery_email"] = mask_email(recovery_email)
+        out["recovery_email_verified"] = False
+        out["recovery_verification_sent"] = verification_sent
     return out
 
 
@@ -679,10 +739,9 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
             "error": "role_not_recoverable",
             "message": "Recovery email is only held for administrator accounts."})
 
-    addr = (body.email or "").strip().lower()
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", addr) or len(addr) > 254:
-        raise HTTPException(400, detail={
-            "error": "invalid_email", "message": "Enter a valid email address."})
+    addr = _normalise_recovery_email(body.email)
+    assert addr is not None
+    _ensure_recovery_email_available(db, addr, exclude_user_id=u.id)
 
     # Re-authenticate the CALLER against their own live code.
     caller_codes = db.query(AccessCode).filter(
