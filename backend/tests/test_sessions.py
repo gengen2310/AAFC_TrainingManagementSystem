@@ -291,4 +291,3 @@ def test_parade_night_list_returns_canonical_assistant_shape(client):
         a.get("user_id") == fac_id and a.get("facilitator_id") == fac_id
         for a in assistants
     )
-
