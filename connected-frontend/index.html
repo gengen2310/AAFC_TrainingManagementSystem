@@ -2810,11 +2810,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Curriculum import card — upload workbook or paste JSON to import curriculum items -->
         <div class="card sc-card" id="sc-curriculum-import-card">
           <div class="sc-section-hdr">Curriculum Import</div>
-          <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Safe to run multiple times without creating duplicates.</div>
+          <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to preview all curriculum changes from <em>zz - Program backend</em>. Nothing is written until you review the preview and choose <strong>Commit import</strong>.</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <label class="btn" style="cursor:pointer;background:#0678a0;color:#fff;border:none">
               Select Workbook (.xlsm)
-              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scImportCurriculum()">
+              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scPreviewCurriculum()">
             </label>
             <span id="sc-curr-import-filename" style="font-size:var(--fs-sm);color:var(--muted)"></span>
           </div>
@@ -6890,45 +6890,121 @@ async function scSaveSdEmail(scope, email, wingId){
   } catch(e){ showToast(apiErr(e),true); }
 }
 
-async function scImportCurriculum(){
+let _scCurriculumPreviewReady=false;
+
+async function _scCurriculumXlsmRequest(preview){
+  const input=document.getElementById('sc-curr-import-file');
+  if(!input||!input.files||!input.files[0]) throw new Error('Select a workbook first.');
+  const file=input.files[0];
+  const form=new FormData();
+  form.append('file',file);
+  const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
+  const token=tokenGet();
+  const suffix=preview?'?preview=true':'';
+  const r=await fetch(base+'/api/curriculum/import-xlsm'+suffix,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token},
+    body:form,
+  });
+  let d={};
+  try{ d=await r.json(); }catch(_){}
+  if(!r.ok){
+    const msg=d.detail?.message||d.detail?.error||'An error occurred. Check the file format.';
+    throw new Error(msg);
+  }
+  return d;
+}
+
+function _scRenderCurriculumSummary(d, preview){
+  const results=document.getElementById('sc-curr-import-results');
+  const failed=(d.results||[]).filter(x=>x.status==='failed');
+  let html='<div style="margin-top:4px">';
+  html+=`<strong>${preview?'Preview':'Committed'}:</strong> created ${Number(d.created||0)}, updated ${Number(d.updated||0)}, skipped ${Number(d.skipped||0)}, failed ${Number(d.failed||0)} of ${Number(d.total||0)}.`;
+  if(failed.length){
+    html+='<div style="color:var(--red);margin-top:6px">Failures:<br>'+
+      failed.map(x=>`${esc(x.identifier||x.code||'row')}: ${esc(x.error||'Import failed')}`).join('<br>')+'</div>';
+  }
+  if(preview){
+    html+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button type="button" class="btn btn-primary" id="sc-curr-import-commit" onclick="scCommitCurriculum()">Commit import</button>'+
+      '<button type="button" class="btn btn-secondary" onclick="scCancelCurriculumPreview()">Cancel</button>'+
+      '</div>';
+  }
+  html+='</div>';
+  results.innerHTML=html;
+}
+
+async function scPreviewCurriculum(){
   const input=document.getElementById('sc-curr-import-file');
   const msg=document.getElementById('sc-curr-import-msg');
   const results=document.getElementById('sc-curr-import-results');
   const fname=document.getElementById('sc-curr-import-filename');
-  if(!input||!input.files||!input.files[0])return;
-  const file=input.files[0];
-  fname.textContent=file.name;
-  msg.textContent='Uploading and parsing…'; msg.style.color='var(--muted)';
+  if(!input||!input.files||!input.files[0]) return;
+  _scCurriculumPreviewReady=false;
+  fname.textContent=input.files[0].name;
+  msg.textContent='Parsing and previewing — no changes will be written…';
+  msg.style.color='var(--muted)';
   results.innerHTML='';
-  const form=new FormData();
-  form.append('file',file);
   try{
-    const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
-    const token=tokenGet();
-    const r=await fetch(base+'/api/curriculum/import-xlsm',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+token},
-      body:form,
-    });
-    const d=await r.json();
-    if(!r.ok){
-      msg.textContent='Import failed: '+(d.detail?.message||d.detail?.error||'An error occurred. Check the file format.');
-      msg.style.color='var(--red)'; return;
-    }
-    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
-    msg.style.color=d.failed>0?'var(--amber)':'var(--ok)';
-    if(d.failed>0){
-      const failed=(d.results||[]).filter(x=>x.status==='failed');
-      results.innerHTML='<div style="color:var(--red);margin-top:4px">Failures:<br>'+
-        failed.map(x=>`${esc(x.identifier||x.code)}: ${esc(x.error)}`).join('<br>')+'</div>';
-    }
-    // Reload curriculum in state
-    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);}catch(_){}
+    const d=await _scCurriculumXlsmRequest(true);
+    _scCurriculumPreviewReady=true;
+    msg.textContent='Preview ready. Review the counts below before committing.';
+    msg.style.color=Number(d.failed||0)>0?'var(--amber)':'var(--ok)';
+    _scRenderCurriculumSummary(d,true);
   }catch(e){
-    msg.textContent='Upload error: '+apiErr(e); msg.style.color='var(--red)';
-  } finally {
+    msg.textContent='Preview failed: '+apiErr(e);
+    msg.style.color='var(--red)';
     input.value='';
+    fname.textContent='';
   }
+}
+
+// Backward-compatible name retained for any automation/bookmark that called the
+// old function directly. It now performs the safe preview stage only.
+async function scImportCurriculum(){
+  return scPreviewCurriculum();
+}
+
+async function scCommitCurriculum(){
+  const input=document.getElementById('sc-curr-import-file');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  const fname=document.getElementById('sc-curr-import-filename');
+  if(!_scCurriculumPreviewReady||!input||!input.files||!input.files[0]){
+    msg.textContent='Preview the workbook before committing.';
+    msg.style.color='var(--red)';
+    return;
+  }
+  const btn=document.getElementById('sc-curr-import-commit');
+  if(btn){btn.disabled=true;btn.textContent='Committing…';}
+  msg.textContent='Committing reviewed curriculum changes…';
+  msg.style.color='var(--muted)';
+  try{
+    const d=await _scCurriculumXlsmRequest(false);
+    _scCurriculumPreviewReady=false;
+    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
+    msg.style.color=Number(d.failed||0)>0?'var(--amber)':'var(--ok)';
+    _scRenderCurriculumSummary(d,false);
+    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);}catch(_){}
+    input.value='';
+    fname.textContent='';
+  }catch(e){
+    msg.textContent='Import failed: '+apiErr(e);
+    msg.style.color='var(--red)';
+    if(btn){btn.disabled=false;btn.textContent='Commit import';}
+  }
+}
+
+function scCancelCurriculumPreview(){
+  const input=document.getElementById('sc-curr-import-file');
+  _scCurriculumPreviewReady=false;
+  if(input) input.value='';
+  const fname=document.getElementById('sc-curr-import-filename');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  if(fname) fname.textContent='';
+  if(msg) msg.textContent='Preview cancelled. No curriculum changes were written.';
+  if(results) results.innerHTML='';
 }
 
 async function scBootstrapStaging(){
