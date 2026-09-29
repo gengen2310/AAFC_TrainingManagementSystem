@@ -84,6 +84,12 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # True for bootstrap/generated/admin-reset credentials until the account holder
+    # completes an authenticated self-service code change. Protected API access is
+    # restricted while this flag is set.
+    must_change_code: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     # Recovery channel. An address is only usable once recovery_email_verified_at
     # is set: entering an address must not by itself make it trusted. Setting or
     # changing the address clears the verification.
