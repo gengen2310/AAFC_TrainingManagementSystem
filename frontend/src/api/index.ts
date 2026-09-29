@@ -384,6 +384,7 @@ export const planningApi = {
   updateSession: (session_id: string, body: {
     curriculum_id?: string | null; activity_title?: string | null;
     facilitator_id?: string | null; assistant_facilitator_id?: string | null;
+    assistant_facilitator_ids?: string[] | null;
     location_id?: string | null; cadet_group?: string | null;
     part_number?: number | null; notes?: string | null;
     training_class_ids?: string[] | null;
