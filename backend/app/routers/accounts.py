@@ -382,6 +382,7 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     u = User(display_name=name, role=body.role,
              national_id=nat_id, wing_id=wing_id, squadron_id=sqn_id,
              flight_id=flight_id, active_status=True, created_by=p.user_id,
+             must_change_code=True,
              recovery_email=recovery_email,
              recovery_email_verified_at=None,
              recovery_email_updated_at=utcnow() if recovery_email else None,
@@ -704,6 +705,10 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     u.token_version = (u.token_version or 0) + 1
+    # Self-service reset with the current credential is the holder choosing a
+    # new code. An administrator-issued reset is a temporary credential and
+    # must be rotated by the target on first use.
+    u.must_change_code = uid != p.user_id
     db.commit()
 
     action = "change_own_code" if uid == p.user_id else "reset_access"
