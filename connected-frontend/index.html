@@ -2482,6 +2482,20 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="cc-msg" style="font-size:var(--fs-xs);margin-top:10px;font-weight:700"></div>
           <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are recorded in the audit log.</div>
         </div>
+        <div class="card no-ro" id="settings-recovery-card" style="display:none">
+          <h2 class="ctitle">Recovery Email</h2>
+          <div class="alert a-info" style="font-size:var(--fs-xs)">A verified recovery email lets eligible administrator accounts recover a forgotten access code. Changing the address requires your current access code.</div>
+          <div class="form-row">
+            <div class="ff"><label for="recovery-email-new">Recovery email</label><input id="recovery-email-new" type="email" autocomplete="email" placeholder="name@example.com"></div>
+            <div class="ff"><label for="recovery-current-code">Current access code</label><input id="recovery-current-code" type="password" autocomplete="current-password" placeholder="Required to change email"></div>
+          </div>
+          <button class="btn btn-dk" onclick="saveMyRecoveryEmail()">Send verification code</button>
+          <div class="form-row" style="margin-top:12px">
+            <div class="ff"><label for="recovery-verify-token">Verification code</label><input id="recovery-verify-token" autocomplete="one-time-code" placeholder="From the verification email"></div>
+            <div class="ff" style="align-self:end"><button class="btn btn-out" onclick="verifyMyRecoveryEmail()">Verify email</button></div>
+          </div>
+          <div id="recovery-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700"></div>
+        </div>
         <!-- Admin: user directory for code resets -->
         <div class="card admin-el" id="user-dir-card" style="display:none">
           <h2 class="ctitle">🗂️ User Directory — Admin Code Reset</h2>
@@ -4324,6 +4338,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div id="ca-fixed-scope" class="alert a-info" style="display:none;font-size:var(--fs-sm);margin-top:8px"></div>
+      <div class="ff" id="ca-recovery-row" style="display:none;margin-top:8px">
+        <label for="ca-recovery-email">Recovery email <span id="ca-recovery-required" style="color:var(--red);display:none">*</span></label>
+        <input id="ca-recovery-email" type="email" autocomplete="email" placeholder="name@example.com">
+        <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:4px">Used only for access-code recovery. The address must be verified before recovery is enabled.</div>
+      </div>
       <div class="card" style="background:var(--hover);padding:12px;margin-top:8px">
         <div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">🔑 Initial Access Code</div>
         <label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);cursor:pointer;margin-bottom:8px">
@@ -6276,6 +6295,10 @@ function bootApp(){
   });
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
+  const recoveryCard=document.getElementById('settings-recovery-card');
+  if(recoveryCard){
+    recoveryCard.style.display=['system_admin','national_admin','wing_admin','sqn_admin'].includes(S.role)?'':'none';
+  }
   // Planning-write controls: visible for sqn_admin + wing_admin (own calendar, no proxy needed).
   const canPlanWrite = canWritePlan();
   document.querySelectorAll('.plan-write-el').forEach(el=>{el.style.display=canPlanWrite?'inline-flex':'none';});
@@ -7799,6 +7822,9 @@ async function openCreateAccountModal(preselectedSqnId){
 
   document.querySelector('[name="ca-code-mode"][value="auto"]').checked=true;
   document.getElementById('ca-manual-code').value='';
+  document.getElementById('ca-recovery-email').value='';
+  document.getElementById('ca-recovery-row').style.display='none';
+  document.getElementById('ca-recovery-required').style.display='none';
   openModal('m-create-account');
 }
 
@@ -7852,6 +7878,12 @@ function onCreateAccountRoleChange(){
     fixed.textContent=`Scope: ${sqn?.code||sqn?.short_name||sqn?.name||'your Squadron'}${wing?` — ${wing.code||wing.name}`:''}`;
     fixed.style.display='';
   }
+  const recoveryRoles=['system_admin','national_admin','wing_admin','sqn_admin'];
+  const recoveryRow=document.getElementById('ca-recovery-row');
+  const recoveryRequired=document.getElementById('ca-recovery-required');
+  if(recoveryRow) recoveryRow.style.display=recoveryRoles.includes(role)?'':'none';
+  if(recoveryRequired) recoveryRequired.style.display=role==='system_admin'?'inline':'none';
+
   // Wing admin: when role is sqn-scope, filter sqn list by wing
   if(_ROLES_SQN_SCOPE.includes(role)&&S.isWing&&S.session&&S.session.wing_id){
     _populateCreateSqns(S.session.wing_id);
@@ -7892,6 +7924,11 @@ async function doCreateAccount(){
     const sid=(fixedSquadron?(S.session&&S.session.squadron_id):document.getElementById('ca-sqn').value)||undefined;
     if(!sid){ msg.textContent='Select a Squadron or Specialist Unit.'; return; }
     payload.squadron_id=sid;
+  }
+  if(['system_admin','national_admin','wing_admin','sqn_admin'].includes(role)){
+    const recovery=(document.getElementById('ca-recovery-email').value||'').trim();
+    if(role==='system_admin'&&!recovery){ msg.textContent='A recovery email is required for System Administrator accounts.'; return; }
+    if(recovery) payload.recovery_email=recovery;
   }
   const codeMode=document.querySelector('[name="ca-code-mode"]:checked').value;
   if(codeMode==='manual'){
@@ -15125,6 +15162,44 @@ async function _pdayPropApply(sessionScope){
     await reloadAndRender();
   }catch(e){ body.innerHTML=`<p style="color:var(--red)">${esc(apiErr(e))}</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">Close</button></div>`; }
 }
+async function saveMyRecoveryEmail(){
+  const msg=document.getElementById('recovery-msg');
+  const email=(document.getElementById('recovery-email-new').value||'').trim();
+  const current=(document.getElementById('recovery-current-code').value||'').trim();
+  const show=(text,ok)=>{msg.textContent=text;msg.style.color=ok?'var(--ok)':'var(--red)';};
+  if(!email){show('Enter a recovery email.',false);return;}
+  if(!current){show('Enter your current access code.',false);return;}
+  const uid=S.session&&S.session.user_id;
+  if(!uid){show('No active session.',false);return;}
+  try{
+    const r=await api('/api/accounts/'+uid+'/recovery-email',{
+      method:'POST',body:JSON.stringify({email,current_code:current})
+    });
+    document.getElementById('recovery-current-code').value='';
+    show(r.verification_sent
+      ? 'Verification code sent. Enter it below to activate recovery.'
+      : 'Email saved, but delivery could not be confirmed. Check SMTP configuration before relying on recovery.',
+      !!r.verification_sent);
+  }catch(e){show('Could not update recovery email: '+apiErr(e),false);}
+}
+
+async function verifyMyRecoveryEmail(){
+  const msg=document.getElementById('recovery-msg');
+  const token=(document.getElementById('recovery-verify-token').value||'').trim();
+  if(!token){msg.textContent='Enter the verification code from the email.';msg.style.color='var(--red)';return;}
+  try{
+    await api('/api/auth/verify-recovery-email',{
+      method:'POST',body:JSON.stringify({token})
+    });
+    document.getElementById('recovery-verify-token').value='';
+    msg.textContent='Recovery email verified.';
+    msg.style.color='var(--ok)';
+  }catch(e){
+    msg.textContent='That verification code is invalid or expired.';
+    msg.style.color='var(--red)';
+  }
+}
+
 async function changeMyCode(){
   const msg=document.getElementById('cc-msg');
   const nw=(document.getElementById('cc-new').value||'').trim();
@@ -15138,7 +15213,8 @@ async function changeMyCode(){
   try{
     await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:uid,new_code:nw})});
     document.getElementById('cc-new').value=''; document.getElementById('cc-confirm').value='';
-    show('✅ Access code changed. Use it at next sign-in.',true);
+    show('Access code changed. Signing you out so you can use the new code.',true);
+    setTimeout(()=>doLogout(),900);
   }catch(e){ show('Could not change code: '+apiErr(e),false); }
 }
 
