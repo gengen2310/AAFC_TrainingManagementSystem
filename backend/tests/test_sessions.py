@@ -178,3 +178,117 @@ def test_session_response_includes_assistant_facilitators(client):
     data = r.json()
     assert "assistant_facilitators" in data, "assistant_facilitators missing from session response"
     assert isinstance(data["assistant_facilitators"], list)
+
+
+def _put_session_payload(detail: dict, assistant_ids: list[str]) -> dict:
+    """Build the legacy PUT /api/sessions body from a session detail response."""
+    return {
+        "parade_night_id": detail["parade_night_id"],
+        "period_number": detail.get("period_number") or 1,
+        "cadet_group": detail.get("cadet_group"),
+        "phase_at_time": detail.get("phase_at_time"),
+        "curriculum_item_id": detail.get("curriculum_item_id"),
+        "custom_title": detail.get("custom_title"),
+        "facilitator_id": detail.get("facilitator_id"),
+        "assistant_facilitator_ids": assistant_ids,
+        "training_area_id": detail.get("training_area_id"),
+        "expected_attendance": detail.get("expected_attendance"),
+        "version": detail.get("version"),
+        "timing_block_id": detail.get("timing_block_id"),
+    }
+
+
+def test_put_session_persists_and_clears_plural_assistants(client):
+    """Regression for PR65 review: Quick Edit plural assistant saves must not be a no-op."""
+    from app.database import SessionLocal
+    from app.models.training import SessionAssistantFacilitator
+
+    h = login(client, "ADMIN703")
+    sess_id = _get_or_create_session_id(client, h)
+    if sess_id is None:
+        import pytest
+        pytest.skip("No sessions available in test DB")
+
+    facs = client.get("/api/facilitators", headers=h).json()
+    if len(facs) < 2:
+        import pytest
+        pytest.skip("Need at least two facilitators")
+    assistant_ids = [facs[0]["facilitator_id"], facs[1]["facilitator_id"]]
+
+    detail = client.get(f"/api/training/sessions/{sess_id}", headers=h).json()
+    # Do not assign the current lead as its own assistant.
+    assistant_ids = [x for x in assistant_ids if x != detail.get("facilitator_id")]
+    if not assistant_ids:
+        import pytest
+        pytest.skip("No non-lead facilitator available")
+
+    r = client.put(
+        f"/api/sessions/{sess_id}",
+        headers=h,
+        json=_put_session_payload(detail, assistant_ids),
+    )
+    assert r.status_code == 200, r.text
+
+    db = SessionLocal()
+    try:
+        stored = {
+            row.user_id for row in db.query(SessionAssistantFacilitator)
+            .filter(SessionAssistantFacilitator.session_id == sess_id).all()
+        }
+        assert stored == set(assistant_ids)
+    finally:
+        db.close()
+
+    detail2 = client.get(f"/api/training/sessions/{sess_id}", headers=h).json()
+    r = client.put(
+        f"/api/sessions/{sess_id}",
+        headers=h,
+        json=_put_session_payload(detail2, []),
+    )
+    assert r.status_code == 200, r.text
+
+    db = SessionLocal()
+    try:
+        assert db.query(SessionAssistantFacilitator).filter(
+            SessionAssistantFacilitator.session_id == sess_id
+        ).count() == 0
+    finally:
+        db.close()
+
+
+def test_parade_night_list_returns_canonical_assistant_shape(client):
+    """Main TMS list response must expose existing assistants for Quick Edit preselection."""
+    h = login(client, "ADMIN703")
+    sess_id = _get_or_create_session_id(client, h)
+    if sess_id is None:
+        import pytest
+        pytest.skip("No sessions available in test DB")
+    facs = client.get("/api/facilitators", headers=h).json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators available in test DB")
+    fac_id = facs[0]["facilitator_id"]
+
+    r = client.post(
+        f"/api/training/sessions/{sess_id}/assistants",
+        headers=h,
+        json={"user_id": fac_id},
+    )
+    assert r.status_code in (200, 201), r.text
+
+    pns = client.get("/api/parade-nights", headers=h)
+    assert pns.status_code == 200, pns.text
+    found = None
+    for pn in pns.json():
+        for session in pn.get("sessions", []):
+            if session.get("session_id") == sess_id:
+                found = session
+                break
+    assert found is not None
+    assistants = found.get("assistant_facilitators")
+    assert isinstance(assistants, list)
+    assert any(
+        a.get("user_id") == fac_id and a.get("facilitator_id") == fac_id
+        for a in assistants
+    )
+
