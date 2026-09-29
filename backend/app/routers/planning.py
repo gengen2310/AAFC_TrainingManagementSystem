@@ -968,6 +968,16 @@ def delete_planning_year(
                 ).filter(ParadeNight.planning_year_id == year_id)
             ),
         ).count(),
+        # Cadet outcomes are operational training history, not disposable planning
+        # children. Any recorded outcome blocks permanent deletion even when the
+        # parade night is archived or the legacy session has no class audience.
+        "cadet_session_outcomes": db.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.session_id.in_(
+                db.query(TrainingSession.id).join(
+                    ParadeNight, TrainingSession.parade_night_id == ParadeNight.id
+                ).filter(ParadeNight.planning_year_id == year_id)
+            )
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
         "parade_night_prep_plans": db.query(AnchorPrepPlan).join(
@@ -1010,7 +1020,6 @@ def delete_planning_year(
                 SessionStatusHistory,
                 SessionAudience,
                 SessionCustomPhaseAudience,
-                CadetSessionOutcome,
             ):
                 db.query(child_model).filter(
                     child_model.session_id.in_(session_ids)
