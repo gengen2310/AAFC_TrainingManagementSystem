@@ -212,6 +212,9 @@ def _account_out(u: User, db: DBSession) -> dict:
         "code_last_changed": iso_z(ac.updated_at) if ac and ac.updated_at else None,
         "code_changed_by": ac.updated_by if ac else None,
         "locked_until": iso_z(ac.locked_until) if ac and ac.locked_until else None,
+        "recovery_email": mask_email(u.recovery_email) if u.recovery_email else None,
+        "recovery_email_verified": bool(u.recovery_email_verified_at),
+        "must_change_code": bool(getattr(u, "must_change_code", False)),
     }
 
 
