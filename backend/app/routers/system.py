@@ -102,7 +102,12 @@ def system_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_
         "maintenance_mode": maint == "on",
         "maintenance_message": _get_setting(db, "maintenance_message"),
         "maintenance_until": _get_setting(db, "maintenance_until"),
+        # This timestamp is intentionally scoped to backups initiated through
+        # this application. Scheduled GitHub Actions backups are independent and
+        # do not write into the application database.
         "last_backup_at": last_backup,
+        "last_backup_source": _get_setting(db, "last_backup_source"),
+        "last_backup_scope": "manual_application_backup" if last_backup else None,
     }
 
 
