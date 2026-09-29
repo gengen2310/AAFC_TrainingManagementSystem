@@ -667,7 +667,7 @@ def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
     if not existing_wing:
         existing_wing = Wing(
             national_id=nat.id, code=body.wing_code, name=body.wing_name,
-            short_name=wing_short, active_status=True, created_by=p.user_id,
+            short_name=wing_short, active_status=True, created_by=p.user_id, must_change_code=True,
             timezone=timezone_for_new_wing(db, nat.id,
                                            getattr(body, "timezone", None)),
         )
@@ -697,13 +697,13 @@ def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
         if not existing_wadmin:
             wadmin = User(
                 display_name=f"{wing.code} Wing Admin", role="wing_admin",
-                wing_id=wing.id, active_status=True, created_by=p.user_id,
+                wing_id=wing.id, active_status=True, created_by=p.user_id, must_change_code=True,
             )
             db.add(wadmin)
             db.flush()
             plain = generate_code()
             db.add(AccessCode(user_id=wadmin.id, code_hash=hash_code(plain),
-                              active_status=True, created_by=p.user_id,
+                              active_status=True, created_by=p.user_id, must_change_code=True,
                               updated_by=p.user_id, updated_at=utcnow()))
             audit(db, p, object_type="account", object_id=wadmin.id, action="account_created",
                   new={"role": "wing_admin", "wing": wing.code, "source": "provision_wing"})
@@ -729,7 +729,7 @@ def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
                 default_parade_day=spec.parade_day,
                 default_start_time=spec.start_time,
                 default_end_time=spec.end_time,
-                active_status=True, created_by=p.user_id,
+                active_status=True, created_by=p.user_id, must_change_code=True,
             )
             db.add(existing_sqn)
             db.flush()
@@ -751,13 +751,13 @@ def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
                     u = User(
                         display_name=dname, role=role,
                         wing_id=wing.id, squadron_id=sqn.id,
-                        active_status=True, created_by=p.user_id,
+                        active_status=True, created_by=p.user_id, must_change_code=True,
                     )
                     db.add(u)
                     db.flush()
                     plain = generate_code()
                     db.add(AccessCode(user_id=u.id, code_hash=hash_code(plain),
-                                      active_status=True, created_by=p.user_id,
+                                      active_status=True, created_by=p.user_id, must_change_code=True,
                                       updated_by=p.user_id, updated_at=utcnow()))
                     audit(db, p, object_type="account", object_id=u.id, action="account_created",
                           new={"role": role, "squadron": sqn.code, "source": "provision_wing"})
