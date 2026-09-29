@@ -518,8 +518,13 @@ def forgot_code(body: ForgotCodeIn, request: Request, db: DBSession = Depends(ge
         # would itself confirm that an address is worth guessing at.
         return _FORGOT_RESPONSE
 
-    u = db.query(User).filter(User.recovery_email == addr).first() if addr else None
-    if is_recovery_eligible(u):
+    matches = db.query(User).filter(User.recovery_email == addr).all() if addr else []
+    eligible = [candidate for candidate in matches if is_recovery_eligible(candidate)]
+    # A recovery address is a credential-reset destination and therefore must
+    # identify exactly one eligible account. Legacy duplicate rows fail closed:
+    # no token is minted and the outward response remains indistinguishable.
+    u = eligible[0] if len(eligible) == 1 else None
+    if u is not None:
         raw = mint_token(db, u, "reset", RESET_TTL_MINUTES, ip)
         db.commit()
         sent = send_mail(
