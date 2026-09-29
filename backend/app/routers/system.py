@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -379,9 +380,12 @@ def create_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
 
 @router.get("/backups/pg-dump")
 def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    """Stream a pg_dump (custom format) of the PostgreSQL database directly to the
-    authenticated system_admin's browser. Nothing is written to the server filesystem.
-    DATABASE_URL is never returned, logged, or exposed in any response.
+    """Create and verify pg_dump before offering it for download.
+
+    The previous streaming path marked last_backup_at before pg_dump completed
+    and could return a truncated HTTP-200 download if pg_dump later failed.
+    This path completes the dump first, verifies success/non-empty output, then
+    streams the ephemeral file and deletes it.
     """
     require_system_admin(p)
     url = settings.DATABASE_URL
@@ -394,11 +398,10 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
     parsed = urllib.parse.urlparse(url)
     qs = dict(urllib.parse.parse_qsl(parsed.query))
     sslmode = qs.get("sslmode", "prefer")
-
-    # Pass credentials via environment — never via command-line arguments.
     env = dict(os.environ)
     env["PGPASSWORD"] = urllib.parse.unquote(parsed.password or "")
-    env.pop("DATABASE_URL", None)   # prevent subprocess from inheriting the full URI
+    env["PGSSLMODE"] = sslmode
+    env.pop("DATABASE_URL", None)
 
     hostname = parsed.hostname or ""
     port = str(parsed.port or 5432)
@@ -406,57 +409,88 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
     dbname = (parsed.path or "/postgres").lstrip("/") or "postgres"
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filename = f"aafc_tms_staging_{ts}.dump"
+    safe_env = (settings.ENVIRONMENT or "unknown").lower().replace("/", "-")
+    filename = f"aafc_tms_{safe_env}_{ts}.dump"
 
+    fd, temp_path = tempfile.mkstemp(prefix="aafc_tms_pg_dump_", suffix=".dump")
+    os.close(fd)
     cmd = [
-        "pg_dump",
-        "--format=custom",
-        "--host", hostname,
-        "--port", port,
-        "--username", username,
-        "--dbname", dbname,
-        "--no-password",
-        f"--sslmode={sslmode}",
+        "pg_dump", "--format=custom",
+        "--host", hostname, "--port", port, "--username", username,
+        "--dbname", dbname, "--no-password", "--file", temp_path,
     ]
 
     try:
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        result = subprocess.run(
+            cmd, stderr=subprocess.PIPE, env=env, timeout=300, check=False,
         )
     except FileNotFoundError:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
         raise HTTPException(503, detail={
             "error": "pg_dump_not_found",
-            "message": "pg_dump is not installed in this environment. "
-                       "Ensure postgresql-client is installed in the Docker image.",
+            "message": "pg_dump is not installed in this environment.",
+        })
+    except subprocess.TimeoutExpired:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        audit(db, p, object_type="system", object_id="backup",
+              action="pg_dump_failed", new={"reason": "timeout"})
+        raise HTTPException(504, detail={
+            "error": "pg_dump_timeout",
+            "message": "The database backup did not complete within five minutes.",
         })
 
-    # Audit before streaming; ignore DB errors here so the download still starts,
-    # but log so a failed audit write for a system_admin backup download is never
-    # silently invisible (CLAUDE.md: "system_admin actions must be audited").
     try:
-        _set_setting(db, "last_backup_at", datetime.now(timezone.utc).isoformat(), p.user_id)
-        audit(db, p, object_type="system", object_id="backup", action="pg_dump_initiated",
-              new={"filename": filename})
-    except Exception:
-        logging.exception("Failed to write audit log for pg_dump_initiated by user_id=%s", p.user_id)
+        size = os.path.getsize(temp_path)
+    except OSError:
+        size = 0
+    if result.returncode != 0 or size <= 0:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        audit(db, p, object_type="system", object_id="backup",
+              action="pg_dump_failed",
+              new={"exit_code": result.returncode, "empty": size <= 0})
+        raise HTTPException(502, detail={
+            "error": "pg_dump_failed",
+            "message": "The PostgreSQL backup failed. No backup was recorded.",
+        })
+
+    completed_at = datetime.now(timezone.utc).isoformat()
+    _set_setting(db, "last_backup_at", completed_at, p.user_id)
+    _set_setting(db, "last_backup_source", "system_console_pg_dump", p.user_id)
+    audit(db, p, object_type="system", object_id="backup",
+          action="pg_dump_completed",
+          new={"filename": filename, "size_bytes": size})
 
     def _generate():
         try:
-            while True:
-                chunk = proc.stdout.read(65536)
-                if not chunk:
-                    break
-                yield chunk
+            with open(temp_path, "rb") as dump:
+                while True:
+                    chunk = dump.read(65536)
+                    if not chunk:
+                        break
+                    yield chunk
         finally:
-            proc.stdout.close()
-            proc.wait()
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                logging.exception("Failed to remove temporary pg_dump file")
 
     return StreamingResponse(
         _generate(),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(size),
+        },
     )
-
 
 # ── POST /api/system/bootstrap-staging ───────────────────────────────────────
 
