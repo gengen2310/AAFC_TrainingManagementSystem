@@ -28,6 +28,7 @@ Security invariants enforced here:
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.exc import IntegrityError
 
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
@@ -258,6 +259,21 @@ def _ensure_recovery_email_available(
         })
 
 
+def _commit_recovery_safe(db: DBSession) -> None:
+    """Commit while translating the DB-level recovery-email race into HTTP 409."""
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        detail = str(getattr(exc, "orig", exc)).lower()
+        if "recovery_email" in detail and ("unique" in detail or "duplicate" in detail):
+            raise HTTPException(409, detail={
+                "error": "recovery_email_in_use",
+                "message": "That recovery email is already assigned to another account.",
+            }) from exc
+        raise
+
+
 class AccountUpdateIn(BaseModel):
     display_name: str | None = None
     flight_id: str | None = None  # pass "" or null to clear
@@ -414,7 +430,10 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
         verification_raw = mint_token(
             db, u, "verify_email", VERIFY_TTL_MINUTES, None
         )
-    db.commit()
+    if recovery_email:
+        _commit_recovery_safe(db)
+    else:
+        db.commit()
 
     verification_sent = False
     if recovery_email and verification_raw:
@@ -766,7 +785,7 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
     u.recovery_email_updated_by = p.user_id
 
     raw = mint_token(db, u, "verify_email", VERIFY_TTL_MINUTES, None)
-    db.commit()
+    _commit_recovery_safe(db)
 
     sent = send_mail(
         addr,
