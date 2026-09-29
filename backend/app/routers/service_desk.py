@@ -357,8 +357,11 @@ def update_ticket(
         changed["admin_notes"] = body.admin_notes
         ticket.admin_notes = body.admin_notes
 
-    if body.assigned_to_user_id is not None:
-        requested_id = body.assigned_to_user_id.strip()
+    if "assigned_to_user_id" in body.model_fields_set:
+        # Pydantic normally collapses an omitted optional field and an explicit
+        # JSON null to the same Python value. Use model_fields_set so clients can
+        # deliberately clear an assignment with either null or "".
+        requested_id = (body.assigned_to_user_id or "").strip()
         if not requested_id:
             changed["assigned_to_user_id"] = None
             changed["assigned_to_name"] = None
@@ -370,7 +373,12 @@ def update_ticket(
                 raise HTTPException(422, detail={"error": "invalid_assignee"})
             if assignee.role not in ("system_admin", "national_admin", "wing_admin"):
                 raise HTTPException(422, detail={"error": "invalid_assignee_role"})
-            if assignee.role == "wing_admin" and ticket_wing_id and assignee.wing_id != ticket_wing_id:
+            # Wing-admin ownership is meaningful only when the ticket has an
+            # authoritative Wing. Never assign an unscoped legacy/free-text
+            # ticket to a Wing administrator merely because its wing is unknown.
+            if assignee.role == "wing_admin" and (
+                not ticket_wing_id or assignee.wing_id != ticket_wing_id
+            ):
                 raise HTTPException(422, detail={"error": "assignee_out_of_scope"})
             if p.role == "wing_admin" and (
                 assignee.role != "wing_admin" or assignee.wing_id != p.wing_id
