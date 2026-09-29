@@ -72,7 +72,6 @@ function SessionForm({
   );
   const [partNumber, setPartNumber] = useState(existing?.part_number?.toString() ?? "");
   const [facilitatorId, setFacilitatorId] = useState(existing?.facilitator_id ?? "");
-  const asstFacId = existing?.assistant_facilitator_id ?? "";
   // Multi-assistant facilitator list. Existing sessions are seeded from the
   // persisted relationship; create mode keeps the same list locally until save.
   const [assistants, setAssistants] = useState<AssistantFacilitator[]>(
@@ -269,7 +268,10 @@ function SessionForm({
           curriculum_id: curriculumId ?? null,
           activity_title: title || null,
           facilitator_id: facilitatorId || null,
-          assistant_facilitator_id: asstFacId || null,
+          // Persist the actual current multi-assistant state. This is critical
+          // when an assistant is promoted to lead: the select handler removes
+          // that person locally and this payload now removes them canonically.
+          assistant_facilitator_ids: assistants.map(a => a.user_id),
           location_id: locationId || null,
           // Preserve the full original audience if the class picker is unchanged.
           // If the user changed the class, send the new single-class list.
@@ -294,11 +296,6 @@ function SessionForm({
           curriculum_id: curriculumId ?? undefined,
           activity_title: title || undefined,
           facilitator_id: facilitatorId || undefined,
-          // The drawer has always collected asstFacId and sent it on UPDATE but
-          // not on CREATE, so an assistant chosen while creating a session was
-          // dropped before the request left the browser. The backend discarded
-          // it too until 2026-09-02; both halves are needed for the field to work.
-          assistant_facilitator_id: asstFacId || undefined,
           assistant_facilitator_ids: assistants.map(a => a.user_id),
           location_id: locationId || undefined,
           part_number: partNumber ? Number(partNumber) : undefined,
@@ -348,6 +345,7 @@ function SessionForm({
         curriculum_item_id: curriculumId ?? null,
         cadet_group: cadetGroup || null,
         facilitator_id: facilitatorId || null,
+        assistant_facilitator_ids: assistants.map(a => a.user_id),
         training_area_id: locationId || null,
         custom_title: title || null,
         status: existing.status,
