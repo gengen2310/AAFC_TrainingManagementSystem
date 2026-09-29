@@ -103,9 +103,16 @@ def _cadet_group_for_class(db: DBSession, tc: "TrainingClass | None") -> str | N
     if tc.training_stage_id:
         phase = db.get(CurriculumPhase, tc.training_stage_id)
         if phase:
-            name = (phase.display_name or phase.name or "").lower()
+            # Canonical name is the governed semantic key; display_name is UI
+            # copy and may be something generic such as "Stage A". Check both
+            # independently so a non-empty display label never masks a useful
+            # canonical value such as "A. Orientation".
+            phase_names = [
+                (phase.name or "").lower(),
+                (phase.display_name or "").lower(),
+            ]
             for cg in _STAGE_CODE_CADET_GROUP.values():
-                if cg in name:
+                if any(cg in phase_name for phase_name in phase_names):
                     return cg
     return None
 
