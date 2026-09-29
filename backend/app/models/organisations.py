@@ -93,7 +93,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # Recovery channel. An address is only usable once recovery_email_verified_at
     # is set: entering an address must not by itself make it trusted. Setting or
     # changing the address clears the verification.
-    recovery_email: Mapped[str | None] = mapped_column(String(254), nullable=True, index=True)
+    recovery_email: Mapped[str | None] = mapped_column(String(254), nullable=True, index=True, unique=True)
     recovery_email_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     recovery_email_updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     recovery_email_updated_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
