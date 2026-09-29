@@ -5728,13 +5728,16 @@ def _link_session(db: DBSession, ci: CurriculumItem, sqn_id: str,
 async def import_curriculum_xlsm(
     file: UploadFile = File(...),
     squadron_id: str | None = None,
+    preview: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Accept an .xlsm workbook upload and import curriculum from 'zz - Program backend' sheet.
+    """Preview or import an .xlsm workbook from 'zz - Program backend'.
 
     Header row: 4. Unique key: Identifier (col 4), fallback (Module_Code, Part).
     Non-curriculum rows (missing Module_Code or Title) are silently skipped.
+    preview=true executes the same downstream classification as commit and
+    rolls the transaction back, matching the JSON and CSV import contracts.
     """
     if p.role not in _NAT_ADMIN_ROLES:
         raise HTTPException(403, detail={"error": "forbidden",
@@ -5762,7 +5765,12 @@ async def import_curriculum_xlsm(
     ws = wb[sheet_name]
     items = _parse_program_backend_sheet(ws)
 
-    body = CurriculumImportIn(items=items, squadron_id=squadron_id, owning_level="national")
+    body = CurriculumImportIn(
+        items=items,
+        squadron_id=squadron_id,
+        owning_level="national",
+        preview=preview,
+    )
     return import_curriculum(body, db=db, p=p)
 
 
