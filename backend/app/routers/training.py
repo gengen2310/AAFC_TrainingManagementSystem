@@ -16,7 +16,8 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
 from ..models.planning import ActivityLocalOverride
 from ..models.faq import FaqEntry
 from ..richtext import sanitize_rich_text
-from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES
+from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
+                               SessionAssistantFacilitator)
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
