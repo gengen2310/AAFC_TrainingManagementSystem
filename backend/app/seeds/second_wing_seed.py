@@ -201,9 +201,39 @@ def second_wing_seed() -> None:
         wing = None if not nat else db.query(Wing).filter(
             Wing.code == wing_code, Wing.is_archived == False).first()  # noqa: E712
         if wing:
-            print(f"[second_wing_seed] Wing {wing_code!r} already exists — skipping create.",
-                  file=sys.stderr)
-            report["wing"]["status"] = "existing"
+            if not wing.timezone:
+                resolved_timezone = timezone_for_new_wing(
+                    db, nat.id, os.environ.get("WING2_TIMEZONE") or None
+                )
+                if dry_run:
+                    report["wing"]["status"] = "would_update_timezone"
+                    report["wing"]["timezone"] = resolved_timezone
+                    print(
+                        f"[second_wing_seed] Wing {wing_code!r} exists with no timezone — "
+                        f"would set {resolved_timezone!r}.",
+                        file=sys.stderr,
+                    )
+                else:
+                    wing.timezone = resolved_timezone
+                    report["wing"]["status"] = "updated_timezone"
+                    report["wing"]["timezone"] = resolved_timezone
+                    audit(
+                        db, None, object_type="wing", object_id=wing.id,
+                        action="staging_onboarding_timezone_repair",
+                        new={"code": wing_code, "timezone": resolved_timezone,
+                             "source": "second_wing_seed"},
+                        commit=False,
+                    )
+                    print(
+                        f"[second_wing_seed] Repaired missing timezone for Wing "
+                        f"{wing_code!r}: {resolved_timezone}",
+                        file=sys.stderr,
+                    )
+            else:
+                print(f"[second_wing_seed] Wing {wing_code!r} already exists — skipping create.",
+                      file=sys.stderr)
+                report["wing"]["status"] = "existing"
+                report["wing"]["timezone"] = wing.timezone
         else:
             report["wing"]["status"] = "would_create" if dry_run else "created"
             if not dry_run:
