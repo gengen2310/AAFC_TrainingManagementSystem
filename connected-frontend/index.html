@@ -6539,7 +6539,8 @@ async function scLoadOverview(){
       <dt>Users (total)</dt><dd>${d.users_total}</dd>
       <dt>Users (active)</dt><dd>${d.users_active}</dd>
       <dt>Maintenance mode</dt><dd>${d.maintenance_mode?'<span class="sc-status-warn">ENABLED</span>':'<span class="sc-status-ok">Off</span>'}</dd>
-      <dt>Last backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No backup recorded</span>'}</dd>
+      <dt>Last manual app backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No manual app backup recorded</span>'}</dd>
+      <dt>Backup source</dt><dd>${d.last_backup_source?esc(d.last_backup_source):'<span class="muted">Scheduled GitHub backups are tracked separately</span>'}</dd>
     </dl>`;
   } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Could not load System Overview: ${esc(apiErr(e))}</div>`; }
 }
