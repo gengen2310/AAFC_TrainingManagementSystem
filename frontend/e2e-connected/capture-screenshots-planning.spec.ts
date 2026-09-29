@@ -1,4 +1,4 @@
-import { test, Page } from "@playwright/test";
+import { test, Page } from "../e2e-fixtures";
 import { resolve } from "node:path";
 
 // Formal staging screenshot evidence for the Planning Workspace preview

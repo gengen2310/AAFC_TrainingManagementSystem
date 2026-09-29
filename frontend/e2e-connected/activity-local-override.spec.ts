@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-103: a squadron admin can locally adjust the date/time/notes of an

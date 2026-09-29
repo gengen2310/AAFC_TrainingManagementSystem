@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear } from "./year-context-helper";
 
@@ -140,7 +140,7 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   _createdClassIds.push(classId);
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
-  const testDate = new Date(fixtureYear, 5, 1 + (Date.now() % 28)).toISOString().slice(0, 10);
+  const testDate = await firstFreeParadeDate(page.request, base, auth, `${fixtureYear}-06-01`, `${fixtureYear}-06-30`);
   const marker = `E2E-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },

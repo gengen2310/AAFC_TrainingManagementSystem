@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // CLASS-06 pt.3: Planning Workspace's Year view (the default landing view,

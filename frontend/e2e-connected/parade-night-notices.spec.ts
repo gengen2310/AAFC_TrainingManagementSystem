@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-34: connected-frontend had zero Notices UI despite full PlanningNotice
@@ -90,7 +90,7 @@ test("sqn_general (read-only) sees notices but no Add/Remove controls", async ({
   const adminLogin = await page.request.post(`${base}/api/auth/login`, { data: { code: "ADMIN703" } });
   const adminToken = (await adminLogin.json()).token as string;
   const adminHdr = { Authorization: `Bearer ${adminToken}` };
-  const date = `2099-07-${String(1 + (Date.now() % 27)).padStart(2, "0")}`;
+  const date = await firstFreeParadeDate(page.request, base, adminHdr, "2099-07-01", "2099-07-31");
   await page.request.post(`${base}/api/parade-nights`, { data: { date }, headers: adminHdr });
 
   await page.evaluate(() => (window as any).reloadAndRender?.());

@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-13 Phase A: previously national_admin/system_admin could only view

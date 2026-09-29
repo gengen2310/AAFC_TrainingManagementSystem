@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // ── Connected-frontend (Main TMS) verification ──────────────────────────────
@@ -141,10 +141,9 @@ test.describe("Parade Night detail — bulk actions", () => {
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
     const apiBase = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
-    // Staging is a persistent environment (never reseeded between runs, unlike
-    // local) -- a fixed date collides with any earlier run's leftover record
-    // (duplicate_date 409). Derive a unique far-future date per run instead.
-    const testDate = new Date(2099, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+    // Staging is persistent and other specs share 2099: take the first date no
+    // non-archived night uses (a clock-derived day collided -> 409 duplicate_date).
+    const testDate = await firstFreeParadeDate(page.request, apiBase, { Authorization: `Bearer ${token}` }, "2099-01-01", "2099-10-31");
     const create = await page.request.post(`${apiBase}/api/parade-nights`, {
       data: { date: testDate, term: "T4", session_count: 1 },
       headers: { Authorization: `Bearer ${token}` },

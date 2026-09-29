@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear } from "./year-context-helper";
 
@@ -142,9 +142,8 @@ test("Weekly Program shows a session's real Training Class assignment in the cur
   const classId = (await classRes.json()).training_class_id as string;
   _createdClassIds.push(classId);
 
-  // Keep the generated date inside the selected planning year; JavaScript date
-  // overflow would otherwise move late offsets into the following year.
-  const testDate = new Date(fixtureYear, 5, 1 + (Date.now() % 28)).toISOString().slice(0, 10);
+  // A free date inside the selected planning year (shared years -> 409 duplicate_date).
+  const testDate = await firstFreeParadeDate(page.request, base, auth, `${fixtureYear}-06-01`, `${fixtureYear}-06-30`);
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
     headers: auth,

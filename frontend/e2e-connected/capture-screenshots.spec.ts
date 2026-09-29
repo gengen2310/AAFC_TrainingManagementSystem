@@ -1,4 +1,4 @@
-import { test, Page } from "@playwright/test";
+import { test, Page } from "../e2e-fixtures";
 import { resolve } from "node:path";
 
 // One-off evidence capture against live staging — not part of the regular verification

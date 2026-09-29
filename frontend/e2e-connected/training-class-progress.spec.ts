@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear, refreshConnectedPlanningYear } from "./year-context-helper";
 
