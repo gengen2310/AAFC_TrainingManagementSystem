@@ -351,6 +351,7 @@ def second_wing_seed() -> None:
                 wing_id=spec["wing_id"],
                 squadron_id=spec["squadron_id"],
                 active_status=True,
+                must_change_code=True,
             )
             db.add(u)
             db.flush()
