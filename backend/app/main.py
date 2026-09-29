@@ -70,7 +70,16 @@ def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
         _maint_cache["pending_until"] = pending_until_iso
         _maint_cache["expires"] = now + 10.0
     except Exception:
-        return False, "", False, False, "normal", None
+        # Pool exhaustion / DB blip: keep the last known state and back off
+        # briefly. Retrying on every request (the old behaviour) re-waited
+        # DB_POOL_TIMEOUT each time, and returning "not active" failed open
+        # during a real maintenance window.
+        _maint_cache["expires"] = now + 2.0
+        active = _maint_cache["active"]
+        pending_until_iso = _maint_cache["pending_until"]
+        return (active, _maint_cache["msg"], _maint_cache["block_reads"],
+                _maint_cache["block_logins"], _compute_phase(active, pending_until_iso),
+                pending_until_iso)
     phase = _compute_phase(active, pending_until_iso)
     return active, msg, block_reads, block_logins, phase, pending_until_iso
 
@@ -229,7 +238,10 @@ async def maintenance_gate(request: Request, call_next):
     system_admin bypasses all maintenance gates.
     Always-exempt: health, maintenance management, logout, me, refresh.
     """
-    active, msg, block_reads, block_logins, phase, _pending_until = _maintenance_active()
+    # Off the event loop: the check may open a DB session, and a pool wait on
+    # the loop stalls every request and gunicorn's heartbeat (WORKER TIMEOUT).
+    from starlette.concurrency import run_in_threadpool
+    active, msg, block_reads, block_logins, phase, _pending_until = await run_in_threadpool(_maintenance_active)
     if not active or phase == "pending":
         return await call_next(request)
 
