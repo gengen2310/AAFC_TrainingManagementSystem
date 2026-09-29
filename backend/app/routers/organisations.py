@@ -11,7 +11,7 @@ from ..models import (
 )
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
-from ..permissions import (Principal, require_role, require_can_view_squadron, require_can_write_squadron,\n                           require_system_or_nat_admin, require_audit_access)
+from ..permissions import (\n    Principal, require_role, require_can_view_squadron, require_can_write_squadron,\n    require_system_or_nat_admin, require_audit_access,\n)
 from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
