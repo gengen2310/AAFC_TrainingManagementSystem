@@ -2218,7 +2218,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print" style="gap:6px">
             <div class="seg-tabs" role="tablist" aria-label="Cadet management views">
               <button type="button" class="tab-btn active" id="cadets-tab-roster" role="tab" aria-selected="true" onclick="showCadetSubview('roster',this)">Cadets</button>
-              <button type="button" class="tab-btn" id="cadets-tab-cea" role="tab" aria-selected="false" onclick="showCadetSubview('cea',this)">CEA Import</button>
+              <button type="button" class="tab-btn plan-write-el" id="cadets-tab-cea" role="tab" aria-selected="false" style="display:none" onclick="showCadetSubview('cea',this)">CEA Import</button>
             </div>
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
@@ -5272,6 +5272,44 @@ function showAuthStep1(){
   onAuthFieldChange();
 }
 
+async function completeRequiredCodeChange(session){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  const next=await promptText(
+    'Change temporary access code',
+    'New access code',
+    {
+      context:'This is an initial or administrator-issued code. Choose your own access code before continuing.',
+      okLabel:'Change access code',
+      validate:(v)=>v.length<6?'Use at least 6 characters.':null,
+    }
+  );
+  if(!next){
+    await doLogout();
+    return false;
+  }
+  try{
+    await api('/api/auth/change-code',{
+      method:'POST',
+      body:{user_id:session.user_id,new_code:next},
+    });
+    tokenClear();
+    document.getElementById('app').style.display='none';
+    document.getElementById('auth-screen').style.display='flex';
+    _authPanels('auth-step2');
+    document.getElementById('auth-code').value='';
+    const err=document.getElementById('auth-err');
+    err.style.display='block';
+    err.textContent='Access code changed. Sign in again with your new code.';
+    document.getElementById('auth-code').focus();
+    return false;
+  }catch(e){
+    showToast(apiErr(e),true);
+    await doLogout();
+    return false;
+  }
+}
+
 async function doLogin(){
   const code=document.getElementById('auth-code').value.trim();
   const err=document.getElementById('auth-err');
@@ -5299,6 +5337,10 @@ async function doLogin(){
     tokenSet(out.token);
     S.session=out.session;
     applySession(out.session);
+    if(out.session&&out.session.must_change_code){
+      await completeRequiredCodeChange(out.session);
+      return;
+    }
     await loadData();
     bootApp();
   }catch(e){
@@ -5344,6 +5386,10 @@ async function tryRestoreSession(){
     const out=await api('/api/auth/me');
     S.session=out.session;
     applySession(out.session);
+    if(out.session&&out.session.must_change_code){
+      await completeRequiredCodeChange(out.session);
+      return;
+    }
     await loadData();
     bootApp();
   }catch(e){
@@ -6016,8 +6062,8 @@ function applyNavScope(){
     let show=target&&allowed.has(target);
     // sqn_general sees Unit Settings read-only (2026-09-28 product decision).
     if(target==='settings')show=show&&['sqn_admin','sqn_general'].includes(S.role);
-    // AUD-2: the backend denies wing_viewer and sqn_general the audit log
-    // (403). Do not offer a nav entry to a page the role cannot read.
+    // Audit visibility follows the centralized backend policy; wing_viewer
+    // remains excluded while squadron roles are scoped to their own audit rows.
     if(target==='audit')show=show&&!['wing_viewer'].includes(S.role);
     if(target==='accounts')show=show&&['sqn_admin','sqn_general','wing_admin','wing_viewer','national_admin','national_viewer','system_admin','auditor'].includes(S.role);
     // system_admin's System Console must stay reachable regardless of which
@@ -12780,21 +12826,14 @@ function _ynRenderYearList(el, years, opts){
     el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
     return;
   }
-  // Logical years have no row, so archive/restore/export have nothing to act
-  // on. They belong in the year bar, not in this administrative list.
-  years = years.filter(function(y){ return y.planning_year_id; });
-  if(!years.length){
-    el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
-    return;
-  }
   const curId = (typeof P!=='undefined') ? P.currentYearId : null;
-  // Archived years are kept out of the way. A unit accumulates one year per
-  // year, and this list is otherwise unbounded -- the dev database holds 118,
-  // which would make the card taller than the rest of Unit Setup combined.
+  const logical = years.filter(function(y){ return !y.planning_year_id; });
+  const materialised = years.filter(function(y){ return !!y.planning_year_id; });
   const showArch = !!opts.showArchived;
-  const active = years.filter(function(y){return y.active_status;});
-  const archived = years.filter(function(y){return !y.active_status;});
-  const visible = showArch ? years : active;
+  const active = materialised.filter(function(y){return y.active_status;});
+  const archived = materialised.filter(function(y){return !y.active_status;});
+  const visible = logical.concat(showArch ? materialised : active)
+    .sort((a,b)=> b.year - a.year);
   const archNote = archived.length
     ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
       + 'onclick="ynToggleArchived(this)" aria-expanded="'+(showArch?'true':'false')+'">'
@@ -12808,26 +12847,33 @@ function _ynRenderYearList(el, years, opts){
   }
   el.innerHTML = '<div class="yn-year-list">' + visible.map(function(y){
     const id = y.planning_year_id;
-    const isCur = id === curId;
-    const active = !!y.active_status;
-    const cls = 'yn-year-row' + (isCur?' is-current':'') + (active?'':' is-arch');
-    // The name is only worth a line of its own when it says something the year
-    // number does not.
+    const isLogical = !id;
+    const isCur = isLogical
+      ? Number(y.year) === Number((typeof P!=='undefined') ? P.currentYearInt : null)
+      : id === curId;
+    const activeRow = isLogical ? true : !!y.active_status;
+    const cls = 'yn-year-row' + (isCur?' is-current':'') + (activeRow?'':' is-arch');
     const nameLine = (y.name && String(y.name) !== String(y.year))
       ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
     const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
-    const stateLabel = y.state==='current'?'Current':y.state==='past'?'Record':'Upcoming';
-    const meta = [ stateLabel, created?('Created '+created):'' ]
-      .filter(Boolean).join(' \u00b7 ');
+    const stateLabel = isLogical ? 'Not set up'
+      : y.state==='current'?'Current':y.state==='past'?'Record':'Upcoming';
+    const meta = [stateLabel, created?('Created '+created):''].filter(Boolean).join(' \u00b7 ');
     let acts = '';
-    acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
-    const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
-    if(canRemediate){
-      acts += active
-        ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
-        : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
-      if(!active){
-        acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+    if(isLogical){
+      if(canWrite){
+        acts += '<button class="btn btn-xs btn-dk" onclick="ynSetUpYear('+(+y.year)+')">Set up '+esc(String(y.year))+'</button>';
+      }
+    }else{
+      acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
+      const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
+      if(canRemediate){
+        acts += activeRow
+          ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
+          : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+        if(!activeRow){
+          acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+        }
       }
     }
     return '<div class="'+cls+'">'
@@ -15969,34 +16015,35 @@ async function exitMode(){
 //  MODALS
 // ═══════════════════════════════════════════════════════════
 let _modalReturnFocus=null;
+const _modalReturnFocusById=new Map();
 function openModal(id){
-  _modalReturnFocus=document.activeElement;
   const bg=document.getElementById(id);
+  if(!bg)return;
+  const returnTarget=document.activeElement;
+  _modalReturnFocus=returnTarget;
+  _modalReturnFocusById.set(id,returnTarget);
   bg.classList.add('active');
-  // Move focus to first focusable element inside the modal for keyboard/AT users
   const first=bg.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled)')||bg.querySelector('button:not(:disabled),[tabindex]:not([tabindex="-1"]),[href]');
   if(first)setTimeout(()=>first.focus(),200);
 }
 function closeModal(id){
-  document.getElementById(id).classList.remove('active');
-  // Defer focus restoration via setTimeout(0) to prevent WebKit from firing
-  // a spurious 'change' event on the previously-focused element (e.g. #or-reason)
-  // before the current call stack unwinds, which would re-open a promptText() modal.
-  if(_modalReturnFocus&&_modalReturnFocus.focus){
-    const el=_modalReturnFocus; _modalReturnFocus=null;
-    // Skip focus restoration if the target is still inside an active modal — e.g.
-    // #act-override-clear-btn inside still-active #m-act-override when
-    // closeModal('m-confirm') fires. Firefox/WebKit trigger a spurious synthetic
-    // click on a re-focused button inside a visible modal, which re-invokes the
-    // caller (clearActivityLocalOverride) and loops without ever closing the parent.
-    const parentBg=el.closest&&el.closest('.modal-bg');
-    if(!parentBg||!parentBg.classList.contains('active')){
-      setTimeout(()=>{try{el.focus();}catch(_){}},0);
-    }
-  }else{
-    _modalReturnFocus=null;
+  const bg=document.getElementById(id);
+  if(!bg)return;
+  bg.classList.remove('active');
+  const el=_modalReturnFocusById.get(id)||_modalReturnFocus;
+  _modalReturnFocusById.delete(id);
+  _modalReturnFocus=null;
+  if(!el||!el.focus)return;
+  const parentBg=el.closest&&el.closest('.modal-bg');
+  if(parentBg&&parentBg.classList.contains('active')){
+    const parentDialog=parentBg.querySelector('.modal')||parentBg;
+    if(!parentDialog.hasAttribute('tabindex'))parentDialog.setAttribute('tabindex','-1');
+    setTimeout(()=>{try{parentDialog.focus();}catch(_){}},0);
+    return;
   }
+  setTimeout(()=>{try{el.focus();}catch(_){}},0);
 }
+
 // REM-106: confirmAction() replaces native confirm() for critical SA/org-
 // management operations (archive Wing/Squadron, maintenance mode, account
 // disable/reactivate/delete/restore/unlock) -- native confirm() blocks the
@@ -16064,7 +16111,7 @@ document.addEventListener('keydown',function(e){
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){
   if(e.target!==this)return;
   if(this.id==='m-fac-dup'){_facDupCancel();return;}
-  this.classList.remove('active');
+  closeModal(this.id);
 });});
 // m-add-pn: modal backdrop handled by the shared .modal-bg click handler above
 window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
@@ -19042,6 +19089,7 @@ async function sdSubmit(event) {
     body.squadron_id = _sdUnitSelected.unit_id;
     body.unit_name = _sdUnitSelected.name;
   } else {
+    body.wing_id = _sdUnitSelected.unit_id;
     body.unit_name = _sdUnitSelected.name;
   }
 
@@ -19054,7 +19102,7 @@ async function sdSubmit(event) {
 
     if (r.status === 201) {
       sdCloseModal();
-      showToast('Ticket submitted — your Wing and a system administrator will follow up.');
+      showToast('Ticket submitted.');
       return;
     }
 
@@ -19080,6 +19128,7 @@ let _sdActiveCategoryFilter = '';
 let _sdActiveUnitFilter = '';
 let _sdEditStatus = null;
 let _sdSelectedTicketId = null;
+let _sdAssignableAccounts = [];
 
 /* The API returns naive UTC timestamps with no zone marker (2026-08-22T22:55:19).
    Date() reads those as LOCAL time, which is eight hours out in Perth and puts
@@ -19140,8 +19189,16 @@ async function loadServiceDesk() {
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:var(--fs-sm)">Loading…</td></tr>';
 
   try {
-    const r = await api('/api/service-desk/tickets');
+    const canAssign = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
+    const [r, accounts] = await Promise.all([
+      api('/api/service-desk/tickets'),
+      canAssign ? api('/api/accounts') : Promise.resolve([]),
+    ]);
     _sdAllTickets = r;
+    _sdAssignableAccounts = (accounts||[]).filter(a =>
+      a.active_status && !a.is_archived &&
+      ['system_admin','national_admin','wing_admin'].includes(a.role)
+    );
     sdRenderList();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:var(--fs-sm)">${esc(apiErr(e))}</td></tr>`;
@@ -19300,7 +19357,17 @@ function sdOpenDetail(ticketId) {
     : `<div style="font-size:var(--fs-sm);color:var(--text)">${t.admin_notes ? esc(t.admin_notes) : '<span style="color:var(--muted)">No notes yet</span>'}</div>`;
 
   const assigneeHtml = canEdit
-    ? `<input id="sd-assignee-input" type="text" aria-label="Assigned to" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:32px" placeholder="e.g. SQNLDR Reid" value="${esc(t.assigned_to_name || '')}">`
+    ? (() => {
+        const legacy = t.assigned_to_name && !t.assigned_to_user_id
+          ? `<option value="__legacy__" selected>${esc(t.assigned_to_name)} (legacy assignment)</option>`
+          : '';
+        const options = _sdAssignableAccounts.map(a =>
+          `<option value="${esc(a.user_id)}" ${a.user_id===t.assigned_to_user_id?'selected':''}>${esc(a.display_name)} — ${esc(a.role.replaceAll('_',' '))}</option>`
+        ).join('');
+        return `<select id="sd-assignee-input" aria-label="Assigned to" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:32px">
+          <option value="">Unassigned</option>${legacy}${options}
+        </select>`;
+      })()
     : `<div style="font-size:var(--fs-sm)">${t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">Unassigned</span>'}</div>`;
 
   const statusHtml = canEdit
@@ -19373,8 +19440,10 @@ async function sdSave(ticketId) {
   const body = {
     status: _sdEditStatus,
     admin_notes: notesInput ? notesInput.value : undefined,
-    assigned_to_name: assigneeInput ? assigneeInput.value.trim() : undefined,
   };
+  if(assigneeInput && assigneeInput.value !== '__legacy__'){
+    body.assigned_to_user_id = assigneeInput.value;
+  }
 
   try {
     await api(`/api/service-desk/tickets/${ticketId}`, {method:'PATCH', body});
@@ -19382,7 +19451,11 @@ async function sdSave(ticketId) {
     if (t) {
       if (body.status) t.status = body.status;
       if (body.admin_notes !== undefined) t.admin_notes = body.admin_notes;
-      if (body.assigned_to_name !== undefined) t.assigned_to_name = body.assigned_to_name;
+      if (body.assigned_to_user_id !== undefined) {
+        t.assigned_to_user_id = body.assigned_to_user_id || null;
+        const assignee = _sdAssignableAccounts.find(a => a.user_id === body.assigned_to_user_id);
+        t.assigned_to_name = assignee ? assignee.display_name : null;
+      }
       if (body.status === 'resolved') t.resolved_at = new Date().toISOString();
       else if (body.status) t.resolved_at = null;
     }
@@ -19755,6 +19828,10 @@ async function showCadetTrainingRecord(cadetId){
 let _ceaBatchId=null;
 
 function showCadetSubview(view, button){
+  if(view==='cea'&&!canWritePlan()){
+    view='roster';
+    button=document.getElementById('cadets-tab-roster');
+  }
   const roster=document.getElementById('cadets-roster-wrap');
   const cea=document.getElementById('cadets-cea-wrap');
   const source=document.getElementById('page-cea-import');
