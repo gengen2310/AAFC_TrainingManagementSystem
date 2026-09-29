@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // CLASS-05: Mission Backlog's new per-Training-Class "Classes" column
@@ -33,6 +33,33 @@ test.beforeAll(async () => {
 
 const ADMIN_CODE = "ADMIN703";
 
+// Exact IDs this test created. Cleanup lives in afterEach, not a finally block
+// in the test body: afterEach still runs (with its own budget) after a body
+// timeout, whereas a finally block inherits the exhausted test budget and its
+// requests are never sent -- which previously leaked an active 2600+ year that
+// REM-129 auto-linking then preferred over the seeded year.
+type Owned = { hdr?: Record<string, string>; classId?: string; stageId?: string; yearId?: string };
+let owned: Owned = {};
+
+test.afterEach(async ({ request }) => {
+  const { hdr, classId, stageId, yearId } = owned;
+  owned = {};
+  if (!hdr) return;
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
+  if (classId) ok(await request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr }), "training class");
+  if (stageId) ok(await request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr }), "stage archive");
+  if (yearId) {
+    const cur = await request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
+    ok(cur, "year lookup");
+    if (cur.ok()) {
+      ok(await request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
+        data: { active_status: false, version: (await cur.json()).version }, headers: hdr,
+      }), "year deactivate");
+    }
+  }
+});
+
 async function authHeader(page: Page, code: string): Promise<Record<string, string>> {
   const r = await page.request.post(`${API_BASE}/api/auth/login`, { data: { code } });
   const token = (await r.json()).token as string;
@@ -41,6 +68,7 @@ async function authHeader(page: Page, code: string): Promise<Record<string, stri
 
 test("Mission Backlog shows a per-Training-Class chip for a session's real audience assignment", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
+  owned.hdr = hdr;
   const suffix = String(Date.now());
 
   const meRes = await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr });
@@ -65,6 +93,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   expect(yearRes.ok()).toBe(true);
   const year = await yearRes.json();
   const yearId = year.planning_year_id as string;
+  owned.yearId = yearId;
 
   const stageName = `CLASS-05-PW-${suffix}`;
   const stageRes = await page.request.post(`${API_BASE}/api/curriculum/phases`, {
@@ -73,6 +102,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   });
   expect(stageRes.ok()).toBe(true);
   const stageId = (await stageRes.json()).phase_id as string;
+  owned.stageId = stageId;
 
   const className = `PW Chip Class ${suffix}`;
   const classRes = await page.request.post(`${API_BASE}/api/training-classes`, {
@@ -81,6 +111,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   });
   expect(classRes.ok()).toBe(true);
   const classId = (await classRes.json()).training_class_id as string;
+  owned.classId = classId;
 
   const code = `PW05${suffix.slice(-6)}`;
   const ciRes = await page.request.post(`${API_BASE}/api/curriculum`, {
@@ -127,49 +158,35 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   });
   expect(audRes.ok()).toBe(true);
 
-  // try/finally so a failed assertion below still deactivates this year --
-  // an active leftover year (from an earlier failed run) is what caused the
-  // REM-129 tie-break bug documented above, so cleanup must run even on
-  // failure, not only on the happy path.
-  try {
-    // ── Real UI verification ────────────────────────────────────────────
-    // authHeader()'s page.request.post(...) call above already set the
-    // aafc_session fallback cookie in this page's own browser context
-    // (page.request shares the context's cookie jar with page) -- a plain
-    // goto("/") auto-resumes that session via the cookie fallback and never
-    // renders the login form at all (architecture.md's documented
-    // sessionStorage-primary/cookie-fallback handoff), so there is no login
-    // form left to fill in here. Go straight to the authenticated page.
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  // ── Real UI verification ────────────────────────────────────────────
+  // authHeader()'s page.request.post(...) call above already set the
+  // aafc_session fallback cookie in this page's own browser context
+  // (page.request shares the context's cookie jar with page) -- a plain
+  // goto("/") auto-resumes that session via the cookie fallback and never
+  // renders the login form at all (architecture.md's documented
+  // sessionStorage-primary/cookie-fallback handoff), so there is no login
+  // form left to fill in here. Go straight to the authenticated page.
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole("button", { name: yearName }).click();
+  await page.getByRole("button", { name: yearName }).click();
 
-    await page.getByText("Planning Tools ▲").click();
-    await page.getByRole("button", { name: "Mission Backlog" }).click();
-    await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
+  await page.getByText("Planning Tools ▲").click();
+  // The drawer tab formerly labelled "Mission Backlog" is "Needs Attention"
+  // since the Mission Backlog → Needs Attention consolidation (key "backlog").
+  await page.getByRole("button", { name: "Needs Attention", exact: true }).click();
+  await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
 
-    // Default status filter is "Unscheduled" -- this item is delivered, so
-    // switch to "All statuses" to see it.
-    await page.locator("select").first().selectOption("");
-    await page.getByPlaceholder("Search code or title…").fill(code);
+  // Default status filter is "Unscheduled" -- this item is delivered, so
+  // switch to "All statuses" to see it.
+  await page.locator("select").first().selectOption("");
+  await page.getByPlaceholder("Search code or title…").fill(code);
 
-    // Use td:first-child to match only the curriculum-item row (code in first cell),
-    // not the class-group header rows that also contain the code as substring text.
-    const row = page.locator("table tr").filter({ has: page.locator("td:first-child", { hasText: code }) });
-    await expect(row).toBeVisible({ timeout: 8000 });
-    const chip = row.getByText(className, { exact: true });
-    await expect(chip).toBeVisible({ timeout: 8000 });
-    await expect(chip).toHaveAttribute("title", new RegExp(`${className}: Scheduled`));
-  } finally {
-    // Clean up -- archive the class + phase and deactivate the year so nothing
-    // here lingers as an active high-`year` PlanningYear for a future test run.
-    await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
-    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
-    const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
-    const curYear = await curYearRes.json();
-    await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
-      data: { active_status: false, version: curYear.version }, headers: hdr,
-    });
-  }
+  // Use td:first-child to match only the curriculum-item row (code in first cell),
+  // not the class-group header rows that also contain the code as substring text.
+  const row = page.locator("table tr").filter({ has: page.locator("td:first-child", { hasText: code }) });
+  await expect(row).toBeVisible({ timeout: 8000 });
+  const chip = row.getByText(className, { exact: true });
+  await expect(chip).toBeVisible({ timeout: 8000 });
+  await expect(chip).toHaveAttribute("title", new RegExp(`${className}: Scheduled`));
 });

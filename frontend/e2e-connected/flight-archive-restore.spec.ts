@@ -1,16 +1,12 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
-// Product contract: local Squadron Flights / sub-squadron groupings were
-// retired from the Main TMS UI. This regression test replaces the obsolete
-// REM-108 archive/restore workflow, which attempted to call the shared
-// Reference Data manager with an unsupported "flight" dataset and therefore
-// exercised hidden legacy markup rather than a reachable user workflow.
-
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
+const BACKEND_BASE =
+  process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
 
 test.beforeAll(async () => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  await resetBackendRateLimits(BACKEND_BASE);
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -30,25 +26,61 @@ async function loginSquadron(page: Page, code: string) {
   await expect(page.locator("#app")).toBeVisible({ timeout: 10000 });
 }
 
-test("retired local Squadron Flights are not exposed in Account Management configuration", async ({ page }) => {
+test("Squadron admins can restore archived Flights from Account Management", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
-  await page.evaluate(() => (window as any).nav("accounts"));
-  await page.getByRole("tab", { name: "Configuration" }).click();
+  const token = await page.evaluate(
+    () => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"),
+  );
+  const auth = { Authorization: `Bearer ${token}` };
+  const meResponse = await page.request.get(`${BACKEND_BASE}/api/auth/me`, { headers: auth });
+  expect(meResponse.ok()).toBe(true);
+  const me = await meResponse.json();
+  const flightName = `Restore workflow ${Date.now()}`;
+  let flightId: string | null = null;
 
-  const configuration = page.getByRole("tabpanel", { name: "Configuration" });
-  await expect(configuration).toBeVisible({ timeout: 5000 });
+  try {
+    const createResponse = await page.request.post(`${BACKEND_BASE}/api/flights`, {
+      data: { name: flightName, squadron_id: me.session.squadron_id },
+      headers: auth,
+    });
+    expect(createResponse.ok()).toBe(true);
+    flightId = (await createResponse.json()).flight_id;
 
-  // Current configuration contract is the six governed datasets. Flights are
-  // intentionally not one of them and must not be resurrected by stale UI.
-  await expect(configuration.getByRole("button", { name: /Manage Training Stages/i })).toBeVisible();
-  await expect(configuration.getByRole("button", { name: /Manage Subject Areas/i })).toBeVisible();
-  await expect(configuration.getByRole("button", { name: /Manage Session Status Reasons/i })).toBeVisible();
-  await expect(configuration.getByRole("button", { name: /Manage Activity Types/i })).toBeVisible();
-  await expect(configuration.getByRole("button", { name: /Manage Facilitator Types/i })).toBeVisible();
-  await expect(configuration.getByRole("button", { name: /Manage Training Area Capabilities/i })).toBeVisible();
+    const archiveResponse = await page.request.post(
+      `${BACKEND_BASE}/api/flights/${flightId}/archive`,
+      { headers: auth },
+    );
+    expect(archiveResponse.ok()).toBe(true);
 
-  await expect(configuration.getByText(/Local Squadron Flights/i)).toHaveCount(0);
-  await expect(configuration.getByText(/sub-squadron groupings/i)).toHaveCount(0);
-  await expect(configuration.getByRole("button", { name: /Manage Flights/i })).toHaveCount(0);
-  await expect(configuration.getByText(/Organise Cadets into Flights/i)).toHaveCount(0);
+    await page.evaluate(() => (window as any).nav("accounts"));
+    const flightsCard = page.locator("#acct-flights-card");
+    await expect(flightsCard).toBeVisible();
+    await page.locator("#flights-show-archived").check();
+    const archivedRow = page.locator("#flight-table tbody tr").filter({ hasText: flightName });
+    await expect(archivedRow).toBeVisible();
+    await archivedRow.getByRole("button", { name: "Restore" }).click();
+    await expect(archivedRow).toHaveCount(0);
+
+    await page.locator("#flights-show-archived").uncheck();
+    await expect(
+      page.locator("#flight-table tbody tr").filter({ hasText: flightName }),
+    ).toBeVisible();
+  } finally {
+    if (flightId) {
+      const flightsResponse = await page.request.get(
+        `${BACKEND_BASE}/api/flights?include_archived=true&squadron_id=${encodeURIComponent(me.session.squadron_id)}`,
+        { headers: auth },
+      );
+      expect(flightsResponse.ok()).toBe(true);
+      const flights = await flightsResponse.json();
+      const flight = flights.find((row: { flight_id: string }) => row.flight_id === flightId);
+      if (flight && !flight.is_archived) {
+        const cleanupResponse = await page.request.post(
+          `${BACKEND_BASE}/api/flights/${flightId}/archive`,
+          { headers: auth },
+        );
+        expect(cleanupResponse.ok()).toBe(true);
+      }
+    }
+  }
 });

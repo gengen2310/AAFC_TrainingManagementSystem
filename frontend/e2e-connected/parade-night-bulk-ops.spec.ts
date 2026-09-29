@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // WORK-11: Copy parade night sessions
@@ -66,8 +66,8 @@ test("WORK-11: copy session modal opens from parade night card", async ({ page }
   const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   // Create two parade nights to copy between
-  const srcDate = `2099-10-${String(1 + (Date.now() % 25)).padStart(2, "0")}`;
-  const tgtDate = `2099-11-${String(1 + (Date.now() % 25)).padStart(2, "0")}`;
+  const srcDate = await firstFreeParadeDate(page.request, BASE, hdr, "2099-10-01", "2099-10-31");
+  const tgtDate = await firstFreeParadeDate(page.request, BASE, hdr, "2099-11-01", "2099-11-30");
   const srcR1 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: srcDate }, headers: hdr });
   const tgtR1 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: tgtDate }, headers: hdr });
   if (srcR1.ok()) _createdPnIds.push((await srcR1.json()).parade_night_id);
@@ -92,8 +92,8 @@ test("WORK-11: copy sessions API endpoint returns ok:true", async ({ page }) => 
   const token = await getAdminToken(page);
   const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const src = `2099-09-${String(2 + (Date.now() % 25)).padStart(2, "0")}`;
-  const tgt = `2099-09-${String(3 + (Date.now() % 25)).padStart(2, "0")}`;
+  const src = await firstFreeParadeDate(page.request, BASE, hdr, "2099-09-01", "2099-09-30");
+  const tgt = await firstFreeParadeDate(page.request, BASE, hdr, "2099-09-01", "2099-09-30", [src]);
   const srcR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: src }, headers: hdr });
   const tgtR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: tgt }, headers: hdr });
   const srcId = (await srcR.json()).parade_night_id;
@@ -122,7 +122,7 @@ test("WORK-12: cancel all button is present in parade night detail", async ({ pa
   const token = await getAdminToken(page);
   const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  const date = `2099-08-${String(4 + (Date.now() % 23)).padStart(2, "0")}`;
+  const date = await firstFreeParadeDate(page.request, BASE, hdr, "2099-08-01", "2099-08-31");
   const pnR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date }, headers: hdr });
   const pnId = (await pnR.json()).parade_night_id;
   _createdPnIds.push(pnId);
@@ -150,7 +150,7 @@ test("WORK-12: cancel-all API returns sessions_updated count", async ({ page }) 
 
   // Use July (month 07) so this test's date range (2099-07-05..27) cannot
   // collide with the WORK-12 button test above which uses August (2099-08-04..26).
-  const date = `2099-07-${String(5 + (Date.now() % 23)).padStart(2, "0")}`;
+  const date = await firstFreeParadeDate(page.request, BASE, hdr, "2099-07-01", "2099-07-31");
   const pnR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date }, headers: hdr });
   const pnId = (await pnR.json()).parade_night_id;
   _createdPnIds.push(pnId);
@@ -186,7 +186,7 @@ test("WORK-05: 'Timing…' button opens Override Parade Night Timing modal with 
   const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   // Seed a parade night with a known date so we can find its card.
-  const pnDate = `2099-12-${String(1 + (Date.now() % 28)).padStart(2, "0")}`;
+  const pnDate = await firstFreeParadeDate(page.request, BASE, hdr, "2099-12-01", "2099-12-31");
   const pnR5 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: pnDate }, headers: hdr });
   if (pnR5.ok()) _createdPnIds.push((await pnR5.json()).parade_night_id);
 

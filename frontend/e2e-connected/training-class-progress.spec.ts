@@ -1,8 +1,8 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear, refreshConnectedPlanningYear } from "./year-context-helper";
 
-// CLASS-04 dedicated UI: the Training Classes card on the Activities page
+// CLASS-04 dedicated UI: the Training Classes card in Unit Settings
 // gains a "Curriculum Progress" coverage pill per class (via the existing
 // stage-level GET /api/curriculum/phases/{id}/class-progress endpoint) and
 // a "View Progress" button opening a detail modal listing every
@@ -27,41 +27,31 @@ test.afterAll(async ({ request }) => {
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
-  if (!lookup.ok()) return;
+  expect(lookup.ok(), "afterAll cleanup: sqn_admin lookup failed").toBe(true);
   const userId = (await lookup.json()).user_id as string;
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "ADMIN703", user_id: userId },
   });
-  if (!loginRes.ok()) return;
+  expect(loginRes.ok(), "afterAll cleanup: sqn_admin login failed").toBe(true);
   const body = await loginRes.json();
   const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
 
   for (const pnId of _createdPnIds) {
-    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+    ok(await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth }), `parade night ${pnId}`);
   }
   for (const classId of _createdClassIds) {
-    await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth });
+    ok(await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth }), `training class ${classId}`);
   }
   for (const itemId of _createdItemIds) {
-    await request.delete(`${base}/api/curriculum/${itemId}`, { headers: auth });
+    ok(await request.delete(`${base}/api/curriculum/${itemId}`, { headers: auth }), `curriculum item ${itemId}`);
   }
   for (const phaseId of _createdPhaseIds) {
-    await request.post(`${base}/api/curriculum/phases/${phaseId}/archive`, { headers: auth });
+    ok(await request.post(`${base}/api/curriculum/phases/${phaseId}/archive`, { headers: auth }), `phase archive ${phaseId}`);
   }
 });
 
-// A pure Date.now()-derived offset (the pattern used elsewhere in this
-// directory, e.g. session-training-classes.spec.ts) collided in practice
-// here, twice: first because this file's own two tests seed a parade night
-// a couple of seconds apart (fixed below with an in-process counter, which
-// guarantees uniqueness *within* one run), and again because Date.now() % 300
-// only has 300 possible values -- separate manual re-runs of this file a
-// few seconds to minutes apart (as done repeatedly while developing this
-// test) landed on the same value across *different* process invocations,
-// where the in-process counter resets to 0 and can't help. A ~3000-value
-// range (~8 years of distinct dates) makes that second kind of collision
-// negligible without needing cross-run persisted state.
-let _dayCounter = 0;
 
 async function selectFirstYear(page: Page): Promise<string> {
   return selectConnectedPlanningYear(page);
@@ -136,8 +126,18 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
   _createdItemIds.push(item2Id);
   const item2Title = "Not Started Item"; // POST /api/curriculum doesn't echo the title back
 
-  const dayOffset = (_dayCounter++) * 5 + (Date.now() % 3000);
-  const testDate = new Date(2065, 8, 1 + dayOffset).toISOString().slice(0, 10);
+  // First free date in a single fixed year. Parade-night dates are unique only
+  // among non-archived nights, and afterAll archives the nights this file made,
+  // so this is collision-free without the ~8-year random spread -- which
+  // auto-materialised a new active Planning Year on most runs.
+  const takenDates = new Set(
+    ((await (await page.request.get(`${base}/api/parade-nights`, { headers: auth })).json()) as Array<{ date?: string }>)
+      .map((pn) => String(pn.date || "").slice(0, 10)),
+  );
+  const testDate = Array.from({ length: 365 }, (_, i) =>
+    new Date(Date.UTC(2065, 0, 1 + i)).toISOString().slice(0, 10))
+    .find((d) => !takenDates.has(d));
+  expect(testDate, "no free 2065 parade-night date for the fixture").toBeTruthy();
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: sqnId, wing_id: wingId, date: testDate, parade_type: "normal" },
     headers: auth,
@@ -183,6 +183,7 @@ test.describe("Training Class curriculum progress UI (CLASS-04 dedicated UI)", (
 
     // Re-select the year to force a fresh render including the new class.
     await refreshConnectedPlanningYear(page, yearId);
+    await page.evaluate(() => (window as any).nav("settings"));
 
     const row = page.locator("#py-classes-body tr", { hasText: className });
     await expect(row).toBeVisible({ timeout: 8000 });
@@ -246,8 +247,8 @@ test.describe("Training Class curriculum progress UI (CLASS-04 dedicated UI)", (
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
-    await page.evaluate(() => (window as any).nav("activities"));
-    await selectFirstYear(page);
+    await page.evaluate(() => (window as any).nav("settings"));
+    await page.locator("#tc-year-sel").selectOption(yearId);
     const row = page.locator("#py-classes-body tr", { hasText: className });
     await expect(row).toBeVisible({ timeout: 8000 });
     await expect(row.getByRole("button", { name: "View Progress" })).toBeVisible();

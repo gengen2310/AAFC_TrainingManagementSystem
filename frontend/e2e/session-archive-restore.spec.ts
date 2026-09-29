@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-133 (5th instance): TrainingSession delete existed with no restore
@@ -64,7 +64,7 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
   expect(classRes.ok()).toBe(true);
   const classId = (await classRes.json()).training_class_id as string;
 
-  const pnDate = new Date(testYear, 2, 1 + (Date.now() % 27)).toISOString().slice(0, 10);
+  const pnDate = await firstFreeParadeDate(page.request, API_BASE, hdr, `${testYear}-03-01`, `${testYear}-03-31`);
   const pdRes = await page.request.post(`${API_BASE}/api/planning/years/${yearId}/parade-dates`, {
     data: { parade_date: pnDate }, headers: hdr,
   });

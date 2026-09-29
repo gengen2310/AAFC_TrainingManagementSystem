@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
@@ -39,8 +40,10 @@ from ..models.planning import (
 # explicit user authorisation per .claude/rules/capability-preservation.md, not done
 # here.
 from ..models.training import (
-    TimingTemplate, TimingBlock, Activity, ParadeNightTimingSnapshot,
-    SessionCustomPhaseAudience, SessionStatusHistory,
+    TimingTemplate, TimingBlock, Activity, ParadeNightTimingOverride,
+    ParadeNightTimingSnapshot, SessionAssistantFacilitator,
+    SessionCustomPhaseAudience, SessionStatusHistory, CadetClassMembership,
+    CadetSessionOutcome,
 )
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
@@ -77,6 +80,34 @@ _CADET_GROUP_STAGE_CODE: dict[str, str] = {
 }
 # Reverse mapping: stage_code → cadet_group (for denormalising when class IDs are provided)
 _STAGE_CODE_CADET_GROUP: dict[str, str] = {v: k for k, v in _CADET_GROUP_STAGE_CODE.items()}
+
+
+def _cadet_group_for_class(db: DBSession, tc: "TrainingClass | None") -> str | None:
+    """Resolve the cadet_group a TrainingClass denormalises to, for session
+    grid grouping (Weekly Program columns are keyed by cadet_group).
+
+    Classes carrying stage_code (the five auto-created-per-year classes,
+    K-006) resolve directly via _STAGE_CODE_CADET_GROUP. Classes assigned to
+    a governed CurriculumPhase instead -- the standard path when an admin
+    creates a class against the Training Phase catalogue rather than the
+    legacy stage_code field -- previously resolved to None here, so a
+    session created against such a class silently lost its cadet_group and
+    dropped off the Weekly Program grid. Fall back to matching the phase's
+    name against the same five cadet-group keywords (phase names follow the
+    "A. Orientation" / "B. Initial" / … convention; see seed_all.py).
+    """
+    if tc is None:
+        return None
+    if tc.stage_code:
+        return _STAGE_CODE_CADET_GROUP.get(tc.stage_code)
+    if tc.training_stage_id:
+        phase = db.get(CurriculumPhase, tc.training_stage_id)
+        if phase:
+            name = (phase.display_name or phase.name or "").lower()
+            for cg in _STAGE_CODE_CADET_GROUP.values():
+                if cg in name:
+                    return cg
+    return None
 
 
 def _upsert_session_audience(db: DBSession, session_id: str, cadet_group: str,
@@ -919,20 +950,44 @@ def delete_planning_year(
 
     dependents = {
         # Only non-archived parade nights block deletion — archived PNs are
-        # cascade-deleted explicitly below (SessionStatusHistory has no ondelete=CASCADE).
+        # explicitly deleted below after their session children are removed.
         "parade_dates": db.query(ParadeNight).filter(
             ParadeNight.planning_year_id == year_id,
             ParadeNight.is_archived == False,  # noqa: E712
         ).count(),
+        "cadet_class_memberships": db.query(CadetClassMembership).join(
+            TrainingClass, CadetClassMembership.training_class_id == TrainingClass.id
+        ).filter(TrainingClass.training_year_id == year_id).count(),
+        "external_session_audiences": db.query(SessionAudience).join(
+            TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+        ).filter(
+            TrainingClass.training_year_id == year_id,
+            ~SessionAudience.session_id.in_(
+                db.query(TrainingSession.id).join(
+                    ParadeNight, TrainingSession.parade_night_id == ParadeNight.id
+                ).filter(ParadeNight.planning_year_id == year_id)
+            ),
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
+        "parade_night_prep_plans": db.query(AnchorPrepPlan).join(
+            ParadeNight, AnchorPrepPlan.planned_parade_night_id == ParadeNight.id
+        ).filter(ParadeNight.planning_year_id == year_id).count(),
         "notices": db.query(PlanningNotice).join(
             ParadeNight, PlanningNotice.parade_night_id == ParadeNight.id
+        ).filter(ParadeNight.planning_year_id == year_id).count(),
+        "timing_overrides": db.query(ParadeNightTimingOverride).join(
+            ParadeNight, ParadeNightTimingOverride.parade_night_id == ParadeNight.id
         ).filter(ParadeNight.planning_year_id == year_id).count(),
         "cea_activities": db.query(CeaActivity).filter(CeaActivity.planning_year_id == year_id).count(),
         "cea_import_batches": db.query(CeaImportBatch).filter(CeaImportBatch.planning_year_id == year_id).count(),
         "facilitator_leave": db.query(PlanningFacilitatorLeave).filter(PlanningFacilitatorLeave.planning_year_id == year_id).count(),
-        "conflicts": db.query(PlanningConflict).filter(PlanningConflict.planning_year_id == year_id).count(),
+        "conflicts": db.query(PlanningConflict).filter(or_(
+            PlanningConflict.planning_year_id == year_id,
+            PlanningConflict.parade_night_id.in_(
+                db.query(ParadeNight.id).filter(ParadeNight.planning_year_id == year_id)
+            ),
+        )).count(),
     }
     blockers = {k: v for k, v in dependents.items() if v > 0}
     if blockers:
@@ -950,13 +1005,27 @@ def delete_planning_year(
             TrainingSession.parade_night_id == pn.id
         ).all()]
         if session_ids:
-            db.query(SessionStatusHistory).filter(
-                SessionStatusHistory.session_id.in_(session_ids)
-            ).delete(synchronize_session=False)
+            for child_model in (
+                SessionAssistantFacilitator,
+                SessionStatusHistory,
+                SessionAudience,
+                SessionCustomPhaseAudience,
+                CadetSessionOutcome,
+            ):
+                db.query(child_model).filter(
+                    child_model.session_id.in_(session_ids)
+                ).delete(synchronize_session=False)
             db.query(TrainingSession).filter(
                 TrainingSession.parade_night_id == pn.id
             ).delete(synchronize_session=False)
+        db.query(ParadeNightTimingSnapshot).filter(
+            ParadeNightTimingSnapshot.parade_night_id == pn.id
+        ).delete(synchronize_session=False)
         db.delete(pn)
+
+    db.query(TrainingClass).filter(
+        TrainingClass.training_year_id == year_id
+    ).delete(synchronize_session=False)
 
     name, year_num = py.name, py.year
     db.delete(py)
@@ -2121,7 +2190,7 @@ def create_session(
         scoped = _resolve_scoped_classes(db, body.training_class_ids, pn.squadron_id)
         # Derive cadet_group for denormalisation from the first class's stage_code.
         first_tc = scoped[0] if scoped else None
-        resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
+        resolved_cadet_group = _cadet_group_for_class(db, first_tc)
     else:
         if body.cadet_group not in CADET_GROUPS:
             raise HTTPException(422, detail={"error": "invalid_cadet_group"})
@@ -4052,7 +4121,7 @@ def assign_mission(
     if use_class_ids:
         scoped = _resolve_scoped_classes(db, body.training_class_ids, py.unit_id)
         first_tc = scoped[0] if scoped else None
-        resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
+        resolved_cadet_group = _cadet_group_for_class(db, first_tc)
     else:
         if body.cadet_group not in CADET_GROUPS:
             raise HTTPException(422, detail={"error": "invalid_cadet_group"})

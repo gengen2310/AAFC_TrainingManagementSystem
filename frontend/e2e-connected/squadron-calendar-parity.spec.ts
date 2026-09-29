@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-13 (squadron-calendar CEA/holiday-merging parity, remaining phase):
@@ -149,4 +149,54 @@ test("Squadron Calendar's local-only Activities keep appearing (no regression) w
       await page.request.delete(`${base}/api/activities/${created.activity_id}`, { headers: hdr });
     }
   }
+});
+
+test("Training Calendar refreshes Holiday Periods when switching selected years", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  const base = LOCAL_API_BASE || "http://localhost:8000";
+  const hdr = await authedRequest(page);
+  const me = await (await page.request.get(`${base}/api/auth/me`, { headers: hdr })).json();
+  const yearNumber = new Date().getFullYear();
+  const yearsRes = await page.request.get(`${base}/api/planning/years`, { headers: hdr });
+  expect(yearsRes.ok()).toBe(true);
+  const years = await yearsRes.json() as Array<{
+    year: number;
+    planning_year_id?: string | null;
+    unit_id?: string | null;
+  }>;
+  const year = years.find(y =>
+    Number(y.year) === yearNumber && y.unit_id === me.session.squadron_id && y.planning_year_id,
+  );
+  expect(year, `squadron Training Year ${yearNumber} must be available`).toBeTruthy();
+  const yearId = year!.planning_year_id!;
+  const holidaysRes = await page.request.get(`${base}/api/planning/years/${yearId}/holidays`, { headers: hdr });
+  expect(holidaysRes.ok()).toBe(true);
+  const holiday = (await holidaysRes.json())[0] as { name: string; start_date: string; end_date: string } | undefined;
+  expect(holiday, `seeded Training Year ${yearNumber} must include a Holiday Period`).toBeTruthy();
+
+  await page.evaluate(() => (window as any).reloadAndRender?.());
+  await page.evaluate(() => (window as any).nav("calendar"));
+  const holidayPath = `/api/planning/years/${yearId}/holidays`;
+  const requestedHolidayPaths: string[] = [];
+  page.on("request", request => {
+    if (new URL(request.url()).pathname.endsWith(holidayPath)) {
+      requestedHolidayPaths.push(new URL(request.url()).pathname);
+    }
+  });
+
+  const previousMonth = page.locator(".cal-nbtn").first();
+  for (let i = 0; i <= new Date().getMonth(); i++) await previousMonth.click();
+  await expect(page.locator("#cal-yr")).toHaveValue(String(yearNumber - 1));
+  await page.locator("#cal-yr").selectOption(String(yearNumber));
+  const targetMonth = new Date(`${holiday!.start_date}T00:00:00`).getMonth();
+  for (let i = 0; i < 11 - targetMonth; i++) await previousMonth.click();
+
+  await expect(page.locator("#cal-holiday-status")).toContainText("loaded", { timeout: 8000 });
+  expect(requestedHolidayPaths).toContain(holidayPath);
+  const holidayDate = new Date(`${holiday!.start_date}T00:00:00`);
+  const dayCell = page.locator(".cal-cell:not(.other)").filter({
+    has: page.locator(`.cal-dt:text-is("${holidayDate.getDate()}")`),
+  });
+  await expect(dayCell).toHaveClass(/holiday-day/);
+  await expect(dayCell).toContainText(holiday!.name.substring(0, 16));
 });

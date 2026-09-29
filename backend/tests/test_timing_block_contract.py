@@ -23,6 +23,8 @@ These tests pin both shapes so neither can drift, and so a future unification
 has to change the tests deliberately rather than break a consumer quietly.
 """
 from conftest import login, next_test_year
+from app.database import SessionLocal
+from app.models import SessionAudience, TrainingClass
 
 # The PW reads these off WeeklyProgramData.timing_blocks (frontend/src/api/types.ts).
 PW_BLOCK_KEYS = {
@@ -147,3 +149,44 @@ def test_planner_create_is_placed_in_canonical_print_block(client):
     assert any(s["session_id"] == session_id
                for s in schedule.json()["sessions_by_block"][block["timing_block_id"]])
     assert all(s["session_id"] != session_id for s in schedule.json()["unlinked_sessions"])
+
+
+def test_schedule_preserves_archived_explicit_class_audience(client):
+    """Archived class links must suppress the legacy cadet_group fallback."""
+    hdr, _, pd_id = _setup(client)
+    builder = client.get(f"/api/planning/parade-dates/{pd_id}/builder", headers=hdr).json()
+    block = next(b for b in builder["timing_blocks"] if b["is_instructional_period"])
+    response = client.post(f"/api/planning/parade-dates/{pd_id}/sessions", json={
+        "cadet_group": "senior",
+        "session_number": block["period_number"],
+        "activity_title": "Archived class audience",
+        "status": "planned",
+    }, headers=hdr)
+    assert response.status_code == 200, response.text
+    session_id = response.json()["session_id"]
+
+    db = SessionLocal()
+    try:
+        audience = db.query(SessionAudience).filter(
+            SessionAudience.session_id == session_id
+        ).first()
+        assert audience is not None, "planner-created class audience is required for this regression"
+        training_class = db.get(TrainingClass, audience.training_class_id)
+        assert training_class is not None
+        training_class.is_archived = True
+        archived_class_id = training_class.id
+        db.commit()
+    finally:
+        db.close()
+
+    schedule = client.get(f"/api/parade-nights/{pd_id}/schedule", headers=hdr)
+    assert schedule.status_code == 200, schedule.text
+    session = next(
+        item
+        for item in schedule.json()["sessions_by_block"][block["timing_block_id"]]
+        if item["session_id"] == session_id
+    )
+    assert any(
+        item["training_class_id"] == archived_class_id
+        for item in session["training_classes"]
+    )

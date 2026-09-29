@@ -9,6 +9,9 @@
 | Wing overview | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | National overview | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Read audit | own | own | wing | wing | all | all | all | all |
+| Read accounts (no codes) | own, read-only | own | wing | wing | all | all | all | all |
+| Unit Settings (Main TMS) | read-only | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Planning Workspace entry | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | Reset access codes | ✗ | own sqn | ✗ | own wing | ✗ | ✓ | ✓ | ✗ |
 | **System Console access** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
 | **Maintenance mode** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |

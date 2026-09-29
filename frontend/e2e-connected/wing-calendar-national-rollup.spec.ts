@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-13 Phase A: previously national_admin/system_admin could only view
@@ -138,6 +138,8 @@ test.describe("Wing HQ Calendar — national cross-wing rollup (REM-13 Phase A)"
       headers: wingHdr,
     });
     expect(actRes.ok()).toBe(true);
+    const createdActivityId = (await actRes.json()).activity_id as string;
+    expect(createdActivityId).toBeTruthy();
 
     await page.evaluate(() => (window as any).nav("wing-calendar"));
     await expect(page.locator("#wc-wing-sel")).toBeVisible();
@@ -151,12 +153,11 @@ test.describe("Wing HQ Calendar — national cross-wing rollup (REM-13 Phase A)"
     await chip.click();
     await expect(page.locator("#m-wing-event-detail")).toBeHidden();
 
-    // Cleanup.
-    const acts = await (await page.request.get(`${base}/api/activities?scope_type=wing&scope_id=${wing7Id}`, { headers: hdr })).json();
-    const created = acts.items.find((a: any) => a.activity_name === actTitle);
-    if (created) {
-      await page.request.delete(`${base}/api/activities/${created.activity_id}`, { headers: hdr });
-    }
+    // Cleanup by exact ID with the owning Wing identity. Deleting with the
+    // viewer's token is correctly refused (cannot_edit_wing_activity), which
+    // previously leaked a current-month 7WG activity into later runs.
+    const del = await page.request.delete(`${base}/api/activities/${createdActivityId}`, { headers: wingHdr });
+    expect([200, 204, 404], `cleanup wing activity -> ${del.status()}`).toContain(del.status());
   });
 
   test("wing_admin's own view is unaffected: no All Wings option, same single-wing fetch as before", async ({ page }) => {

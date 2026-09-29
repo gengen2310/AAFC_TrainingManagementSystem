@@ -50,6 +50,7 @@ from ..database import SessionLocal
 from ..models import NationalEntity, Wing, Squadron, User, AccessCode
 from ..models.planning import PlanningYear, HolidayPeriod
 from ..services import audit
+from ..services_year import timezone_for_new_wing
 from ..security import generate_code, hash_code
 
 
@@ -206,10 +207,14 @@ def second_wing_seed() -> None:
         else:
             report["wing"]["status"] = "would_create" if dry_run else "created"
             if not dry_run:
+                # Same resolver as POST /api/wings (requested -> sibling wing ->
+                # national default). A Wing without a timezone makes every
+                # planning-year read for its squadrons raise MissingTimezone.
                 wing = Wing(
                     national_id=nat.id,
                     code=wing_code, name=wing_name, short_name=wing_short,
                     active_status=True,
+                    timezone=timezone_for_new_wing(db, nat.id, os.environ.get("WING2_TIMEZONE") or None),
                 )
                 db.add(wing)
                 db.flush()

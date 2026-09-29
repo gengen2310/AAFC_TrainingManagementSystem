@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear } from "./year-context-helper";
 
@@ -16,6 +16,8 @@ import { selectConnectedPlanningYear } from "./year-context-helper";
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const base = LOCAL_API_BASE || "http://localhost:8000";
 const _createdPnIds: string[] = [];
+// Only years this file actually created (not ones reused via 409 existing_id).
+const _createdYearIds: string[] = [];
 
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
@@ -26,16 +28,28 @@ test.afterAll(async ({ request }) => {
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
-  if (!lookup.ok()) return;
+  expect(lookup.ok(), "afterAll cleanup: sqn_admin lookup failed").toBe(true);
   const userId = (await lookup.json()).user_id as string;
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "ADMIN703", user_id: userId },
   });
-  if (!loginRes.ok()) return;
+  expect(loginRes.ok(), "afterAll cleanup: sqn_admin login failed").toBe(true);
   const body = await loginRes.json();
   const hdr = { Authorization: `Bearer ${body.token || body.access_token}` };
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
   for (const pnId of _createdPnIds) {
-    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr });
+    ok(await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr }), `parade night ${pnId}`);
+  }
+  // Deactivate (not delete: dependents block deletion) every fixture year this
+  // file created -- exact IDs only, never a broad "year >= N" sweep.
+  for (const yearId of _createdYearIds) {
+    const cur = await request.get(`${base}/api/planning/years/${yearId}`, { headers: hdr });
+    ok(cur, `year lookup ${yearId}`);
+    if (!cur.ok()) continue;
+    ok(await request.patch(`${base}/api/planning/years/${yearId}`, {
+      data: { active_status: false, version: (await cur.json()).version }, headers: hdr,
+    }), `year deactivate ${yearId}`);
   }
 });
 
@@ -64,7 +78,8 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
   expect(yearRes.ok() || yearRes.status() === 409).toBe(true);
   const yearBody = await yearRes.json().catch(() => ({}));
   const planningYearId = (yearBody.planning_year_id || yearBody.existing_id) as string;
-  const testDate = new Date(fixtureYear, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
+  if (yearRes.ok()) _createdYearIds.push(planningYearId);
+  const testDate = await firstFreeParadeDate(page.request, base, hdr, `${fixtureYear}-01-01`, `${fixtureYear}-10-27`);
   const marker = `E2E-REASON-MARKER-${uniqueSuffix}`;
   const pnRes = await page.request.post(`${base}/api/parade-nights`, {
     data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
@@ -82,10 +97,16 @@ async function seedSession(page: Page, hdr: Record<string, string>, uniqueSuffix
 }
 
 async function openQuickEditForFirstSession(page: Page, marker: string, planningYearId: string) {
+  const backendBase = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
   await page.evaluate(() => (window as any).reloadAndRender());
   await selectConnectedPlanningYear(page, planningYearId);
+  // Reset before nav('parade-nights'): nav() calls reloadAndRender() for this
+  // page (index.html line 6358), so a separate explicit reloadAndRender() after
+  // it would double the burst. Reset here to give the single nav-reload a fresh
+  // budget, keeping the combined count well under the 300 req/60s ceiling.
+  await resetBackendRateLimits(backendBase);
   await page.evaluate("nav('parade-nights')");
-  await page.evaluate("reloadAndRender()");
+  // nav('parade-nights') already calls reloadAndRender() — no second call needed.
   await page.evaluate("document.getElementById('pn-f-term').value='all'; document.getElementById('pn-f-status').value='all'; document.getElementById('pn-search').value=''; renderPN()");
   await expect.poll(() => page.locator(".pn-card").count(), { timeout: 10000 }).toBeGreaterThan(0);
   const card = page.locator(".pn-card").filter({ hasText: marker });
@@ -94,6 +115,9 @@ async function openQuickEditForFirstSession(page: Page, marker: string, planning
   await expect(editBtn).toBeVisible();
   await editBtn.click();
   await expect(page.locator("#m-sess-edit")).toBeVisible();
+  // Reset after loadSessEdit() so the test's save/create API calls
+  // (saveSessEdit PATCH, POST session-status-reason-tags) have a fresh budget.
+  await resetBackendRateLimits(backendBase);
 }
 
 test.describe("Session Status Reason tags (REM-23 continuation)", () => {
@@ -103,6 +127,11 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
     const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()));
+
+    // seedSession makes 5+ direct API calls and loginSquadron makes several more.
+    // Reset here so loadData()'s /api/session-status-reason-tags request succeeds
+    // inside openQuickEditForFirstSession's reloadAndRender() calls.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("cancelled");
@@ -131,6 +160,10 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await loginSquadron(page, "ADMIN703");
     const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
     const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "b");
+
+    // Same budget exhaustion risk as the Cancelled test above -- reset so
+    // loadData() can populate S.sessionStatusReasonTags successfully.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await openQuickEditForFirstSession(page, marker, fixtureYear);
     await page.locator("#qe-st").selectOption("not_delivered");

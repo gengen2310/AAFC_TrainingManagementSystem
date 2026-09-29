@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // Low-severity UI/UX fixes from the ADDENDUM UI/UX audit (2026-08-06):
@@ -118,7 +118,8 @@ test("MBACK-06: Per-Class CSV export button is visible in Mission Backlog for sq
   // MBACK-06: exportPerClassDeliveryCSV() — sqn_admin must be able to download
   // a per-class delivery summary from the Mission Backlog filter bar.
   await loginSquadron(page, "ADMIN703");
-  await page.evaluate(() => (window as any).nav("activities"));
+  // Mission Backlog content was consolidated into Needs Attention (#page-action-items).
+  await page.evaluate(() => (window as any).nav("action-items"));
   // Wait for the missions filters card to appear — this requires loadMissions()
   // to complete, which in turn requires _loadPlanningYears() to return a year ID.
   await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
@@ -129,7 +130,8 @@ test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip 
   // HELP-01: .ht buttons use data-tip for contextual help — present on the
   // Mission Backlog header and the Training Class add/edit forms.
   await loginSquadron(page, "ADMIN703");
-  await page.evaluate(() => (window as any).nav("activities"));
+  // Mission Backlog content was consolidated into Needs Attention (#page-action-items).
+  await page.evaluate(() => (window as any).nav("action-items"));
   await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
   // The Mission Backlog section header has a .ht button with data-tip text.
   const htBtn = page.locator("#missions-filters-card .ht").first();
@@ -189,7 +191,10 @@ test("HELP-04: Readiness checklist section is visible on the dashboard when a pa
   } finally {
     // The parade night belongs to shared seed data; remove only the session this
     // test created so the fixture is order-independent and repeatable.
-    await page.request.delete(`${base}/api/sessions/${sessionId}`, { headers: auth });
+    // Session DELETE lives under /api/planning (DELETE /api/sessions/{id} is a 405,
+    // which previously leaked a period-99 session onto the seeded night every run).
+    const del = await page.request.delete(`${base}/api/planning/sessions/${sessionId}`, { headers: auth });
+    expect([200, 204, 404], `cleanup session -> ${del.status()}`).toContain(del.status());
   }
 });
 
@@ -215,7 +220,8 @@ test("MBACK-04: '↗ View PN' button is visible in Mission Backlog for a schedul
   // the 2026 planning year, so at least one mission should have a schedDate and
   // show this button.
   await loginSquadron(page, "ADMIN703");
-  await page.evaluate(() => (window as any).nav("activities"));
+  // Mission Backlog content was consolidated into Needs Attention (#page-action-items).
+  await page.evaluate(() => (window as any).nav("action-items"));
   // Wait for the missions filters card, then for the missions table body to have
   // content (not just "Loading…") with a scheduled mission's button.
   await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });

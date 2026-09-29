@@ -59,8 +59,10 @@ _CREATE_AUTHORITY: dict[str, set[str]] = {
     "sqn_admin":      {"sqn_general"},
 }
 
-# Which roles an actor may read/manage
-_READ_ROLES = {"sqn_admin", "wing_viewer", "wing_admin",
+# Which roles an actor may read/manage. sqn_general reads its own squadron's
+# accounts read-only (2026-09-28 product decision); scope is enforced below
+# (list filter + _can_read_account) and writes stay behind _WRITE_ROLES.
+_READ_ROLES = {"sqn_admin", "sqn_general", "wing_viewer", "wing_admin",
                "national_viewer", "national_admin", "system_admin", "auditor"}
 
 _WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}

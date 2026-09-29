@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page } from "../e2e-fixtures";
 
 /**
  * Select a materialised Planning Year through the same canonical setter used by

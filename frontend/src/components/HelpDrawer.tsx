@@ -43,14 +43,9 @@ const GLOSSARY: { term: string; definition: string }[] = [
       "One training block within a parade night — a specific curriculum item, period number, one or more Training Classes, facilitator, and room. A Training Period can serve a single class or several classes at once (for example, Senior 1 and Senior 2 attending the same lesson together). A parade night typically has six Training Periods and may run several in parallel.",
   },
   {
-    term: "Mission Backlog",
+    term: "Needs Attention",
     definition:
-      "A list of curriculum modules that are required for your active Training Classes but have not yet been scheduled. The backlog tells you what still needs to be planned and for which classes.",
-  },
-  {
-    term: "Anchor Event",
-    definition:
-      "A fixed event that appears on the planning calendar but is not a curriculum session — for example, a wing parade, camp, or stand-down. Anchor events help frame the training year.",
+      "A consolidated list of actionable training requirements, conflicts, and other planning work that needs follow-up.",
   },
   {
     term: "Facilitator",
@@ -146,10 +141,10 @@ const TASKS: { title: string; steps: string[] }[] = [
     ],
   },
   {
-    title: "Understand the Mission Backlog",
+    title: "Use Needs Attention",
     steps: [
-      "Open Planning Workspace. The left panel shows the Mission Backlog.",
-      "Each item in the backlog is a curriculum module required for at least one Training Class but not yet scheduled.",
+      "Open Planning Workspace and select Needs Attention.",
+      "Each training requirement is a curriculum module required for at least one Training Class but not yet scheduled.",
       "Select an item to see which classes still need it.",
       "Drag or click the item to schedule it on a parade night.",
     ],
@@ -233,7 +228,7 @@ export function HelpDrawer({ onClose }: Props) {
                   <li>Schedule curriculum sessions</li>
                   <li>Assign facilitators and rooms</li>
                   <li>Record outcomes after each night</li>
-                  <li>Review Mission Backlog</li>
+                  <li>Review Needs Attention</li>
                 </ul>
                 <p className="pw-help-note">
                   <strong>Access via:</strong> the Planning Workspace link in TMS navigation, or directly via the /planning URL.
@@ -366,7 +361,7 @@ export function HelpDrawer({ onClose }: Props) {
                 <div className="pw-help-faq-a">Facilitators must be set up in TMS first. In TMS, go to Facilitators and add the person, then return to Planning Workspace.</div>
               </div>
               <div className="pw-help-faq-item">
-                <div className="pw-help-faq-q">The Mission Backlog shows items I have already delivered.</div>
+                <div className="pw-help-faq-q">Needs Attention shows items I have already delivered.</div>
                 <div className="pw-help-faq-a">Make sure the session outcome is recorded as 'Delivered'. Open the session in Planning Workspace and update the status.</div>
               </div>
               <div className="pw-help-faq-item">

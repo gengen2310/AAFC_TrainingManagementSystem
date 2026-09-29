@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-107: unit_type has been a real field on Squadron (standard_squadron /
@@ -21,16 +21,20 @@ test.afterAll(async ({ request }) => {
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "national", identifier: "national", role: "system_admin" },
   });
-  if (!lookup.ok()) return;
+  // Fail loudly: a silent early return here is what left test-created units
+  // active under 7WG and broke later Account Management scope assertions.
+  expect(lookup.ok(), "afterAll cleanup: sysadmin lookup failed").toBe(true);
   const { user_id: userId } = await lookup.json();
   const loginRes = await request.post(`${base}/api/auth/login`, {
     data: { code: "SYSADMIN2026", user_id: userId },
   });
-  if (!loginRes.ok()) return;
+  expect(loginRes.ok(), "afterAll cleanup: sysadmin login failed").toBe(true);
   const loginBody = await loginRes.json();
   const auth = { Authorization: `Bearer ${loginBody.token || loginBody.access_token}` };
   for (const id of _createdSqnIds) {
-    await request.post(`${base}/api/squadrons/${id}/archive`, { headers: auth }).catch(() => {});
+    // Exact-ID cleanup of the unit this test created. 404 = already removed.
+    const res = await request.post(`${base}/api/squadrons/${id}/archive`, { headers: auth });
+    expect([200, 204, 404], `afterAll cleanup: archive ${id} -> ${res.status()}`).toContain(res.status());
   }
 });
 
@@ -90,11 +94,12 @@ test("Units table can be filtered to a single unit type, and a Specialist Flight
   const sqnData = await page.request.get(`${base}/api/squadrons?unit_type=specialist_flight`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (sqnData.ok()) {
-    const sqns = await sqnData.json();
-    const created = (Array.isArray(sqns) ? sqns : []).find((s: any) => s.code === uniqueCode);
-    if (created?.id) _createdSqnIds.push(created.id);
-  }
+  expect(sqnData.ok(), "listing units for cleanup ID capture failed").toBe(true);
+  const sqns = await sqnData.json();
+  const created = (Array.isArray(sqns) ? sqns : []).find((s: any) => s.code === uniqueCode);
+  // GET /api/squadrons exposes the key as `squadron_id` (not `id`).
+  expect(created?.squadron_id, `created unit ${uniqueCode} not found for cleanup`).toBeTruthy();
+  _createdSqnIds.push(created.squadron_id);
 
   const row = page.locator("#units-table tr", { hasText: uniqueCode });
   await expect(row).toBeVisible({ timeout: 10000 });

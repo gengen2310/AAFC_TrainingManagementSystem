@@ -60,6 +60,11 @@ did; see §4's progress log for what changed between the two snapshots:
 | Backend tests | 1231 passed, 5 skipped (full `pytest tests/ -q` run) |
 | Master gap register entries | 161 (REM + QUAL combined, includes REM-122) |
 
+**Current local worktree update — 2026-09-27:** `fix/post-v17-frontend-workflow-remediation`
+is based at `fe166fc8afbe353ada795646aaef3b6e629e1aad`, aligned with `origin/main` at inspection;
+the remediation changes remain uncommitted. See Phase G for fresh local evidence and open gates.
+Staging and production were not queried or changed in this continuation.
+
 ## 2a. Deployment fingerprints — 2026-09-05 remediation build (latest)
 
 **Staging redeployed 2026-09-05 with the security remediation commit `30d43111`.** This is the
@@ -4631,3 +4636,59 @@ Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP
 | P57-01: Dead code proven and removed | `#builder-card`/`#builder-grid` never exist in DOM; 10 JS functions + `#m-edit-session` modal (345 lines) removed; 0 orphan references remain | `1fcf71f` |
 
 **Branch HEAD after F6 (traceability CSV audit commit):** `83349d62`
+
+---
+
+## Phase G — Local workflow remediation and qualification (2026-09-27; no release GO)
+
+This is local-only evidence from `fix/post-v17-frontend-workflow-remediation`, at base HEAD
+`fe166fc8afbe353ada795646aaef3b6e629e1aad`. The worktree is intentionally dirty and no commit,
+push, merge, deployment, or release authorization was made.
+
+### G1. Remediation and local checks
+
+| Gate | Evidence | Result |
+|---|---|---|
+| Backend regression suite | `cd backend && .venv/bin/python -m pytest tests/ -q` → 2480 passed, 12 skipped, 0 failures (311.27s) | PASS |
+| Planning Workspace unit tests | `npm test` → 144 passed, 21 files | PASS |
+| TypeScript | `npm run typecheck` → 0 errors | PASS |
+| ESLint | `npm run lint` → 0 errors, 35 warnings | PASS WITH WARNINGS |
+| Production frontend build | `npm run build` → success; Vite warns that the main JS chunk exceeds 500 kB | PASS WITH SIZE WARNING |
+| Single-file frontend build | `npm run build:single` → success | PASS |
+| Design contract and token sync | `scripts/check_design_contract.py` and `scripts/check_token_sync.py` | PASS; connected-only token notices documented by the checker |
+| Diff hygiene | `git diff --check` | PASS after removing one trailing space |
+
+The local browser runs used Chromium and the isolated SQLite-backed API only:
+
+| Suite | Evidence | Result |
+|---|---|---|
+| Training Year navigation | `playwright.yearbar.config.ts` → 20 tests | 20/20 PASS |
+| Connected workflow regression set | 12 targeted specs covering accounts, Activities/inheritance, CEA/Main TMS, flight archive, calendar, sessions, Training Classes/progress/dashboard, and Weekly Program | 63/63 PASS |
+| Training Dashboard after forecast wiring | `training-dashboard.spec.ts` | 16/16 PASS |
+| Training Classes and forecast placement | `training-classes.spec.ts`, rerun after per-test rate-limit reset and with a non-empty forecast assertion | 6/6 PASS |
+
+The added Dashboard regression confirms the class-forecast endpoint returns rows and that each
+forecast is rendered in the Training Dashboard. Training Classes remain managed under Unit Setup.
+
+The required frontend security greps returned matches only for reviewed non-secret uses:
+`access_code_reset` is an audit-event label, `localStorage` stores only the `navCollapsed` display
+preference, and `DATABASE_URL` appears as a quoted restore-command placeholder. No seeded access
+codes, plaintext codes, hashes, or secret values were found in `connected-frontend`.
+
+### G2. Migration rehearsal and remaining technical gates
+
+`alembic heads` reports the single head `7f61608fa538`. On a fresh disposable SQLite database,
+`alembic upgrade head`, `alembic check`, downgrade to base, re-upgrade to head, and a final
+`alembic check` all completed successfully. The check is clean through narrowly scoped,
+documented compatibility comparisons in `backend/alembic/env.py`; no global type or object
+comparison suppression was added.
+
+The repository PostgreSQL rehearsal also passed against the disposable database
+`aafc_release_gate_20260927`:
+`82/82` forward migrations, full down/up cycle, and identical head schema fingerprint on the
+second pass. This establishes local PostgreSQL migration compatibility for this worktree.
+
+Not run in this continuation: Firefox/WebKit, the full connected-browser matrix, staging E2E,
+staging load/deploy/rollback gates, backup/restore verification, or human/UAT gates. Staging and
+production state remain unverified here; the historical deployment fingerprints in §2a were not
+refreshed. **Technical/release GO is withheld.**

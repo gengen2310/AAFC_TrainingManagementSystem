@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, firstFreeParadeDate } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // CLASS-06 follow-up (gap register CLASS-22's residual item): ParadeNightGridView.tsx
@@ -75,7 +75,7 @@ test("Planning Workspace Night view grid cell shows a session's real Training Cl
   // reads by parade_date_id, and Year view is built from
   // GET /api/planning/years/{id}/parade-dates. The date's own calendar
   // year matches testYear, per the comment above.
-  const pnDate = new Date(testYear, 2, 1 + (Date.now() % 27)).toISOString().slice(0, 10);
+  const pnDate = await firstFreeParadeDate(page.request, API_BASE, hdr, `${testYear}-03-01`, `${testYear}-03-31`);
   const pdRes = await page.request.post(`${API_BASE}/api/planning/years/${yearId}/parade-dates`, {
     data: { parade_date: pnDate }, headers: hdr,
   });

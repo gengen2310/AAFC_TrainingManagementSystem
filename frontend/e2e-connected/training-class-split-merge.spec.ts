@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear } from "./year-context-helper";
 
@@ -52,6 +52,35 @@ async function selectFirstYear(page: Page): Promise<string> {
 
 const base = LOCAL_API_BASE || "http://localhost:8000";
 
+// Exact resources the historical-audience test creates. Its future-dated parade
+// night auto-materialises that date's Planning Year when none exists; left
+// behind, that empty active year later became year-bar's "Copy setup" source
+// and copied 0 classes. afterEach runs even when an assertion fails.
+let owned: { hdr?: Record<string, string>; pnId?: string; yearIds: string[] } = { yearIds: [] };
+
+test.afterEach(async ({ request }) => {
+  const { hdr, pnId, yearIds } = owned;
+  owned = { yearIds: [] };
+  if (!hdr) return;
+  const ok = (r: { status(): number }, what: string) =>
+    expect([200, 204, 404], `cleanup ${what} -> ${r.status()}`).toContain(r.status());
+  if (pnId) ok(await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: hdr }), `parade night ${pnId}`);
+  for (const yearId of yearIds) {
+    const cur = await request.get(`${base}/api/planning/years/${yearId}`, { headers: hdr });
+    ok(cur, `year lookup ${yearId}`);
+    if (!cur.ok()) continue;
+    ok(await request.patch(`${base}/api/planning/years/${yearId}`, {
+      data: { active_status: false, version: (await cur.json()).version }, headers: hdr,
+    }), `year deactivate ${yearId}`);
+  }
+});
+
+async function planningYearIds(page: Page, hdr: Record<string, string>): Promise<Set<string>> {
+  const r = await page.request.get(`${base}/api/planning/years`, { headers: hdr });
+  expect(r.ok()).toBe(true);
+  return new Set(((await r.json()) as Array<{ planning_year_id: string }>).map((y) => y.planning_year_id));
+}
+
 async function authedRequest(page: Page) {
   const token = await page.evaluate(() => sessionStorage.getItem("aafc_token"));
   return { Authorization: `Bearer ${token}` };
@@ -93,8 +122,9 @@ test.describe("Training Class split/merge/restore (CLASS-10)", () => {
     const cadetId = await page.evaluate(async () => (await (window as any).api("/api/cadets"))[0].cadet_id);
     await seedMembership(page, hdr, cadetId, sourceId);
 
-    await page.evaluate(() => (window as any).nav("activities"));
     await selectFirstYear(page);
+    // Training Classes live in Settings (year taken from P.currentYearId).
+    await page.evaluate(() => (window as any).nav("settings"));
     await expect(page.locator("#py-classes-body")).toContainText(sourceName, { timeout: 5000 });
 
     const row = page.locator("#py-classes-body tr", { hasText: sourceName });
@@ -151,8 +181,9 @@ test.describe("Training Class split/merge/restore (CLASS-10)", () => {
     const cadetId = await page.evaluate(async () => (await (window as any).api("/api/cadets"))[0].cadet_id);
     await seedMembership(page, hdr, cadetId, sourceId);
 
-    await page.evaluate(() => (window as any).nav("activities"));
     await selectFirstYear(page);
+    // Training Classes live in Settings (year taken from P.currentYearId).
+    await page.evaluate(() => (window as any).nav("settings"));
     await expect(page.locator("#py-classes-body")).toContainText(sourceName, { timeout: 5000 });
 
     const row = page.locator("#py-classes-body tr", { hasText: sourceName });
@@ -226,7 +257,9 @@ test.describe("Training Class split/merge/restore (CLASS-10)", () => {
     // colliding with any other spec/pytest fixture's own parade night on the
     // same computed date -- this suite has hit that exact collision before
     // (703's weekly recurring demo data, and other tests' own day offsets).
-    const sessionId = await page.evaluate(async () => {
+    owned.hdr = hdr;
+    const yearsBefore = await planningYearIds(page, hdr);
+    const { sessionId, pnId } = await page.evaluate(async () => {
       const me = await (window as any).api("/api/auth/me");
       const sqnId = me.session.squadron_id, wingId = me.session.wing_id;
       let pn: any = null;
@@ -251,8 +284,10 @@ test.describe("Training Class split/merge/restore (CLASS-10)", () => {
         method: "POST",
         body: { parade_night_id: pnId, period_number: 1, cadet_group: "senior" },
       });
-      return sess.session_id;
+      return { sessionId: sess.session_id as string, pnId: pnId as string };
     });
+    owned.pnId = pnId;
+    owned.yearIds = [...(await planningYearIds(page, hdr))].filter((id) => !yearsBefore.has(id));
     await page.evaluate(
       async ({ sessionId, sourceId }) => {
         await (window as any).api(`/api/sessions/${sessionId}/audience`, {
@@ -263,8 +298,9 @@ test.describe("Training Class split/merge/restore (CLASS-10)", () => {
       { sessionId, sourceId },
     );
 
-    await page.evaluate(() => (window as any).nav("activities"));
     await selectFirstYear(page);
+    // Training Classes live in Settings (year taken from P.currentYearId).
+    await page.evaluate(() => (window as any).nav("settings"));
     const row = page.locator("#py-classes-body tr", { hasText: sourceName });
     await row.getByRole("button", { name: "Merge into…" }).click();
     await page.locator("#tcmerge-target-inp").selectOption({ label: targetName });

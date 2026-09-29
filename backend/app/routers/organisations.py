@@ -690,7 +690,9 @@ def current_proxy(p: Principal = Depends(get_principal)):
     return {"active": True, "mode": p.proxy_mode, "acting_squadron_id": p.acting_squadron_id}
 
 
-_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "wing_admin", "national_admin", "national_viewer", "system_admin"})
+# sqn_general reads its own squadron's audit rows read-only (2026-09-28 product
+# decision); the query below scopes non-national, non-wing actors to squadron_id.
+_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "sqn_general", "wing_admin", "national_admin", "national_viewer", "system_admin"})
 
 # ── Audit (read-only; auditor + wing/national admins) ──
 @router.get("/audit")

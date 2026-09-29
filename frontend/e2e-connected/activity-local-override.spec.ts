@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-103: a squadron admin can locally adjust the date/time/notes of an
@@ -84,6 +84,11 @@ test("Squadron admin can adjust, see, and clear a local override on an inherited
   await expect(adjustedRow).toContainText("Adjusted");
   await expect(adjustedRow).toContainText("adjusted");
   await expect(adjustedRow.getByRole("button", { name: "Edit Adjustment" })).toBeVisible();
+
+  // Reset rate limits before the Clear workflow: the test makes enough API
+  // calls during setup (two logins, create activity, save override) that the
+  // per-window budget may be exhausted by the time the DELETE fires.
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
   // Clear uses the application's accessible confirmation modal, not a native
   // browser confirm(). Exercise the real confirmation workflow.

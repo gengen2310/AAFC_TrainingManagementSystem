@@ -55,6 +55,7 @@ describe("connected-frontend/index.html", () => {
   });
 
   it("passes the canonical timing block when creating a direct planner session", () => {
-    expect(source).toContain("timing_block_id:document.getElementById('sess-edit-id').dataset.timingBlockId||null");
+    expect(source).toContain("const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;");
+    expect(source).toContain("timing_block_id:s.timingBlockId||null,");
   });
 });

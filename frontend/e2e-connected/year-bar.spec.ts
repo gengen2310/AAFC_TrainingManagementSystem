@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // The Training Year is a time context, not a workflow object. These tests hold
@@ -15,13 +15,13 @@ test.beforeEach(async () => {
     process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
-async function loginSquadron(page: Page, code: string) {
+async function loginSquadron(page: Page, code: string, path = "/", expectedHeading = "Training Dashboard") {
   if (LOCAL_API_BASE) {
     await page.addInitScript((base) => {
       (window as any).AAFC_API_BASE = base;
     }, LOCAL_API_BASE);
   }
-  await page.goto("/");
+  await page.goto(path);
   await page.locator("#auth-type").selectOption("squadron");
   await page.locator("#auth-wing-select").selectOption("7WG");
   await page.locator("#auth-sqn-select").selectOption("703");
@@ -29,7 +29,9 @@ async function loginSquadron(page: Page, code: string) {
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
+  if (expectedHeading) {
+    await expect(page.locator(".ph-title", { hasText: expectedHeading })).toBeVisible({ timeout: 10000 });
+  }
 }
 
 async function openYearBar(page: Page) {
@@ -160,15 +162,32 @@ test("no request is ever made for a null planning year", async ({ page }) => {
   expect(errors, "uncaught page errors").toEqual([]);
 });
 
+test("the TMS Unit Setup handoff opens settings for the selected year", async ({ page }) => {
+  const year = new Date().getFullYear() + 2;
+  await loginSquadron(
+    page,
+    "ADMIN703",
+    `/?aafc_page=settings&aafc_training_year=${year}`,
+    "",
+  );
+  await expect(page.locator("#page-settings")).toHaveClass(/active/);
+  expect(await page.evaluate("P.currentYearInt")).toBe(year);
+  expect(await page.evaluate("window.location.search")).toBe("");
+});
+
 // --- phase 2: the empty future year, and the past year -----------------------
 
 async function apiToken(page: Page): Promise<string> {
   return await page.evaluate("sessionStorage.getItem('aafc_token')") as string;
 }
 
+function authorizationHeader(token: string): string {
+  return ["Bearer", token].join(" ");
+}
+
 async function unmaterialisedFutureYear(page: Page): Promise<number> {
   const years = await page.evaluate(
-    "P.years.filter(y => y && y.materialised !== false && (y.id || y.planning_year_id)).map(y => Number(y.year))",
+    "P.years.filter(y => y && y.active_status !== false && y.materialised !== false && (y.id || y.planning_year_id)).map(y => Number(y.year))",
   ) as number[];
   const current = Number(await page.locator("#ynLabel").textContent());
   if (!years.includes(current + 1)) return current + 1;
@@ -204,26 +223,49 @@ async function deleteYear(page: Page, year: number) {
   const token = await apiToken(page);
   const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
   const rows = await (await page.request.get(
-    `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
+    `${base}/api/planning/years`, { headers: { Authorization: authorizationHeader(token) } })).json();
   const row = rows.find((r: any) => r.year === year);
   if (!row?.planning_year_id) return; // year not materialised, nothing to do
 
   // Archive all parade nights for this year so they no longer block deletion.
   const pns = await (await page.request.get(
     `${base}/api/parade-nights?planning_year_id=${row.planning_year_id}`,
-    { headers: { Authorization: `Bearer ${token}` } })).json();
+    { headers: { Authorization: authorizationHeader(token) } })).json();
   for (const pn of (pns || [])) {
     await page.request.delete(`${base}/api/parade-nights/${pn.parade_night_id}`,
-      { headers: { Authorization: `Bearer ${token}` } });
+      { headers: { Authorization: authorizationHeader(token) } });
   }
 
   // Now permanently delete the year (succeeds once no active parade nights remain).
   await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
-    { headers: { Authorization: `Bearer ${token}` } });
+    { headers: { Authorization: authorizationHeader(token) } });
 
   // Re-fetch the year list so P.years reflects the delete; without this, the
   // client-side year bar still shows the deleted year as materialised.
   await page.evaluate("_loadPlanningYears()");
+}
+
+async function archiveYear(page: Page, year: number) {
+  const token = await apiToken(page);
+  const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+  const rows = await (await page.request.get(
+    `${base}/api/planning/years`, { headers: { Authorization: authorizationHeader(token) } })).json();
+  // Archive every ACTIVE row for this year. find() returned the first match,
+  // which could be an older inactive duplicate -- the early return then left
+  // the active year this test materialised behind (silent no-op).
+  const activeRows = rows.filter((r: any) => r.year === year && r.active_status && r.planning_year_id);
+  for (const row of activeRows) {
+    const archiveUrl = `${base}/api/planning/years/` + encodeURIComponent(row.planning_year_id);
+    const response = await page.request.patch(archiveUrl, {
+      headers: { Authorization: authorizationHeader(token) },
+      data: { active_status: false, version: row.version },
+    });
+    expect(response.ok(), `archive year ${year} (${row.planning_year_id}) -> ${response.status()}`).toBe(true);
+  }
+  if (!activeRows.length) return;
+  await page.evaluate(
+    "_loadPlanningYears().then(() => { const current = (P.years || []).find((candidate) => candidate.state === 'current'); if (current) setCurrentYear(current); })",
+  );
 }
 
 test("an empty future year offers exactly the two things that can be done", async ({ page }) => {
@@ -246,11 +288,48 @@ test("an empty future year offers exactly the two things that can be done", asyn
   await expect(buttons.nth(1)).toHaveText(`Copy setup from ${current}`);
 });
 
+test("moving backward within future years keeps the unmaterialised year writable", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const token = await apiToken(page);
+  const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+  const headers = { Authorization: authorizationHeader(token) };
+  const rows = await (await page.request.get(`${base}/api/planning/years`, { headers })).json();
+  const existing = new Set(rows.map((row: any) => Number(row.year)));
+  const currentCalendarYear = new Date().getFullYear();
+  let sourceYear = currentCalendarYear + 2;
+  while (existing.has(sourceYear) || existing.has(sourceYear - 1)) sourceYear += 1;
+  expect(sourceYear).toBeLessThan(2999);
+
+  const createResponse = await page.request.post(`${base}/api/planning/years`, {
+    headers,
+    data: { year: sourceYear, name: `${sourceYear} Training Year` },
+  });
+  expect(createResponse.ok()).toBe(true);
+
+  try {
+    await page.evaluate("_loadPlanningYears()");
+    await page.evaluate(
+      `setCurrentYear(P.years.find(y => Number(y.year) === ${sourceYear}))`,
+    );
+    await page.evaluate("ynNav(-1)");
+
+    const targetYear = sourceYear - 1;
+    await expect(page.locator("#ynLabel")).toHaveText(String(targetYear));
+    const notice = page.locator("#yn-year-notice .yn-notice");
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText(`Nothing has been set up for ${targetYear} yet`);
+    await expect(notice).not.toContainText("Read-only");
+    await expect(notice.getByRole("button", { name: `Set up ${targetYear}` })).toBeVisible();
+  } finally {
+    await archiveYear(page, sourceYear);
+  }
+});
+
 test("Set up materialises the year and the panel goes away", async ({ page }) => {
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const target = await unmaterialisedFutureYear(page);
-  const current = Number(await page.locator("#ynLabel").textContent());
   await page.locator("#ynNext").click();
   await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
 
@@ -260,8 +339,7 @@ test("Set up materialises the year and the panel goes away", async ({ page }) =>
     expect(await page.evaluate("P.currentYearId")).not.toBeNull();
     expect(Number(await page.locator("#ynLabel").textContent())).toBe(target);
   } finally {
-    // Keep the test-owned year as historical state; archived history is
-    // intentionally retained and blocks destructive year deletion.
+    await archiveYear(page, target);
   }
 });
 
@@ -280,11 +358,10 @@ test("Copy setup brings the class structure across and says how much it copied",
     const id = await page.evaluate("P.currentYearId");
     const classes = await (await page.request.get(
       `${LOCAL_API_BASE}/api/training-classes?training_year_id=${id}`,
-      { headers: { Authorization: `Bearer ${token}` } })).json();
+      { headers: { Authorization: authorizationHeader(token) } })).json();
     expect(classes.length).toBeGreaterThan(0);
   } finally {
-    // Keep the test-owned year as historical state; archived history is
-    // intentionally retained and blocks destructive year deletion.
+    await archiveYear(page, target);
   }
 });
 
@@ -295,7 +372,7 @@ test("a past year states it is read-only and names the way to correct it", async
   const past = 2019;
 
   await page.request.post(`${LOCAL_API_BASE}/api/planning/years`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: authorizationHeader(token) },
     data: { year: past, name: `${past} Training Year` },
   });
 
@@ -351,6 +428,7 @@ test("choosing a year from the menu moves the bar and closes the menu", async ({
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const start = Number(await page.locator("#ynLabel").textContent());
+  await ensureYearExists(page, start + 1);
 
   await page.locator("#ynDisplay").click();
   await page.locator("#ynMenu button", { hasText: String(start + 1) }).click();
@@ -408,6 +486,32 @@ test("the year menu is actually on screen, not clipped by its container", async 
 
 // --- phase 4: the year rolling over mid-session ------------------------------
 
+// Years a test materialised only to satisfy its own precondition; archived in
+// afterEach (which runs even after a body timeout). These tests previously
+// relied on a next year leaked by another spec and failed on a fresh seed.
+let _ownedYears: number[] = [];
+test.afterEach(async ({ page }) => {
+  const years = _ownedYears;
+  _ownedYears = [];
+  for (const year of years) await archiveYear(page, year);
+});
+
+/** Make sure `year` exists as an active Planning Year; record it for cleanup
+ *  only when this test created it. Refreshes P.years so the bar can see it. */
+async function ensureYearExists(page: Page, year: number) {
+  const token = await apiToken(page);
+  const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+  const headers = { Authorization: authorizationHeader(token) };
+  const rows = await (await page.request.get(`${base}/api/planning/years`, { headers })).json();
+  if (rows.some((r: any) => Number(r.year) === year && r.active_status)) return;
+  const res = await page.request.post(`${base}/api/planning/years`, {
+    headers, data: { year, name: `${year} Training Year` },
+  });
+  expect(res.ok(), `materialise ${year} -> ${res.status()}`).toBe(true);
+  _ownedYears.push(year);
+  await page.evaluate("_loadPlanningYears()");
+}
+
 /** Simulate midnight: the year the user is on becomes past, the next becomes
  *  current. Nothing is written -- that is the point -- so this is exactly what
  *  the server's derived state would return the moment the date changes. */
@@ -427,6 +531,7 @@ test("when the year rolls over mid-session the bar says so and offers the switch
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const on = Number(await page.locator("#ynLabel").textContent());
+  await ensureYearExists(page, on + 1);
   await simulateMidnight(page, on);
 
   const notice = page.locator("#yn-rollover .yn-rollover");
@@ -442,6 +547,7 @@ test("taking the switch moves to the new year and clears the notice", async ({ p
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
   const on = Number(await page.locator("#ynLabel").textContent());
+  await ensureYearExists(page, on + 1);
   await simulateMidnight(page, on);
 
   await page.locator("#yn-rollover button").click();
@@ -455,7 +561,7 @@ test("deliberately opening a past year does not claim the year just rolled over"
   const token = await apiToken(page);
   const past = 2018;
   await page.request.post(`${LOCAL_API_BASE}/api/planning/years`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: authorizationHeader(token) },
     data: { year: past, name: `${past} Training Year` } });
 
   try {

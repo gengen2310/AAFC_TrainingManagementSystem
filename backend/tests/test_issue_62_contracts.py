@@ -33,6 +33,17 @@ def test_post_cadets_rejects_unauthenticated_and_read_only(client):
     assert client.post("/api/cadets", json=payload, headers=headers).status_code == 403
 
 
+def test_post_cadets_without_intervention_returns_permission_error(client):
+    headers = login(client, "ADMIN7WG")
+    response = client.post(
+        "/api/cadets",
+        json={"service_number": "I62-NO-SCOPE", "last_name": "Denied"},
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"]["error"] == "proxy_required"
+
+
 def test_cea_realistic_excel_export_bom_and_header_aliases(client):
     headers = login(client, "ADMIN703")
     csv_text = (
@@ -50,6 +61,26 @@ def test_cea_realistic_excel_export_bom_and_header_aliases(client):
     assert row["service_number"] == "I62-CEA-001"
     assert row["first_name"] == "Alex"
     assert row["last_name"] == "Nguyen"
+
+
+def test_cea_preview_accepts_canonical_and_service_number_headers(client):
+    headers = login(client, "ADMIN703")
+    for identifier_header, service_number in (
+        ("Id", "I62-ID-001"),
+        ("Service #", "I62-HASH-001"),
+    ):
+        response = client.post(
+            "/api/import/cea-members/preview",
+            json={
+                "csv_text": f"{identifier_header},Rank,Name,Surname\n{service_number},CDT,Alex,Nguyen\n",
+                "file_name": "CEA Members.csv",
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        row = response.json()["rows"][0]
+        assert row["action"] == "NEW"
+        assert row["service_number"] == service_number
 
 
 def test_cea_missing_columns_explains_the_required_fix(client):

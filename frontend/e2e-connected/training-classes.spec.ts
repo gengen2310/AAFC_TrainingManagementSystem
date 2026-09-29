@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Page } from "../e2e-fixtures";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { selectConnectedPlanningYear } from "./year-context-helper";
 
@@ -8,7 +8,7 @@ import { selectConnectedPlanningYear } from "./year-context-helper";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
@@ -29,20 +29,21 @@ async function loginSquadron(page: Page, code: string) {
   await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
-test.describe("Training Classes panel on the Activities page", () => {
+test.describe("Training Classes panel in Unit Settings", () => {
   test("card is present and explains what a Training Class is", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
-    await page.evaluate(() => (window as any).nav("activities"));
-    await expect(page.locator("#page-activities .ctitle", { hasText: "Training Classes" })).toBeVisible();
-    await expect(page.locator("#page-activities")).toContainText("A Training Class is a local group completing a Training Stage");
+    await page.evaluate(() => (window as any).nav("settings"));
+    await expect(page.locator("#page-settings .ctitle", { hasText: "Training Classes" })).toBeVisible();
+    await expect(page.locator("#page-settings")).toContainText("View class membership and curriculum progress");
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 
   test("selecting a Training Year shows the Training Classes card and Add button", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     await selectConnectedPlanningYear(page);
+    await page.evaluate(() => (window as any).nav("settings"));
 
     await expect(page.locator("#py-classes-card")).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Add Training Class" })).toBeVisible();
@@ -53,6 +54,11 @@ test.describe("Training Classes panel on the Activities page", () => {
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     await selectConnectedPlanningYear(page);
+    await page.evaluate(() => (window as any).nav("settings"));
+
+    // loginSquadron + selectConnectedPlanningYear exhaust the rate limit budget
+    // before the Add/Archive API calls fire. Reset here so modal mutations succeed.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
     const modal = page.locator("#m-add-training-class");
@@ -93,6 +99,11 @@ test.describe("Training Classes panel on the Activities page", () => {
   test("edit a Training Class: rename via the edit modal", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     await selectConnectedPlanningYear(page);
+    await page.evaluate(() => (window as any).nav("settings"));
+
+    // Same rate-limit budget concern as the create test — reset before any
+    // modal Add/Save calls so mutations don't hit 429.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 
     const originalName = `Playwright Edit Class ${Date.now()}`;
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
@@ -134,8 +145,32 @@ test.describe("Training Classes panel on the Activities page", () => {
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
+    // loginSquadron's loadData() fires 26 base calls + one holiday call per
+    // active non-past planning year. With accumulated fixture years this exhausts
+    // the 300 req/60s budget before selectConnectedPlanningYear() can load the
+    // activities page data that makes #py-classes-card visible.
+    await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+
     await selectConnectedPlanningYear(page);
+    await page.evaluate(() => (window as any).nav("settings"));
     await expect(page.locator("#py-classes-card")).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Add Training Class" })).toBeHidden();
   });
+});
+
+test("class forecasts load on the Training Dashboard", async ({ page }) => {
+  const forecastResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/planning/class-forecasts?year_id=")
+    && response.request().method() === "GET");
+  await loginSquadron(page, "ADMIN703");
+
+  const response = await forecastResponse;
+  expect(response.ok()).toBe(true);
+  const forecasts = await response.json();
+  expect(Array.isArray(forecasts)).toBe(true);
+  expect(forecasts.length).toBeGreaterThan(0);
+
+  const section = page.locator("#dash-class-forecast-section");
+  await expect(section).toBeVisible();
+  await expect(page.locator("#fc-cards-body .fc-card")).toHaveCount(forecasts.length);
 });
