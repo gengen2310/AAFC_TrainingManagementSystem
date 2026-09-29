@@ -17,7 +17,7 @@ def upgrade():
     with op.batch_alter_table("users") as batch:
         batch.add_column(sa.Column(
             "must_change_code", sa.Boolean(), nullable=False,
-            server_default=sa.text("0"),
+            server_default=sa.false(),
         ))
 
 
