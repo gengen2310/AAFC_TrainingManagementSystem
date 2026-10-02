@@ -389,12 +389,40 @@ def update_ticket(
             ticket.assigned_to_user_id = assignee.id
             ticket.assigned_to_name = assignee.display_name
     elif body.assigned_to_name is not None:
-        # Backward-compatible display-only update for pre-v70 clients. Do not
-        # pretend this creates ownership: clear the canonical relationship.
-        changed["assigned_to_user_id"] = None
-        changed["assigned_to_name"] = body.assigned_to_name.strip() or None
-        ticket.assigned_to_user_id = None
-        ticket.assigned_to_name = changed["assigned_to_name"]
+        # Backward compatibility for pre-v70 clients is resolution-only: a
+        # display name may identify a real eligible account, but arbitrary free
+        # text must never become apparent ticket ownership.
+        requested_name = body.assigned_to_name.strip()
+        if not requested_name:
+            changed["assigned_to_user_id"] = None
+            changed["assigned_to_name"] = None
+            ticket.assigned_to_user_id = None
+            ticket.assigned_to_name = None
+        else:
+            candidates = db.query(User).filter(
+                User.display_name == requested_name,
+                User.active_status == True,   # noqa: E712
+                User.is_archived == False,    # noqa: E712
+                User.role.in_(("system_admin", "national_admin", "wing_admin")),
+            ).all()
+            if len(candidates) != 1:
+                raise HTTPException(422, detail={
+                    "error": "invalid_assignee",
+                    "message": "Assigned To must identify one active support account.",
+                })
+            assignee = candidates[0]
+            if assignee.role == "wing_admin" and (
+                not ticket_wing_id or assignee.wing_id != ticket_wing_id
+            ):
+                raise HTTPException(422, detail={"error": "assignee_out_of_scope"})
+            if p.role == "wing_admin" and (
+                assignee.role != "wing_admin" or assignee.wing_id != p.wing_id
+            ):
+                raise HTTPException(403, detail={"error": "assignee_out_of_scope"})
+            changed["assigned_to_user_id"] = assignee.id
+            changed["assigned_to_name"] = assignee.display_name
+            ticket.assigned_to_user_id = assignee.id
+            ticket.assigned_to_name = assignee.display_name
 
     db.commit()
 
