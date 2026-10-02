@@ -552,8 +552,11 @@ def import_commit(body: ImportCommitIn, db: DBSession = Depends(get_db), p: Prin
                   phase=g("phase") or None,
                   attendance_percentage=float(att) if att.replace(".", "", 1).isdigit() else None,
                   created_by=p.user_id)
-        # tag for rollback via created_by + import correlation in audit
         db.add(c); accepted += 1
+    # Commit the cadets BEFORE finalising the log, so log.updated_at (set by
+    # this second commit) is later than every cadet this import created. That
+    # gives rollback an upper bound: [log.created_at, log.updated_at].
+    db.commit()
     log.rows_accepted = accepted; log.rows_rejected = rejected
     log.validation_errors = json.dumps(errors[:50]); log.committed = 1
     db.commit()
@@ -562,19 +565,41 @@ def import_commit(body: ImportCommitIn, db: DBSession = Depends(get_db), p: Prin
     return {"ok": True, "import_id": log.id, "accepted": accepted, "rejected": rejected}
 
 
+class ImportRollbackIn(BaseModel):
+    import_id: str | None = None
+
+
 @router.post("/import/rollback")
-def import_rollback(import_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def import_rollback(import_id: str | None = None, body: ImportRollbackIn | None = None,
+                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    # Planning Workspace sends {"import_id"} as a JSON body; older callers use
+    # ?import_id=. Accepting only the query made every PW rollback a 422.
+    import_id = import_id or (body.import_id if body else None)
+    if not import_id:
+        raise HTTPException(422, detail={"error": "import_id_required"})
     from ..models import Cadet, CadetClassMembership
     log = db.get(ImportLog, import_id)
     if not log or not log.committed:
         raise HTTPException(404, detail={"error": "not_found_or_not_committed"})
+    if log.rollback_status == "rolled_back":
+        raise HTTPException(409, detail={"error": "already_rolled_back",
+                                         "message": "This import has already been rolled back."})
     from ..permissions import require_can_write_squadron
     s = db.get(Squadron, log.squadron_id)
     require_can_write_squadron(p, s.id, s.wing_id)
-    # Soft-archive cadets created by this import (correlated by created_by + created_at >= log time).
+    # Soft-archive cadets created by THIS import: same squadron and user, and
+    # created inside the import's own window. There was no upper bound, so a
+    # rollback also archived every cadet that user added by hand or by a later
+    # import. Cadet rows carry no import id; the window is closed by
+    # log.updated_at (see import_commit). No slack on purpose: for an import
+    # committed before that ordering existed, the worst case is archiving FEWER
+    # rows (left for manual archive) -- never someone else's cadets.
+    window_end = log.updated_at or log.created_at
     cadets = db.query(Cadet).filter(Cadet.squadron_id == log.squadron_id,
                                     Cadet.created_by == log.user_id,
-                                    Cadet.created_at >= log.created_at).all()
+                                    Cadet.created_at >= log.created_at,
+                                    Cadet.created_at <= window_end,
+                                    Cadet.is_archived == False).all()  # noqa: E712
     cadet_ids = [c.id for c in cadets]
     for c in cadets:
         c.is_archived = True; c.archived_at = utcnow()
