@@ -40,7 +40,7 @@ export const authApi = {
   me: () => api.get<{ session: SessionInfo }>("/api/auth/me"),
   logout: () => api.post<{ ok: boolean }>("/api/auth/logout"),
   refresh: () => api.post<{ token: string; session: SessionInfo }>("/api/auth/refresh"),
-  changeCode: (user_id: string, new_code: string) => api.post<{ ok: boolean }>("/api/auth/change-code", { user_id, new_code }),
+  changeCode: (user_id: string, new_code: string, current_code?: string) => api.post<{ ok: boolean }>("/api/auth/change-code", { user_id, new_code, ...(current_code ? { current_code } : {}) }),
 };
 
 export const orgApi = {
