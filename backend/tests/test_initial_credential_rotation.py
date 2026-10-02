@@ -53,7 +53,7 @@ def test_generated_initial_code_requires_rotation_before_app_access(client):
     assert client.get("/api/parade-nights", headers=normal_headers).status_code == 200
 
 
-def test_explicit_initial_code_is_not_treated_as_generated_temporary_code(client):
+def test_explicit_initial_code_also_requires_first_login_rotation(client):
     admin = login(client, "SYSADMIN2026")
     squadron_id = _squadron_id(client, admin)
     chosen = "C-" + uuid.uuid4().hex
@@ -67,7 +67,11 @@ def test_explicit_initial_code_is_not_treated_as_generated_temporary_code(client
 
     signed_in = client.post("/api/auth/login", json={"code": chosen})
     assert signed_in.status_code == 200, signed_in.text
-    assert signed_in.json()["session"]["must_change_code"] is False
+    assert signed_in.json()["session"]["must_change_code"] is True
+    headers = {"Authorization": f"Bearer {signed_in.json()['token']}"}
+    blocked = client.get("/api/parade-nights", headers=headers)
+    assert blocked.status_code == 403, blocked.text
+    assert blocked.json()["detail"]["error"] == "code_change_required"
 
 
 def test_system_admin_creation_requires_recovery_email(client):
