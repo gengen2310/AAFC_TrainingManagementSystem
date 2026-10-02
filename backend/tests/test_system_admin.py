@@ -440,16 +440,18 @@ def test_audit_summary_filter_by_action(client):
         assert entry["action"] == "login"
 
 
-def test_audit_summary_forbidden_sqn(client):
+def test_audit_summary_sqn_admin_allowed_read_only(client):
+    """Squadron admins may read audit evidence scoped to their own squadron."""
     hdr = _sqn_admin(client)
     r = client.get("/api/system/audit-summary", headers=hdr)
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
-def test_audit_summary_forbidden_general(client):
+def test_audit_summary_sqn_general_allowed_read_only(client):
+    """sqn_general has the same deliberately read-only audit visibility."""
     hdr = _general(client)
     r = client.get("/api/system/audit-summary", headers=hdr)
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
 def test_audit_summary_limit_cap(client):
