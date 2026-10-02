@@ -274,6 +274,21 @@ def _commit_recovery_safe(db: DBSession) -> None:
         raise
 
 
+def _flush_recovery_safe(db: DBSession) -> None:
+    """Flush a newly-created account while preserving the recovery-email 409 contract."""
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        detail = str(getattr(exc, "orig", exc)).lower()
+        if "recovery_email" in detail and ("unique" in detail or "duplicate" in detail):
+            raise HTTPException(409, detail={
+                "error": "recovery_email_in_use",
+                "message": "That recovery email is already assigned to another account.",
+            }) from exc
+        raise
+
+
 class AccountUpdateIn(BaseModel):
     display_name: str | None = None
     flight_id: str | None = None  # pass "" or null to clear
@@ -411,7 +426,10 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
              recovery_email_updated_at=utcnow() if recovery_email else None,
              recovery_email_updated_by=p.user_id if recovery_email else None)
     db.add(u)
-    db.flush()  # get u.id
+    if recovery_email:
+        _flush_recovery_safe(db)
+    else:
+        db.flush()  # get u.id
 
     # Generate or hash the initial code
     if body.new_code:
