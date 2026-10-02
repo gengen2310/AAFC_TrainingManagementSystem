@@ -124,5 +124,23 @@ def next_test_year() -> int:
 def login(client, code):
     r = client.post("/api/auth/login", json={"code": code})
     assert r.status_code == 200, r.text
-    token = r.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    payload = r.json()
+    token = payload["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    # Feature tests frequently create fixture accounts with a known explicit
+    # code and then call this helper. Production correctly forces those accounts
+    # through first-login rotation; the generic test helper acknowledges that
+    # onboarding step with the fixture code itself so unrelated tests keep
+    # exercising their intended feature. Tests for the rotation UX use raw
+    # /api/auth/login and are therefore unaffected.
+    if payload.get("session", {}).get("must_change_code"):
+        changed = client.post(
+            "/api/auth/change-code",
+            json={"user_id": payload["session"]["user_id"], "new_code": code},
+            headers=headers,
+        )
+        assert changed.status_code == 200, changed.text
+        r = client.post("/api/auth/login", json={"code": code})
+        assert r.status_code == 200, r.text
+        headers = {"Authorization": f"Bearer {r.json()['token']}"}
+    return headers
