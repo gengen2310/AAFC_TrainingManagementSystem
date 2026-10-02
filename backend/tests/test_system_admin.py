@@ -454,6 +454,52 @@ def test_audit_summary_sqn_general_allowed_read_only(client):
     assert r.status_code == 200
 
 
+def test_audit_summary_squadron_reader_is_tenant_scoped(client):
+    """Granting read-only audit access must not expose another squadron's rows."""
+    import uuid
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    hdr = _sqn_admin(client)
+    me = client.get("/api/auth/me", headers=hdr)
+    assert me.status_code == 200
+    squadron_id = me.json()["session"]["squadron_id"]
+    own_id = str(uuid.uuid4())
+    foreign_id = str(uuid.uuid4())
+
+    db = SessionLocal()
+    try:
+        db.add(AuditLog(
+            id=own_id, role="sqn_admin", scope="squadron",
+            squadron_id=squadron_id, action="scope_probe_own",
+            object_type="test", object_id=str(uuid.uuid4()),
+        ))
+        db.add(AuditLog(
+            id=foreign_id, role="sqn_admin", scope="squadron",
+            squadron_id=str(uuid.uuid4()), action="scope_probe_foreign",
+            object_type="test", object_id=str(uuid.uuid4()),
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        r = client.get("/api/system/audit-summary?limit=500", headers=hdr)
+        assert r.status_code == 200, r.text
+        ids = {row["audit_id"] for row in r.json()["logs"]}
+        assert own_id in ids
+        assert foreign_id not in ids
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(AuditLog).filter(AuditLog.id.in_([own_id, foreign_id])).delete(
+                synchronize_session=False
+            )
+            db.commit()
+        finally:
+            db.close()
+
+
 def test_audit_summary_limit_cap(client):
     """Limit is capped at 500 to prevent huge responses."""
     hdr = _sysadmin(client)
