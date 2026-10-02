@@ -18876,9 +18876,14 @@ document.addEventListener('keydown',function(e){
     // Close the topmost active modal-bg (excluding the outcome-reason modal which has its own handler)
     const activeModals=Array.from(document.querySelectorAll('.modal-bg.active:not(#m-outcome-reason)'));
     if(activeModals.length){
-      const top=activeModals[activeModals.length-1];
+      // Most recently OPENED dialog (openModal's Map keeps open order). DOM
+      // order -- the old rule -- closed the OUTER dialog whenever the inner one
+      // (e.g. #m-confirm) sat earlier in the markup. DOM order remains the
+      // fallback for dialogs shown without openModal().
+      const opened=[..._modalReturnFocusById.keys()].map(id=>document.getElementById(id)).filter(m=>m&&activeModals.includes(m));
+      const top=opened.length?opened[opened.length-1]:activeModals[activeModals.length-1];
       const xBtn=top.querySelector('.modal-x');
-      if(xBtn){xBtn.click();}else{top.classList.remove('active');if(_modalReturnFocus&&_modalReturnFocus.focus)try{_modalReturnFocus.focus();}catch(_){}_modalReturnFocus=null;}
+      if(xBtn){xBtn.click();}else{closeModal(top.id);}
     }
   }
 });
