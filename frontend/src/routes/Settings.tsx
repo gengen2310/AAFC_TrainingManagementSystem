@@ -30,7 +30,7 @@ function unitLabel(u: UserRecord): string {
 }
 
 export function Settings() {
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
 
   // ── Self-service: change own code ──────────────────────────────────────────
   const [selfCurrent, setSelfCurrent] = useState("");
@@ -41,9 +41,12 @@ export function Settings() {
 
   const selfChange = useMutation({
     mutationFn: () => authApi.changeCode(session!.user_id, selfNew, selfCurrent),
-    onSuccess: () => {
-      setSelfMsg("Access code updated.");
+    onSuccess: async () => {
+      setSelfMsg("Access code updated. Sign in again with your new code.");
       setSelfCurrent(""); setSelfNew(""); setSelfConfirm(""); setSelfErr("");
+      // change-code increments token_version, so the current session is
+      // intentionally invalid after a successful credential rotation.
+      await logout();
     },
     onError: (e) => {
       setSelfMsg("");
