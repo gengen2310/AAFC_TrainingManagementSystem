@@ -33,16 +33,17 @@ export function Settings() {
   const { session } = useAuth();
 
   // ── Self-service: change own code ──────────────────────────────────────────
+  const [selfCurrent, setSelfCurrent] = useState("");
   const [selfNew, setSelfNew] = useState("");
   const [selfConfirm, setSelfConfirm] = useState("");
   const [selfMsg, setSelfMsg] = useState("");
   const [selfErr, setSelfErr] = useState("");
 
   const selfChange = useMutation({
-    mutationFn: () => authApi.changeCode(session!.user_id, selfNew),
+    mutationFn: () => authApi.changeCode(session!.user_id, selfNew, selfCurrent),
     onSuccess: () => {
       setSelfMsg("Access code updated.");
-      setSelfNew(""); setSelfConfirm(""); setSelfErr("");
+      setSelfCurrent(""); setSelfNew(""); setSelfConfirm(""); setSelfErr("");
     },
     onError: (e) => {
       setSelfMsg("");
@@ -51,7 +52,7 @@ export function Settings() {
   });
 
   const mismatch = selfConfirm.length > 0 && selfNew !== selfConfirm;
-  const selfDisabled = !selfNew.trim() || selfNew !== selfConfirm || selfChange.isPending;
+  const selfDisabled = !selfCurrent.trim() || !selfNew.trim() || selfNew !== selfConfirm || selfChange.isPending;
 
   // ── Admin: reset another user's code ──────────────────────────────────────
   const [selected, setSelected] = useState<UserRecord | null>(null);
@@ -98,10 +99,19 @@ export function Settings() {
       {/* ── Self-service card ── always visible ── */}
       <Card title="Change my access code">
         <p className="muted" style={{ marginBottom: 12 }}>
-          Change your own access code. The current code is not required. The previous code cannot
-          be recovered once changed.
+          Change your own access code. Re-enter your current code to confirm the change. The previous
+          code cannot be recovered once changed.
         </p>
         <div className="form" style={{ maxWidth: 340 }}>
+          <label htmlFor="sc-current">Current access code</label>
+          <input
+            id="sc-current"
+            type="password"
+            value={selfCurrent}
+            onChange={(e) => { setSelfCurrent(e.target.value); setSelfMsg(""); setSelfErr(""); }}
+            autoComplete="current-password"
+            placeholder="Enter current code"
+          />
           <label htmlFor="sc-new">New access code</label>
           <input
             id="sc-new"
