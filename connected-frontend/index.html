@@ -7460,7 +7460,7 @@ function _renderAccountTable(){
       return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button> `+
         `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteAccount('${u.user_id}','${dn}')">Delete Permanently…</button>`;
     }
-    const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
+    const resetBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
     const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
       ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
@@ -8738,11 +8738,12 @@ function renderUserDir(){
     national_viewer:'NAT Viewer',national_admin:'NAT Admin',system_admin:'System',auditor:'Auditor'};
   const ROLE_CLS={sqn_general:'b-blue',sqn_admin:'b-blue',wing_viewer:'b-ok',wing_admin:'b-ok',
     national_viewer:'b-amber',national_admin:'b-amber',system_admin:'b-amber',auditor:'b-grey'};
-  const rows=(S.users||[]).filter(u=>!flt||
+  const myUid=S.session&&S.session.user_id;
+  const rows=(S.users||[]).filter(u=>u.user_id!==myUid && (!flt||
     (u.display_name||'').toLowerCase().includes(flt)||
     (u.role||'').includes(flt)||
     (u.squadron_code||'').toLowerCase().includes(flt)||
-    (u.wing_code||'').toLowerCase().includes(flt));
+    (u.wing_code||'').toLowerCase().includes(flt)));
   if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:var(--fs-xs);padding:8px 0">'+(!(S.users||[]).length?'No users in scope.':'No users match the filter.')+'</div>'; return; }
   const unit=u=>u.squadron_code?'SQN '+u.squadron_code:u.wing_code?'Wing '+u.wing_code:u.national_id?'NAT HQ':'—';
   el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th></th></tr></thead><tbody>'+
