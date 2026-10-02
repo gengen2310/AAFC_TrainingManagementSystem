@@ -82,11 +82,14 @@ export function Settings() {
 
   const q = filter.toLowerCase();
   const filtered = (users ?? []).filter((u) =>
-    !q
-    || u.display_name.toLowerCase().includes(q)
-    || u.role.includes(q)
-    || (u.squadron_code ?? "").toLowerCase().includes(q)
-    || (u.wing_code ?? "").toLowerCase().includes(q),
+    u.user_id !== session?.user_id
+    && (
+      !q
+      || u.display_name.toLowerCase().includes(q)
+      || u.role.includes(q)
+      || (u.squadron_code ?? "").toLowerCase().includes(q)
+      || (u.wing_code ?? "").toLowerCase().includes(q)
+    ),
   );
 
   function selectUser(u: UserRecord) { setSelected(u); setNewCode(""); setMsg(""); setErr(""); }
