@@ -416,11 +416,11 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     u = User(display_name=name, role=body.role,
              national_id=nat_id, wing_id=wing_id, squadron_id=sqn_id,
              flight_id=flight_id, active_status=True, created_by=p.user_id,
-             # An auto-generated initial code is a temporary bootstrap secret and
-             # must be rotated by the account holder. If the administrator
-             # explicitly supplies new_code, treat it as the deliberately chosen
-             # initial credential rather than inventing a second forced rotation.
-             must_change_code=(body.new_code is None),
+             # Every administrator-issued initial credential is known to
+             # someone other than the account holder, whether generated or
+             # manually entered. Force the holder to choose their own code on
+             # first sign-in.
+             must_change_code=True,
              recovery_email=recovery_email,
              recovery_email_verified_at=None,
              recovery_email_updated_at=utcnow() if recovery_email else None,
