@@ -208,6 +208,12 @@ _MAINTENANCE_ALWAYS_EXEMPT = frozenset({
     # Login is exempt here; the handler applies block_logins after role is known
     # so system_admin can always log back in even when block_logins=True (MAINT-03).
     "/api/auth/login",
+    # Sign-in is lookup (unit+role -> user_id) THEN login. lookup is a POST, so
+    # the gate treated it as a write and 503'd every fresh sign-in -- system_admin
+    # included -- in any locked window, defeating the login exemption above. It
+    # changes nothing but the same failed-attempt record login itself writes;
+    # block_logins is still enforced by the login handler.
+    "/api/auth/lookup",
     "/api/system/maintenance",
     "/api/system/maintenance/enable",
     "/api/system/maintenance/disable",
