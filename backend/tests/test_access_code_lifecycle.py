@@ -570,3 +570,29 @@ class TestSiblingLoginFallbackLockout:
                 f"primary failed_attempts grew more than the 3 genuine failures "
                 f"(before={before}, after={after})"
             )
+
+
+class TestSelfChangeCodeReauthentication:
+    """A stolen authenticated session must not be enough to rotate its own credential."""
+
+    def test_self_change_without_current_code_is_rejected(self, client):
+        uid = _get_sqn_admin_id(client)
+        hdr = login(client, "ADMIN703")
+        r = client.post(
+            "/api/auth/change-code",
+            json={"user_id": uid, "new_code": "ATTEMPT99"},
+            headers=hdr,
+        )
+        assert r.status_code == 403, r.text
+        assert r.json()["detail"]["error"] == "reauth_required"
+
+    def test_self_change_with_wrong_current_code_is_rejected(self, client):
+        uid = _get_sqn_admin_id(client)
+        hdr = login(client, "ADMIN703")
+        r = client.post(
+            "/api/auth/change-code",
+            json={"user_id": uid, "new_code": "ATTEMPT99", "current_code": "WRONG-CODE"},
+            headers=hdr,
+        )
+        assert r.status_code == 403, r.text
+        assert r.json()["detail"]["error"] == "reauth_required"
