@@ -2473,8 +2473,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card no-ro">
           <h2 class="ctitle">🔑 Access Code</h2>
-          <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
+          <div class="alert a-info">Change your own sign-in code. Re-enter your current code to confirm the change. Existing codes cannot be viewed and the previous code cannot be recovered once changed.</div>
           <div class="form-row">
+            <div class="ff"><label for="cc-current">Current access code</label><input id="cc-current" type="password" autocomplete="current-password" placeholder="Enter current code"></div>
             <div class="ff"><label for="cc-new">New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
             <div class="ff"><label for="cc-confirm">Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
           </div>
@@ -5291,7 +5292,7 @@ function showAuthStep1(){
   onAuthFieldChange();
 }
 
-async function completeRequiredCodeChange(session){
+async function completeRequiredCodeChange(session,currentCode){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='block';
   const next=await promptText(
@@ -5310,7 +5311,7 @@ async function completeRequiredCodeChange(session){
   try{
     await api('/api/auth/change-code',{
       method:'POST',
-      body:{user_id:session.user_id,new_code:next},
+      body:{user_id:session.user_id,new_code:next,current_code:currentCode},
     });
     tokenClear();
     document.getElementById('app').style.display='none';
@@ -5357,7 +5358,7 @@ async function doLogin(){
     S.session=out.session;
     applySession(out.session);
     if(out.session&&out.session.must_change_code){
-      await completeRequiredCodeChange(out.session);
+      await completeRequiredCodeChange(out.session,code);
       return;
     }
     await loadData();
@@ -5406,7 +5407,15 @@ async function tryRestoreSession(){
     S.session=out.session;
     applySession(out.session);
     if(out.session&&out.session.must_change_code){
-      await completeRequiredCodeChange(out.session);
+      // A restored JWT is not enough to rotate credentials. The user must
+      // re-enter the temporary/current access code so the change-code endpoint
+      // can re-authenticate the credential itself.
+      tokenClear();
+      restoring.style.display='none';
+      showAuthStep1();
+      const err=document.getElementById('auth-err');
+      err.style.display='block';
+      err.textContent='Sign in again with your current access code to complete the required code change.';
       return;
     }
     await loadData();
@@ -15279,17 +15288,19 @@ async function verifyMyRecoveryEmail(){
 
 async function changeMyCode(){
   const msg=document.getElementById('cc-msg');
+  const current=(document.getElementById('cc-current').value||'').trim();
   const nw=(document.getElementById('cc-new').value||'').trim();
   const cf=(document.getElementById('cc-confirm').value||'').trim();
   const show=(t,ok)=>{ if(msg){ msg.textContent=t; msg.style.color=ok?'var(--ok)':'var(--red)'; } };
+  if(!current){ show('Enter your current access code.',false); return; }
   if(!nw||!cf){ show('Enter and confirm the new code.',false); return; }
   if(nw!==cf){ show('Codes do not match.',false); return; }
   if(nw.length<6){ show('Use at least 6 characters.',false); return; }
   const uid=S.session&&S.session.user_id;
   if(!uid){ show('No active session.',false); return; }
   try{
-    await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:uid,new_code:nw})});
-    document.getElementById('cc-new').value=''; document.getElementById('cc-confirm').value='';
+    await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:uid,new_code:nw,current_code:current})});
+    document.getElementById('cc-current').value=''; document.getElementById('cc-new').value=''; document.getElementById('cc-confirm').value='';
     show('Access code changed. Signing you out so you can use the new code.',true);
     setTimeout(()=>doLogout(),900);
   }catch(e){ show('Could not change code: '+apiErr(e),false); }
