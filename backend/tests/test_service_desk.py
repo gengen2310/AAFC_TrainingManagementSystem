@@ -347,7 +347,7 @@ def test_national_admin_can_patch_any_ticket(client):
 
     h = login(client, "ADMINNATIONAL")
     r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
-                     json={"status": "in_progress", "assigned_to_name": "Maj Smith"}, headers=h)
+                     json={"status": "in_progress"}, headers=h)
     assert r.status_code == 200, r.text
 
 
@@ -457,20 +457,45 @@ def test_create_ticket_no_squadron_no_unit_name_rejected(client):
     assert r.status_code == 422
 
 
-def test_assigned_to_name_field(client):
+def test_legacy_assigned_to_name_resolves_real_account(client):
+    """Pre-v70 name-only clients may resolve a unique real support account,
+    but the server still stores canonical ownership by user id."""
     sqn703 = _sqn_id("703SQN")
     h_sys = login(client, "SYSADMIN2026")
 
-    created = _make_ticket(client, sqn703, description="Assignee field test ticket here.")
+    created = _make_ticket(client, sqn703, description="Assignee compatibility test ticket.")
     ticket_id = created["ticket_id"]
 
-    r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
-                     json={"assigned_to_name": "Capt Jones"}, headers=h_sys)
-    assert r.status_code == 200
+    accounts = client.get("/api/accounts", headers=h_sys).json()
+    assignee = next(
+        a for a in accounts
+        if a["role"] in ("system_admin", "national_admin")
+        and a["active_status"] and not a["is_archived"]
+    )
+    r = client.patch(
+        f"/api/service-desk/tickets/{ticket_id}",
+        json={"assigned_to_name": assignee["display_name"]},
+        headers=h_sys,
+    )
+    assert r.status_code == 200, r.text
 
     tickets = client.get("/api/service-desk/tickets", headers=h_sys).json()
-    t = next((x for x in tickets if x["ticket_id"] == ticket_id), None)
-    assert t["assigned_to_name"] == "Capt Jones"
+    t = next(x for x in tickets if x["ticket_id"] == ticket_id)
+    assert t["assigned_to_name"] == assignee["display_name"]
+    assert t["assigned_to_user_id"] == assignee["user_id"]
+
+
+def test_legacy_assigned_to_name_rejects_free_text(client):
+    sqn703 = _sqn_id("703SQN")
+    h_sys = login(client, "SYSADMIN2026")
+    created = _make_ticket(client, sqn703, description="Reject free text assignee test.")
+    r = client.patch(
+        f"/api/service-desk/tickets/{created['ticket_id']}",
+        json={"assigned_to_name": "Not A Real Support Account"},
+        headers=h_sys,
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "invalid_assignee"
 
 
 # ── Public units endpoint ─────────────────────────────────────────────────────
