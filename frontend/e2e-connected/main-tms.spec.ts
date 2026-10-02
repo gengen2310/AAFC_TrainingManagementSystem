@@ -55,7 +55,11 @@ test.describe("Retired pages are gone", () => {
 test.describe("Planning Workspace restoration", () => {
   test("Planning Workspace nav link is visible for sqn_admin and opens without a second login", async ({ page, context }) => {
     await page.route("**/api/health/ui-config", route =>
-      route.fulfill({ json: { planning_workspace_url: "http://localhost:5173", training_year: 2026, environment: "development" } })
+      route.fulfill({ json: {
+        // The PW server this run actually started (PW_BASE_URL, as the handoff
+        // spec uses); a hardcoded :5173 sent the popup to whatever owned that port.
+        planning_workspace_url: process.env.PW_BASE_URL || "http://localhost:5173",
+        training_year: 2026, environment: "development" } })
     );
     await loginSquadron(page, "ADMIN703");
     const pwLink = page.locator("#nav-pw-link");
