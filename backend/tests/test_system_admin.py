@@ -790,3 +790,62 @@ def test_recent_changes_change_entry_has_required_fields(client):
         assert "label" in entry
         assert "object_type" in entry
         assert "object_id" in entry
+
+
+def test_pg_dump_failure_does_not_record_successful_backup(client, monkeypatch):
+    """A failed PostgreSQL dump must not advance the System Console backup timestamp."""
+    from types import SimpleNamespace
+    from app.config import settings
+    import app.routers.system as system_router
+
+    hdr = _sysadmin(client)
+    before = client.get("/api/system/overview", headers=hdr)
+    assert before.status_code == 200
+    before_json = before.json()
+
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql://user:pass@example.invalid:5432/aafc")
+    monkeypatch.setattr(
+        system_router.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=1, stderr=b"synthetic pg_dump failure"),
+    )
+
+    failed = client.get("/api/system/backups/pg-dump", headers=hdr)
+    assert failed.status_code == 502, failed.text
+    assert failed.json()["detail"]["error"] == "pg_dump_failed"
+
+    after = client.get("/api/system/overview", headers=hdr)
+    assert after.status_code == 200
+    after_json = after.json()
+    assert after_json["last_backup_at"] == before_json["last_backup_at"]
+    assert after_json["last_backup_source"] == before_json["last_backup_source"]
+
+
+def test_pg_dump_records_manual_backup_only_after_verified_nonempty_dump(client, monkeypatch):
+    """Successful manual pg_dump is verified before last_backup_at is recorded."""
+    from pathlib import Path
+    from types import SimpleNamespace
+    from app.config import settings
+    import app.routers.system as system_router
+
+    hdr = _sysadmin(client)
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql://user:pass@example.invalid:5432/aafc")
+
+    def fake_run(cmd, **kwargs):
+        output = cmd[cmd.index("--file") + 1]
+        Path(output).write_bytes(b"PGDMP synthetic verified backup")
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr(system_router.subprocess, "run", fake_run)
+
+    response = client.get("/api/system/backups/pg-dump", headers=hdr)
+    assert response.status_code == 200, response.text
+    assert response.content.startswith(b"PGDMP")
+    assert int(response.headers["content-length"]) == len(response.content)
+
+    overview = client.get("/api/system/overview", headers=hdr)
+    assert overview.status_code == 200
+    body = overview.json()
+    assert body["last_backup_at"]
+    assert body["last_backup_source"] == "system_console_pg_dump"
+    assert body["last_backup_scope"] == "manual_application_backup"
