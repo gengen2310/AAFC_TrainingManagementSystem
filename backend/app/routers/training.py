@@ -5281,6 +5281,7 @@ class CurriculumImportIn(BaseModel):
     items: List[CurriculumImportItem]
     squadron_id: str | None = None  # if provided, link scheduled items to this sqn
     owning_level: str = "national"  # national | wing | squadron
+    wing_id: str | None = None      # required when owning_level == "wing"
     # Phase 3.4: compute and return the create/update/skip/failed breakdown
     # without writing anything -- default False preserves this endpoint's
     # original immediate-commit behaviour for every existing caller.
@@ -5552,10 +5553,31 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     owning_level = body.owning_level if body.owning_level in {"national", "wing", "squadron"} else "national"
     sqn_id = body.squadron_id
 
+    sqn = None
     if sqn_id:
-        if not db.get(Squadron, sqn_id):
+        sqn = db.get(Squadron, sqn_id)
+        if not sqn:
             raise HTTPException(404, detail={"error": "squadron_not_found",
                                              "message": "The referenced squadron does not exist."})
+
+    # A unit-level import must name its unit. Without one, "wing" items were
+    # created with wing_id NULL (owned by no Wing) and a re-import matched and
+    # overwrote a same-code item of ANY Wing; "squadron" items without a
+    # squadron_id were owned by no squadron.
+    target_wing_id: str | None = None
+    if owning_level == "wing":
+        w = db.get(Wing, body.wing_id) if body.wing_id else None
+        if not w or w.is_archived:
+            raise HTTPException(422, detail={
+                "error": "wing_required",
+                "message": "A Wing-level import needs the Wing it belongs to (wing_id)."})
+        target_wing_id = w.id
+    elif owning_level == "squadron":
+        if not sqn:
+            raise HTTPException(422, detail={
+                "error": "squadron_required",
+                "message": "A Squadron-level import needs the Squadron it belongs to (squadron_id)."})
+        target_wing_id = sqn.wing_id
 
     created = updated = skipped = failed = 0
     results = []
@@ -5581,6 +5603,8 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 CurriculumItem.is_archived == False)  # noqa: E712
             if owning_level == "squadron":
                 q = q.filter(CurriculumItem.squadron_id == sqn_id)
+            elif owning_level == "wing":
+                q = q.filter(CurriculumItem.wing_id == target_wing_id)
 
             existing: CurriculumItem | None = None
             if item.identifier:
@@ -5599,6 +5623,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 ci = CurriculumItem(
                     owning_level=owning_level,
                     squadron_id=sqn_id if owning_level == "squadron" else None,
+                    wing_id=target_wing_id,
                     identifier=item.identifier,
                     code=item.code,
                     part_number=item.part_number,
@@ -5899,6 +5924,8 @@ async def import_curriculum_csv(
     file: UploadFile = File(...),
     owning_level: str = "national",
     preview: bool = False,
+    wing_id: str | None = None,       # required for owning_level=wing
+    squadron_id: str | None = None,   # required for owning_level=squadron
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -5972,7 +5999,8 @@ async def import_curriculum_csv(
         msg = "No valid rows found. " + "; ".join(parse_errors[:5]) if parse_errors else "File is empty or contains no data rows."
         raise HTTPException(400, detail={"error": "csv_parse_failed", "message": msg})
 
-    import_body = CurriculumImportIn(items=items, owning_level=owning_level, preview=preview)
+    import_body = CurriculumImportIn(items=items, owning_level=owning_level, preview=preview,
+                                     wing_id=wing_id, squadron_id=squadron_id)
     result = import_curriculum(import_body, db, p)
     result["parse_errors"] = parse_errors
     return result
