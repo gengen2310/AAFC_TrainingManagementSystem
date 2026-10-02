@@ -97,6 +97,7 @@ class LookupIn(BaseModel):
 class ChangeCodeIn(BaseModel):
     user_id: str
     new_code: str
+    current_code: str | None = None
 
 
 @router.post("/lookup")
@@ -378,7 +379,20 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "not_found"})
     # Scope check: the actor must have management authority over the target account.
     # (Mirrors the check in accounts.py:reset_code — prevents cross-scope code takeover.)
-    if not is_self:
+    if is_self:
+        # A stolen session token alone must not be sufficient to permanently
+        # rotate the account credential. Re-authenticate against the live code
+        # for both normal self-service and first-login forced rotation.
+        active_codes = db.query(AccessCode).filter(
+            AccessCode.user_id == target.id,
+            AccessCode.active_status == True,  # noqa: E712
+        ).all()
+        if not any(verify_code(body.current_code or "", row.code_hash) for row in active_codes):
+            raise HTTPException(403, detail={
+                "error": "reauth_required",
+                "message": "Enter your current access code to change it.",
+            })
+    else:
         from .accounts import _require_manage_authority
         _require_manage_authority(p, target, db)
     # Validate the new code: strip, non-empty, minimum length, maximum length.
