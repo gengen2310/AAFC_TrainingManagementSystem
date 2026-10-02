@@ -306,6 +306,14 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
                   role: str | None = None, since: str | None = None):
     require_audit_access(p)
     q = db.query(AuditLog)
+    # Keep this surface aligned with /api/audit: role authorization alone is
+    # not enough. Squadron and Wing readers must never receive audit rows from
+    # outside their tenancy.
+    if not p.is_national:
+        if p.is_wing:
+            q = q.filter(AuditLog.wing_id == p.wing_id)
+        else:
+            q = q.filter(AuditLog.squadron_id == p.squadron_id)
     if action:
         q = q.filter(AuditLog.action == action)
     if role:
