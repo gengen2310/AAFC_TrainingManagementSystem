@@ -6232,12 +6232,18 @@ function _consumeTmsSetupHandoff(){
   window.history.replaceState(null,'',url.pathname+url.search+url.hash);
   const existing=(P.years||[]).find(y=>Number(y.year)===year&&y.active_status!==false);
   if(existing)return existing;
-  const logical={
-    year, planning_year_id:null, active_status:true, materialised:false,
-    state:year<new Date().getFullYear()?'past':year>new Date().getFullYear()?'future':'current',
-  };
+  // Remembered so the year survives the refetch Settings does on open; without
+  // it the logical row vanished and the landing had no Set up action (T08).
+  P._handoffYear=year;
+  const logical=_ynLogicalYear(year);
   P.years=[...(P.years||[]).filter(y=>Number(y.year)!==year),logical];
   return logical;
+}
+
+function _ynLogicalYear(year){
+  const now=new Date().getFullYear();
+  return {year, planning_year_id:null, active_status:true, materialised:false,
+          state:year<now?'past':year>now?'future':'current'};
 }
 
 function bootApp(){
@@ -13026,9 +13032,15 @@ async function _ynFetchYears(){
   // nobody has written to has no row. Every P.years assignment goes through
   // here -- six call sites used to refetch without the flag, and the first one
   // to run after a step silently dropped the future years back out of the bar.
-  const all = await api('/api/planning/years?include_unmaterialised=true');
-  if(typeof P!=='undefined') P.years = all || [];
-  return all || [];
+  let all = await api('/api/planning/years?include_unmaterialised=true') || [];
+  // Keep a year handed off from Planning Workspace selectable until it exists.
+  if(typeof P!=='undefined' && P._handoffYear){
+    const hy = P._handoffYear;
+    if(all.some(y => Number(y.year) === hy && y.active_status !== false && y.planning_year_id)) P._handoffYear = null;
+    else if(!all.some(y => Number(y.year) === hy && y.active_status !== false)) all = [...all, _ynLogicalYear(hy)];
+  }
+  if(typeof P!=='undefined') P.years = all;
+  return all;
 }
 
 // Repaint every year surface that is currently in the DOM.
