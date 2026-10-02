@@ -482,6 +482,10 @@ def test_backup_create_sysadmin(client):
     assert "size_bytes" in d
     assert d["size_bytes"] > 0
     assert "backup_" in d["filename"]
+    overview = client.get("/api/system/overview", headers=hdr)
+    assert overview.status_code == 200
+    assert overview.json()["last_backup_source"] == "system_console_sqlite"
+    assert overview.json()["last_backup_scope"] == "manual_application_backup"
 
 
 def test_backup_create_forbidden_sqn(client):
