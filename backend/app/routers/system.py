@@ -384,6 +384,7 @@ def create_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     size = dest.stat().st_size
     created_at = datetime.now(timezone.utc).isoformat()
     _set_setting(db, "last_backup_at", created_at, p.user_id)
+    _set_setting(db, "last_backup_source", "system_console_sqlite", p.user_id)
     audit(db, p, object_type="system", object_id="backup", action="backup_created",
           new={"filename": dest.name, "size_bytes": size})
     return {"filename": dest.name, "size_bytes": size, "created_at": created_at}
