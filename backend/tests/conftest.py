@@ -136,7 +136,7 @@ def login(client, code):
     if payload.get("session", {}).get("must_change_code"):
         changed = client.post(
             "/api/auth/change-code",
-            json={"user_id": payload["session"]["user_id"], "new_code": code},
+            json={"user_id": payload["session"]["user_id"], "new_code": code, "current_code": code},
             headers=headers,
         )
         assert changed.status_code == 200, changed.text
