@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, TypeAdapter, field_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session as DBSession
 
@@ -10,6 +10,8 @@ from ..dependencies import get_principal
 from ..permissions import Principal, require_role
 from ..services import audit
 from ..email_service import send_ticket_notification, send_ticket_update_notification
+
+_EMAIL = TypeAdapter(EmailStr)
 
 router = APIRouter(prefix="/api", tags=["service_desk"])
 
@@ -88,6 +90,17 @@ class EmailConfigIn(BaseModel):
     scope: str          # "system" | "national" | "wing"
     wing_id: str | None = None
     notification_email: str
+
+    @field_validator("notification_email", mode="before")
+    @classmethod
+    def validate_notification_email(cls, v):
+        # "" clears the address (recipients skip blanks; there is no DELETE).
+        # Anything else must be ONE valid address: an unvalidated typo saved
+        # with 200 and every later ticket notification failed silently.
+        v = (v or "").strip()
+        if v:
+            _EMAIL.validate_python(v)
+        return v
 
     @field_validator("scope", mode="before")
     @classmethod
@@ -512,6 +525,7 @@ def upsert_email_config(
         q = q.filter(_EmailCfg.wing_id == body.wing_id)
 
     existing = q.first()
+    old_email = existing.notification_email if existing else None
     if existing:
         existing.notification_email = body.notification_email
         existing.updated_at = utcnow()
@@ -532,7 +546,7 @@ def upsert_email_config(
         object_type="service_desk_email_config",
         object_id=f"{body.scope}:{body.wing_id or ''}",
         action="updated",
-        old={},
+        old={"scope": body.scope, "wing_id": body.wing_id, "notification_email": old_email},
         new={"scope": body.scope, "wing_id": body.wing_id, "notification_email": body.notification_email},
     )
     return {"ok": True}
