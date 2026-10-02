@@ -41,6 +41,7 @@ def test_generated_initial_code_requires_rotation_before_app_access(client):
 
     replacement = "R-" + uuid.uuid4().hex
     changed = client.post("/api/auth/change-code", headers=temporary_headers, json={
+        "user_id": signed_in.json()["session"]["user_id"],
         "current_code": temporary_code,
         "new_code": replacement,
     })
