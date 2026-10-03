@@ -2756,10 +2756,20 @@ def get_long_range(
             ParadeNightTimingSnapshot.display_order,
         ).all():
             snaps_by_pn_lr.setdefault(snap.parade_night_id, []).append(snap)
+
+        # Conflicts are another parade-night child collection. Load them once
+        # for the whole range rather than issuing one SELECT per night.
+        conflicts_by_pn_lr: dict[str, list] = {}
+        for conflict in db.query(PlanningConflict).filter(
+            PlanningConflict.parade_night_id.in_(pn_ids_lr),
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        ).all():
+            conflicts_by_pn_lr.setdefault(conflict.parade_night_id, []).append(conflict)
     else:
         ts_by_night_lr = {}
         classes_by_session_lr = {}
         snaps_by_pn_lr = {}
+        conflicts_by_pn_lr = {}
 
     rows = []
     for pn_obj in parade_dates:
@@ -2770,10 +2780,7 @@ def get_long_range(
         for sess_out, s in zip(real_sessions, ts):
             sess_out["training_classes"] = classes_by_session_lr.get(s.id, [])
 
-        conflicts = db.query(PlanningConflict).filter(
-            PlanningConflict.parade_night_id == pn_obj.id,
-            PlanningConflict.is_resolved == False,  # noqa: E712
-        ).all()
+        conflicts = conflicts_by_pn_lr.get(pn_obj.id, [])
 
         pn_snaps_lr = snaps_by_pn_lr.get(pn_obj.id, [])
         instructional_periods = [
