@@ -1049,6 +1049,41 @@ def test_sqn_admin_can_create_scheduled_session(client):
     assert d["activity_title"] == "Drill Practice"
 
 
+
+def test_create_session_resolves_effective_template_when_night_has_no_explicit_template(client):
+    """Regression: a Planning-created parade night normally has no timing_template_id.
+
+    Session creation must call the shared effective-template service without
+    shadowing that function name, then continue successfully.
+    """
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    parade_date = f"{year['year']}-08-06"
+    pn = client.post(
+        f"/api/planning/years/{yr_id}/parade-dates",
+        json={"parade_date": parade_date},
+        headers=hdr,
+    )
+    assert pn.status_code == 200, pn.text
+    pd_id = pn.json()["parade_date_id"]
+
+    db = SessionLocal()
+    try:
+        row = db.get(ParadeNight, pd_id)
+        assert row is not None
+        assert row.timing_template_id is None
+    finally:
+        db.close()
+
+    created = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1},
+        headers=hdr,
+    )
+    assert created.status_code == 200, created.text
+
+
 def test_invalid_cadet_group_returns_422(client):
     hdr = _sqn_admin_hdr(client)
     yr_id, pd_id = _setup_year_with_date(client, hdr)
