@@ -18,7 +18,6 @@ from ..models.faq import FaqEntry
 from ..richtext import sanitize_rich_text
 from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
                                SessionAssistantFacilitator)
-from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
@@ -29,6 +28,7 @@ from ..services import (audit, score_parade, publish_blockers, close_blockers,
                         visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
 from ..services_readiness import parade_night_readiness
+from ..services_timing import effective_template
 from ..services_year import ensure_year_context
 
 router = APIRouter(prefix="/api", tags=["training"])
@@ -459,7 +459,7 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
             raise HTTPException(422, detail={"error": "timing_template_expired"})
         effective_tmpl = explicit_tmpl
     else:
-        effective_tmpl = _effective_template(db, s.id, body.date)
+        effective_tmpl = effective_template(db, s.id, body.date)
 
     if effective_tmpl is None:
         raise HTTPException(422, detail={
@@ -2242,7 +2242,7 @@ def parade_night_builder(pnid: str, db: DBSession = Depends(get_db), p: Principa
     if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2326,7 +2326,7 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
     if pn.timing_template_id:
         _tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not _tmpl and pn.squadron_id:
-        _tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        _tmpl = effective_template(db, pn.squadron_id, pn.date)
     tmpl_name = _tmpl.name if _tmpl else None
 
     # Resolve timing_block_id from the live template for both snapshot and template paths.

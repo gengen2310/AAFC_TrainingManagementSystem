@@ -19,7 +19,6 @@ from ..models import (
 from ..services_year import current_year, find_year_context
 from ..dependencies import get_principal
 from ..permissions import Principal, resolve_view_squadron_id
-from .training import _NAT_ADMIN_ROLES
 
 router = APIRouter(prefix="/api", tags=["setup"])
 

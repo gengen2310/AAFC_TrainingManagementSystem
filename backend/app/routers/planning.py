@@ -58,6 +58,7 @@ from ..services_year import (
     PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
     selectable_years, year_display_name, year_state,
 )
+from ..services_timing import effective_template
 
 
 def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
@@ -67,7 +68,6 @@ def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
     except PastYearLocked as exc:
         raise HTTPException(403, detail={"error": "past_year_read_only",
                                          "message": str(exc)})
-from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
@@ -2071,7 +2071,7 @@ def get_builder(
     if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2231,7 +2231,7 @@ def create_session(
     # canonical schedule/print endpoint can place the session on its real row.
     placement_template_id = pn.timing_template_id
     if not placement_template_id:
-        effective_template = _effective_template(db, pn.squadron_id, pn.date)
+        effective_template = effective_template(db, pn.squadron_id, pn.date)
         placement_template_id = effective_template.id if effective_template else None
     if placement_template_id:
         period_block = db.query(TimingBlock).filter(
@@ -2628,7 +2628,7 @@ def get_weekly_program(
     if pn and pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,

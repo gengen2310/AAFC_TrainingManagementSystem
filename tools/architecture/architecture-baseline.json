@@ -37,14 +37,7 @@
     ],
     "backend/app/routers/planning.py": [
       "dashboard",
-      "timing",
       "training"
-    ],
-    "backend/app/routers/setup.py": [
-      "training"
-    ],
-    "backend/app/routers/training.py": [
-      "timing"
     ]
   }
 }
