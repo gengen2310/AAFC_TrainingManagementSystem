@@ -48,7 +48,8 @@ from ..models.training import (
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
+from ..permissions import (Principal, require_role, require_write_role,
+                           require_can_write_squadron, require_can_view_squadron)
 from ..services import audit
 from ..services import (visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
@@ -344,15 +345,13 @@ def _parse_program_file(content: bytes, is_xlsx: bool) -> list[dict]:
 # RBAC helpers
 # ─────────────────────────────────────────────────────────────
 
-_WRITE_BLOCKED = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
 _NAT_ROLES     = frozenset({"national_admin", "system_admin"})
 _WING_ROLES    = frozenset({"wing_admin", *_NAT_ROLES})
 _ALL_ADMIN     = frozenset({"sqn_admin", "wing_admin", "national_admin", "system_admin"})
 
 
 def _require_plan_write(p: Principal) -> None:
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
 
 
 def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
@@ -363,8 +362,8 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
     rather than at each of the fifteen year-scoped write endpoints so that a new
     endpoint added later inherits the protection instead of forgetting it.
     """
-    if write and p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if write:
+        _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
     if p.role in ("sqn_admin", "sqn_general"):

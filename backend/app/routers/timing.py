@@ -27,7 +27,7 @@ from ..models.training import SessionAudience, TrainingClass
 from ..models.training import BLOCK_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import (
-    Principal, WRITE_ROLES, require_role,
+    Principal, require_write_role,
     require_can_view_squadron, require_can_write_squadron,
 )
 from ..services import audit
@@ -326,7 +326,7 @@ def create_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         raise HTTPException(400, detail={"error": "no_squadron_scope",
@@ -424,7 +424,7 @@ def update_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -470,7 +470,7 @@ def archive_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -505,7 +505,7 @@ def apply_from_date(
     that would overlap. Past parade nights are NOT changed — only new creation will
     use the new template.
     """
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -605,7 +605,7 @@ def set_timing_override(
 
     Does not change the squadron's default future template.
     """
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     pn = db.get(ParadeNight, pnid)
     if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -659,7 +659,7 @@ def remove_timing_override(
     p: Principal = Depends(get_principal),
 ):
     """Remove a one-night timing override. The parade night reverts to the default template."""
-    require_role(p, *WRITE_ROLES)
+    require_write_role(p)
     pn = db.get(ParadeNight, pnid)
     if not pn:
         raise HTTPException(404, detail={"error": "not_found"})

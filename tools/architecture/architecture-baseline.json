@@ -10,7 +10,7 @@
   },
   "router_direct_role_checks": {
     "backend/app/routers/__init__.py": 0,
-    "backend/app/routers/accounts.py": 21,
+    "backend/app/routers/accounts.py": 20,
     "backend/app/routers/auth.py": 0,
     "backend/app/routers/custom_phases.py": 9,
     "backend/app/routers/dashboard.py": 0,
@@ -19,7 +19,7 @@
     "backend/app/routers/jobs.py": 1,
     "backend/app/routers/ops.py": 1,
     "backend/app/routers/organisations.py": 16,
-    "backend/app/routers/planning.py": 20,
+    "backend/app/routers/planning.py": 18,
     "backend/app/routers/search.py": 4,
     "backend/app/routers/service_desk.py": 10,
     "backend/app/routers/setup.py": 1,

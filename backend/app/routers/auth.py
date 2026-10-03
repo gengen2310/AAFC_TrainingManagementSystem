@@ -12,7 +12,7 @@ from ..security import (verify_code, create_token, hash_code,
 from ..database import utcnow
 from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession, SystemSetting
 from ..dependencies import get_principal, client_meta, real_client_ip
-from ..permissions import Principal, WRITE_ROLES, require_role
+from ..permissions import Principal, require_write_role
 from ..services import audit
 from ..services_recovery import (
     RESET_TTL_MINUTES, consume_token, hash_token, is_recovery_eligible, mint_token,
@@ -373,7 +373,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     # Any authenticated user may change their own code.
     # Changing another user's code requires an admin role + management authority over that account.
     if not is_self:
-        require_role(p, *WRITE_ROLES)
+        require_write_role(p)
     target = db.get(User, body.user_id)
     if not target:
         raise HTTPException(404, detail={"error": "not_found"})

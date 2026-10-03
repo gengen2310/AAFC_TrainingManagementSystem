@@ -33,7 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
-from ..permissions import Principal
+from ..permissions import Principal, require_write_role
 import re
 
 from ..security import hash_code, generate_code, verify_code
@@ -62,11 +62,10 @@ _CREATE_AUTHORITY: dict[str, set[str]] = {
 
 # Which roles an actor may read/manage. sqn_general reads its own squadron's
 # accounts read-only (2026-09-28 product decision); scope is enforced below
-# (list filter + _can_read_account) and writes stay behind _WRITE_ROLES.
+# (list filter + _can_read_account) and writes stay behind the central write-role policy.
 _READ_ROLES = {"sqn_admin", "sqn_general", "wing_viewer", "wing_admin",
                "national_viewer", "national_admin", "system_admin", "auditor"}
 
-_WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
 
 _NATIONAL_SCOPE_ROLES = {"national_admin", "national_viewer", "system_admin", "auditor"}
 _WING_SCOPE_ROLES = {"wing_admin", "wing_viewer"}
@@ -86,8 +85,7 @@ def _scope_type(role: str) -> str:
 # ─────────────────────────────────────────────
 
 def _require_write_actor(p: Principal) -> None:
-    if p.role not in _WRITE_ROLES:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
 
 
 def _validate_create_scope(p: Principal, target_role: str,

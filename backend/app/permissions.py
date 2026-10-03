@@ -179,6 +179,16 @@ def require_role(p: Principal, *roles: str):
         })
 
 
+def require_write_role(p: Principal):
+    """Require one of the system's write-capable roles.
+
+    Kept separate from require_role() so migrating legacy router gates does not
+    silently change their established 403 response payload.
+    """
+    if p.role not in WRITE_ROLES:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+
 def require_system_admin(p: Principal):
     if not p.is_system_admin:
         raise HTTPException(403, detail={
