@@ -20,7 +20,11 @@ function openModal(id){
   _modalReturnFocusById.set(id,returnTarget);
   bg.classList.add('active');
   const first=bg.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled)')||bg.querySelector('button:not(:disabled),[tabindex]:not([tabindex="-1"]),[href]');
-  if(first)setTimeout(()=>first.focus(),200);
+  // Deferred, but never steal focus: if focus is already inside this dialog
+  // when the timer fires (the user started typing, or autofill), leave it.
+  // An unconditional focus() redirected keystrokes mid-word into the first
+  // field (CI REM-111: "Regression" landed in Rank, Family Name stayed empty).
+  if(first)setTimeout(()=>{ if(bg.classList.contains('active')&&!bg.contains(document.activeElement))first.focus(); },200);
 }
 function closeModal(id){
   const bg=document.getElementById(id);
