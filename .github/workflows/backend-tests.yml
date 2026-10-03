@@ -2,7 +2,7 @@ name: Backend Tests
 
 on:
   push:
-    branches: [main, "release/**", "fix/**", "next-stage/**"]
+    branches: [main, "release/**", "fix/**", "next-stage/**", "stabilise/**", "refactor/**"]
   pull_request:
     branches: [main, "release/**"]
 
@@ -87,6 +87,9 @@ jobs:
 
       - name: Verify shared design-token sync
         run: python scripts/check_token_sync.py
+
+      - name: Enforce architecture stabilisation ratchets
+        run: python tools/architecture/guard.py
 
       - name: Verify frontend security hygiene
         shell: bash
