@@ -34,7 +34,7 @@ from ..models import (
 from ..permissions import (Principal, resolve_view_squadron_id, require_role,
                            require_can_view_squadron, require_can_view_wing)
 from ..services_readiness import parade_night_readiness, session_requirements
-from .training import _class_curriculum_progress
+from ..services_curriculum_progress import class_curriculum_progress
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -473,7 +473,7 @@ def _class_curriculum_progress_summary(db: DBSession, sq_id: str) -> dict:
 
     stages: dict[str, dict] = {}
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         stage_id = prog["training_stage_id"]
         entry = stages.setdefault(stage_id, {
             "stage_name": prog["stage_name"] or "Unnamed stage",

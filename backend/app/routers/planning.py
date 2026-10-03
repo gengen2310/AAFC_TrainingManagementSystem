@@ -59,6 +59,7 @@ from ..services_year import (
     selectable_years, year_display_name, year_state,
 )
 from ..services_timing import effective_template
+from ..services_curriculum_progress import class_curriculum_progress
 
 
 def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
@@ -3641,7 +3642,6 @@ def get_class_forecasts(
     """
     from sqlalchemy import func, select as sa_select
     import math
-    from .training import _class_curriculum_progress
 
     py = db.get(PlanningYear, year_id)
     if not py:
@@ -3702,7 +3702,7 @@ def get_class_forecasts(
 
     forecasts = []
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         requirements = prog.get("requirements", [])
         remaining = [r for r in requirements if r["status"] not in _DELIVERED_STATUSES]
         planned = [r for r in remaining if r["status"] == _PLANNED_STATUS]
@@ -3716,7 +3716,7 @@ def get_class_forecasts(
         if c.training_stage_id is None:
             # The five classes auto-created with a planning year carry a
             # stage_code (ORI/INI/...) but no training_stage_id, and
-            # _class_curriculum_progress keys off the stage, so they have zero
+            # class_curriculum_progress keys off the stage, so they have zero
             # requirements for a reason that has nothing to do with progress.
             # Reporting "All requirements delivered." there is a green light
             # for work nobody has scoped yet -- say what is actually true.
@@ -3893,7 +3893,7 @@ def list_missions(
     # CLASS-05: per-class breakdown, additive to the existing item-level
     # backlog_status/is_scheduled/etc fields below (none of which change).
     # A Training Class's Stage is matched to a CurriculumItem's phase the
-    # same way _class_curriculum_progress (training.py) does -- by
+    # same way class_curriculum_progress (services_curriculum_progress.py) does -- by
     # CurriculumPhase.name == CurriculumItem.phase -- so this reuses that
     # resolution rather than inventing a second one (addendum §44). Classes
     # are not filtered by training_year_id: the Session<->Class assignment

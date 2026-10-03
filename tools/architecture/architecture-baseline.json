@@ -32,12 +32,8 @@
     "backend/app/routers/auth.py": [
       "accounts"
     ],
-    "backend/app/routers/dashboard.py": [
-      "training"
-    ],
     "backend/app/routers/planning.py": [
-      "dashboard",
-      "training"
+      "dashboard"
     ]
   }
 }

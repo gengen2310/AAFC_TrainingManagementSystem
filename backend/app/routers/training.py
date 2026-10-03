@@ -28,6 +28,7 @@ from ..services import (audit, score_parade, publish_blockers, close_blockers,
                         visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
 from ..services_readiness import parade_night_readiness
+from ..services_curriculum_progress import ITEM_STATUS_PRIORITY, class_curriculum_progress
 from ..services_timing import effective_template
 from ..services_year import ensure_year_context
 
@@ -3236,83 +3237,17 @@ def merge_training_class(source_id: str, body: MergeTrainingClassIn,
 
 
 # ── CLASS-SPECIFIC CURRICULUM PROGRESS ──────────────────────────────────────
-# CLASS-04: curriculum progress derived PER Training Class, not blended
-# across every class sharing a Training Stage. Derived entirely from
-# existing operational data (CurriculumItem, Session, SessionAudience) --
-# no second, manually-maintained progress database (addendum §44). One
-# recorded fact (a Session's status, or its per-class outcome_override)
-# drives this read model; nothing here is itself written to directly.
-_ITEM_STATUS_PRIORITY = ["delivered", "delivered_with_issue", "not_delivered",
-                         "cancelled", "planned", "rescheduled"]
-
-
-def _class_curriculum_progress(db: DBSession, c: TrainingClass) -> dict:
-    stage = db.get(CurriculumPhase, c.training_stage_id) if c.training_stage_id else None
-    stage_name = stage.name if stage else None
-    s = db.get(Squadron, c.squadron_id)
-    wing_id = s.wing_id if s else None
-
-    from sqlalchemy import or_
-    conditions = [CurriculumItem.owning_level == "national"]
-    if wing_id:
-        conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
-    conditions.append(CurriculumItem.squadron_id == c.squadron_id)
-    items = db.query(CurriculumItem).filter(
-        CurriculumItem.is_archived == False,  # noqa: E712
-        CurriculumItem.phase == stage_name,
-        or_(*conditions),
-    ).order_by(CurriculumItem.recommended_sequence).all()
-
-    # One query for every Session linked to this class via SessionAudience,
-    # joined back to the Session row for its curriculum_item_id/status.
-    linked = (
-        db.query(SessionAudience, Session)
-        .join(Session, SessionAudience.session_id == Session.id)
-        .filter(SessionAudience.training_class_id == c.id, Session.is_archived == False)  # noqa: E712
-        .all()
-    )
-    from collections import defaultdict
-    by_item: dict[str, list[dict]] = defaultdict(list)
-    for aud, sess in linked:
-        if not sess.curriculum_item_id:
-            continue
-        effective = aud.outcome_override or sess.status or "planned"
-        by_item[sess.curriculum_item_id].append({"session_id": sess.id, "status": effective})
-
-    requirements = []
-    summary = {"total": 0, "delivered": 0, "planned": 0, "not_delivered": 0, "cancelled": 0, "not_started": 0}
-    for item in items:
-        sessions = by_item.get(item.id, [])
-        if not sessions:
-            status = "not_started"
-        else:
-            present = {row["status"] for row in sessions}
-            status = next((cand for cand in _ITEM_STATUS_PRIORITY if cand in present), "planned")
-        bucket = "delivered" if status in ("delivered", "delivered_with_issue") else status
-        summary["total"] += 1
-        summary[bucket] = summary.get(bucket, 0) + 1
-        requirements.append({
-            "curriculum_id": item.id, "code": item.code, "title": item.title,
-            "status": status, "sessions": sessions,
-        })
-
-    return {
-        "training_class_id": c.id,
-        "training_stage_id": c.training_stage_id,
-        "stage_name": stage_name,
-        "requirements": requirements,
-        "summary": summary,
-    }
-
+# Calculation lives in services_curriculum_progress.py so Training, Dashboard,
+# and Planning cannot drift.
 
 @router.get("/training-classes/{cid}/curriculum-progress")
-def get_class_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def getclass_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     c = db.get(TrainingClass, cid)
     if not c:
         raise HTTPException(404, detail={"error": "not_found"})
     s = db.get(Squadron, c.squadron_id)
     require_can_view_squadron(p, c.squadron_id, s.wing_id if s else None)
-    return _class_curriculum_progress(db, c)
+    return class_curriculum_progress(db, c)
 
 
 @router.get("/curriculum/class-matrix")
@@ -3412,7 +3347,7 @@ def get_class_matrix(
                 else:
                     present = {row["status"] for row in sessions}
                     status = next(
-                        (cand for cand in _ITEM_STATUS_PRIORITY if cand in present),
+                        (cand for cand in ITEM_STATUS_PRIORITY if cand in present),
                         "planned",
                     )
                 cells[tc.id] = {
@@ -3479,7 +3414,7 @@ def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = De
     total_delivered = 0
     total_applicable = 0
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         delivered = prog["summary"]["delivered"]
         total = prog["summary"]["total"]
         total_delivered += delivered
