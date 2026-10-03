@@ -1614,17 +1614,39 @@ def list_facs(squadron_id: str | None = None, include_archived: bool = False,
 @router.post("/facilitators")
 def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
             idempotency_key: str | None = Header(None, alias="Idempotency-Key")):
-    from sqlalchemy import func
-    from ..security import idempotency_get, idempotency_set
+    from ..database import SessionLocal
+    from .. import services_idempotency as idem
     require_write_role(p)
     # A retried POST after a client-perceived timeout must not create a second
     # facilitator, most importantly when confirm_duplicate=true (the "Add
     # anyway" resubmit) -- that path has no other duplicate protection at all.
-    idem_cache_key = f"{p.user_id}:facilitators:{idempotency_key}" if idempotency_key else None
-    if idem_cache_key:
-        cached = idempotency_get(idem_cache_key)
-        if cached is not None:
-            return cached[1]
+    # The claim is shared by every worker (database row), so a retry that
+    # reaches a different gunicorn worker is still recognised.
+    idem_key = f"{p.user_id}:facilitators:{idempotency_key}" if idempotency_key else None
+    if not idem_key:
+        return _add_fac(body, db, p)
+    idem_db = SessionLocal()
+    try:
+        state = idem.claim(idem_db, idem_key)
+        if state == "in_progress":
+            raise HTTPException(409, detail={
+                "error": "request_in_progress",
+                "message": "This request is already being processed. Try again in a moment."})
+        if state is not None:
+            return state[1]
+        try:
+            result = _add_fac(body, db, p)
+        except Exception:
+            idem.release(idem_db, idem_key)   # a fixed retry with the same key may run
+            raise
+        idem.complete(idem_db, idem_key, 200, result)
+        return result
+    finally:
+        idem_db.close()
+
+
+def _add_fac(body: "FacIn", db: DBSession, p: Principal) -> dict:
+    from sqlalchemy import func
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -1677,10 +1699,7 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=rank, effective_from=str(utcnow().date())))
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="create")
-    result = {"ok": True, "facilitator_id": f.id}
-    if idem_cache_key:
-        idempotency_set(idem_cache_key, 200, result)
-    return result
+    return {"ok": True, "facilitator_id": f.id}
 
 
 @router.get("/facilitators/import/template.csv")
