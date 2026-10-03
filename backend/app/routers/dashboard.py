@@ -35,6 +35,7 @@ from ..permissions import (Principal, resolve_view_squadron_id, require_role,
                            require_can_view_squadron, require_can_view_wing)
 from ..services_readiness import parade_night_readiness, session_requirements
 from ..services_curriculum_progress import class_curriculum_progress
+from ..services_data_quality import data_freshness
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -2360,93 +2361,6 @@ def _wing_comparison_charts(
     return charts
 
 
-def _data_freshness(
-    db: DBSession,
-    scope: str,
-    sq_id: str | None,
-    wing_id: str | None,
-) -> dict:
-    """Compute data-quality indicators for the dashboard response.
-
-    Returns:
-      as_at       — UTC ISO timestamp of when freshness was computed
-      coverage_pct — % of active squadrons with recent delivery (wing/national); null for squadron
-      issues      — human-readable list of data quality concerns
-    """
-    as_at = datetime.now(timezone.utc).isoformat()
-    issues: list[str] = []
-    coverage_pct: int | None = None
-    today_str = date.today().isoformat()
-    sixty_days_ago = (date.today() - timedelta(days=60)).isoformat()
-
-    if scope == "squadron" and sq_id:
-        # Unrecorded outcomes: past parade night sessions still in "planned" state
-        past_pn_ids = select(ParadeNight.id).where(
-            ParadeNight.squadron_id == sq_id,
-            ParadeNight.date < today_str,
-            ParadeNight.is_archived == False,  # noqa: E712
-        )
-        unrecorded = db.query(func.count(Session.id)).filter(
-            Session.parade_night_id.in_(past_pn_ids),
-            Session.status.notin_(list(_TERMINAL)),
-            Session.is_archived == False,  # noqa: E712
-        ).scalar() or 0
-        if unrecorded > 0:
-            issues.append(f"{unrecorded} session(s) with unrecorded outcomes")
-
-        # Last CEA import: MAX(updated_at) on Activity rows with cea_seq_nr set
-        last_cea: datetime | None = db.query(func.max(Activity.updated_at)).filter(
-            Activity.squadron_id == sq_id,
-            Activity.cea_seq_nr.isnot(None),
-            Activity.is_archived == False,  # noqa: E712
-        ).scalar()
-        if last_cea is None:
-            issues.append("No CEA import on record")
-        else:
-            # utcnow() is timezone-aware, matching what UTCDateTime columns now
-            # return. datetime.utcnow() is naive and would raise here.
-            cea_days = (utcnow() - last_cea).days
-            if cea_days > 30:
-                issues.append(f"CEA data is {cea_days} day(s) old")
-
-        # Incomplete facilitators: active with null or empty subject_areas
-        facs = db.query(Facilitator).filter(
-            Facilitator.squadron_id == sq_id,
-            Facilitator.active_status == True,  # noqa: E712
-            Facilitator.is_archived == False,  # noqa: E712
-        ).all()
-        incomplete_fac = sum(1 for f in facs if not f.subject_areas)
-        if incomplete_fac > 0:
-            issues.append(f"{incomplete_fac} facilitator(s) missing subject areas")
-
-    elif scope in ("wing", "national"):
-        # Coverage: % of active squadrons (scoped to wing if applicable) with delivery in last 60 days
-        sq_q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
-        if scope == "wing" and wing_id:
-            sq_q = sq_q.filter(Squadron.wing_id == wing_id)
-        active_sqs = sq_q.all()
-        if active_sqs:
-            covered = 0
-            for sq in active_sqs:
-                pn_ids_sub = select(ParadeNight.id).where(
-                    ParadeNight.squadron_id == sq.id,
-                    ParadeNight.date >= sixty_days_ago,
-                    ParadeNight.is_archived == False,  # noqa: E712
-                )
-                has_delivery = db.query(Session.id).filter(
-                    Session.parade_night_id.in_(pn_ids_sub),
-                    Session.status.in_(list(_DELIVERED)),
-                    Session.is_archived == False,  # noqa: E712
-                ).first()
-                if has_delivery:
-                    covered += 1
-            coverage_pct = round(covered / len(active_sqs) * 100)
-            if coverage_pct < 80:
-                issues.append(f"Only {coverage_pct}% of squadrons have recent training delivery")
-
-    return {"as_at": as_at, "coverage_pct": coverage_pct, "issues": issues}
-
-
 @router.get("/charts")
 def get_dashboard_charts(
     window: str = Query("term", pattern="^(week|term|year)$"),
@@ -2561,7 +2475,7 @@ def get_dashboard_charts(
         "window_start": w_start,
         "window_end": w_end,
         "charts": charts,
-        "data_freshness": _data_freshness(db, scope, _freshness_sq_id, _freshness_wing_id),
+        "data_freshness": data_freshness(db, scope, _freshness_sq_id, _freshness_wing_id),
     }
 
 

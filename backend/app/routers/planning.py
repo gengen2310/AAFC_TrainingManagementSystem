@@ -60,6 +60,7 @@ from ..services_year import (
 )
 from ..services_timing import effective_template
 from ..services_curriculum_progress import class_curriculum_progress
+from ..services_data_quality import data_freshness
 
 
 def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
@@ -3362,7 +3363,6 @@ def get_command_centre(
     p: Principal = Depends(get_principal),
 ):
     from sqlalchemy import or_, func
-    from .dashboard import _data_freshness
 
     today = date.today().isoformat()
 
@@ -3613,7 +3613,7 @@ def get_command_centre(
         "training_classes": training_classes_out,
         "recent_imports": [],
         "nights_missing_facilitator": nights_missing_fac,
-        "data_freshness": _data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
+        "data_freshness": data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
     }
 
 

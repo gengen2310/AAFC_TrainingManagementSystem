@@ -31,9 +31,6 @@
   "router_cross_imports": {
     "backend/app/routers/auth.py": [
       "accounts"
-    ],
-    "backend/app/routers/planning.py": [
-      "dashboard"
     ]
   }
 }
