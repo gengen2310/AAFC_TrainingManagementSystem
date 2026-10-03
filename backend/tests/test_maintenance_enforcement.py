@@ -288,24 +288,32 @@ def test_create_and_archive_squadron(client):
 
 
 def test_archive_squadron_forbidden_wing_other(client):
-    """wing_admin cannot archive a squadron in a different wing."""
+    """wing_admin cannot archive a squadron in a different wing.
+
+    Previously skipped whenever the test DB held one Wing -- which is always --
+    so this cross-Wing check never ran. It now creates its own second Wing and
+    Squadron, and also proves the same wing_admin CAN archive in its own Wing
+    (so the 403 is the scope rule, not a blanket denial).
+    """
+    import uuid
     wing_hdr = _wing_admin(client)
-    nat_hdr = _nat_admin(client)
-    # Find a squadron not in 7WG
-    r = client.get("/api/wings", headers=nat_hdr)
-    other_wing_id = None
-    for w in r.json():
-        if "7WG" not in (w.get("code") or ""):
-            other_wing_id = w["wing_id"]
-            break
-    if not other_wing_id:
-        pytest.skip("Only one wing in test DB")
-    r2 = client.get("/api/squadrons", headers=nat_hdr)
-    other_sqn = next((s for s in r2.json() if s["wing_id"] == other_wing_id), None)
-    if not other_sqn:
-        pytest.skip("No squadrons in other wing")
-    r3 = client.post(f"/api/squadrons/{other_sqn['squadron_id']}/archive", headers=wing_hdr)
-    assert r3.status_code == 403
+    sysadmin_hdr = _sysadmin(client)
+    tag = uuid.uuid4().hex[:5].upper()
+    w = client.post("/api/wings", json={"code": f"X{tag}", "name": f"Other Wing {tag}",
+                                        "timezone": "Australia/Perth"}, headers=sysadmin_hdr)
+    assert w.status_code in (200, 201), w.text
+    other = client.post("/api/squadrons", json={"wing_id": w.json()["wing_id"], "code": f"9{tag}",
+                                                "name": f"Other Sqn {tag}"}, headers=sysadmin_hdr)
+    assert other.status_code == 200, other.text
+    r = client.post(f"/api/squadrons/{other.json()['squadron_id']}/archive", headers=wing_hdr)
+    assert r.status_code == 403, r.text
+
+    me = client.get("/api/auth/me", headers=wing_hdr).json()["session"]
+    own = client.post("/api/squadrons", json={"wing_id": me["wing_id"], "code": f"8{tag}",
+                                              "name": f"Own Sqn {tag}"}, headers=sysadmin_hdr)
+    assert own.status_code == 200, own.text
+    r = client.post(f"/api/squadrons/{own.json()['squadron_id']}/archive", headers=wing_hdr)
+    assert r.status_code == 200, r.text
 
 
 def test_archive_squadron_forbidden_sqn_general(client):

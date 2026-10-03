@@ -12,8 +12,9 @@ from ..security import (verify_code, create_token, hash_code,
 from ..database import utcnow
 from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession, SystemSetting
 from ..dependencies import get_principal, client_meta, real_client_ip
-from ..permissions import Principal
+from ..permissions import Principal, require_write_role
 from ..services import audit
+from ..services_accounts import require_manage_authority
 from ..services_recovery import (
     RESET_TTL_MINUTES, consume_token, hash_token, is_recovery_eligible, mint_token,
 )
@@ -22,20 +23,23 @@ from ..models import RecoveryToken
 
 # In-memory recovery limiter. Deliberately separate from the login limiter so a
 # recovery attempt never consumes a legitimate user's login budget.
-_recovery_hits: dict[str, list[float]] = {}
-
-
-def _recovery_rate_ok(key: str, limit_per_hour: int) -> bool:
-    import time
-    now = time.time()
-    hits = [t for t in _recovery_hits.get(key, []) if now - t < 3600]
-    hits.append(now)
-    _recovery_hits[key] = hits
-    return len(hits) <= limit_per_hour
+def _recovery_rate_ok(db: DBSession, key: str, limit_per_hour: int) -> bool:
+    # Database-backed so the limit holds across gunicorn workers and restarts
+    # (a per-process dict doubled it with 2 workers and reset on deploy).
+    from ..services_rate_limit import hit
+    return hit(db, f"recovery:{key}", limit=limit_per_hour, window_seconds=3600)
 
 
 def reset_recovery_limiter() -> None:
-    _recovery_hits.clear()
+    """Test/E2E helper: clear every recovery bucket."""
+    from ..database import SessionLocal
+    from ..models import RateLimitBucket
+    db = SessionLocal()
+    try:
+        db.query(RateLimitBucket).filter(RateLimitBucket.key.like("recovery:%")).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
 from ..services import audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -157,6 +161,11 @@ def lookup(body: LookupIn, request: Request, db: DBSession = Depends(get_db)):
     return {"user_id": user.id, "display_name": user.display_name}
 
 
+# Environments where code-only (scan-all) login is permitted. Never staging or
+# production: see login().
+_CODE_ONLY_LOGIN_ENVS = frozenset({"development", "test"})
+
+
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, db: DBSession = Depends(get_db)):
     key = real_client_ip(request)
@@ -195,7 +204,18 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         else:
             matched = ac
     else:
-        # Legacy scan-all path (used by tests; production always provides user_id via /lookup).
+        # Code-only login verifies the code against EVERY active account (one
+        # slow hash each) and can only check per-account lockout after a match,
+        # so failures never lock anything. It exists for local tooling and the
+        # test suite. Everywhere else -- staging and production, including a
+        # production service mislabelled ENVIRONMENT=staging -- it is refused
+        # before any hash is computed; every real client sends user_id from
+        # /api/auth/lookup. The refusal still counts against the IP.
+        if (settings.ENVIRONMENT or "").strip().lower() not in _CODE_ONLY_LOGIN_ENVS:
+            record_login_failure_db(key, db)
+            raise HTTPException(422, detail={
+                "error": "user_id_required",
+                "message": "Sign in through account lookup (unit and role) first."})
         matched = None
         for ac in db.query(AccessCode).filter(AccessCode.active_status == True).all():  # noqa: E712
             if verify_code(code, ac.code_hash):
@@ -207,9 +227,8 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         _raise_if_locked(matched)
         # R5-L04 (note): the scan-all path cannot increment a per-account counter on
         # failure because no account is identified until the code matches. IP-level
-        # throttle (record_login_failure_db above) is the only defence on this path.
-        # This path is test-only; production always provides user_id via /lookup,
-        # which takes the per-account counter path above.
+        # throttle (record_login_failure_db above) is the only defence on this path,
+        # which is why it is confined to development/test (enforced above).
 
     record_login_success_db(key, db)
     user = db.get(User, matched.user_id)
@@ -372,8 +391,8 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     is_self = body.user_id == p.user_id
     # Any authenticated user may change their own code.
     # Changing another user's code requires an admin role + management authority over that account.
-    if not is_self and p.role not in ("system_admin", "national_admin", "wing_admin", "sqn_admin"):
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if not is_self:
+        require_write_role(p)
     target = db.get(User, body.user_id)
     if not target:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -393,8 +412,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
                 "message": "Enter your current access code to change it.",
             })
     else:
-        from .accounts import _require_manage_authority
-        _require_manage_authority(p, target, db)
+        require_manage_authority(p, target, db)
     # Validate the new code: strip, non-empty, minimum length, maximum length.
     plain = (body.new_code or "").strip()
     if not plain:
@@ -529,7 +547,7 @@ def forgot_code(body: ForgotCodeIn, request: Request, db: DBSession = Depends(ge
     ip = real_client_ip(request) or "unknown"
     addr = (body.email or "").strip().lower()
 
-    if not _recovery_rate_ok(f"ip:{ip}", 5) or (addr and not _recovery_rate_ok(f"em:{addr}", 3)):
+    if not _recovery_rate_ok(db, f"ip:{ip}", 5) or (addr and not _recovery_rate_ok(db, f"em:{addr}", 3)):
         # Even the rate-limit response is the constant body: a distinct 429
         # would itself confirm that an address is worth guessing at.
         return _FORGOT_RESPONSE

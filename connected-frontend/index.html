@@ -4769,6 +4769,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   </div>
 </div>
 
+<script src="js/modal.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 //  SQUADRON DATA
@@ -16188,98 +16189,6 @@ async function exitMode(){
   await loadData(); renderAll(); updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
 }
 
-// ═══════════════════════════════════════════════════════════
-//  MODALS
-// ═══════════════════════════════════════════════════════════
-let _modalReturnFocus=null;
-const _modalReturnFocusById=new Map();
-function openModal(id){
-  const bg=document.getElementById(id);
-  if(!bg)return;
-  const returnTarget=document.activeElement;
-  _modalReturnFocus=returnTarget;
-  _modalReturnFocusById.set(id,returnTarget);
-  bg.classList.add('active');
-  const first=bg.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled)')||bg.querySelector('button:not(:disabled),[tabindex]:not([tabindex="-1"]),[href]');
-  if(first)setTimeout(()=>first.focus(),200);
-}
-function closeModal(id){
-  const bg=document.getElementById(id);
-  if(!bg)return;
-  bg.classList.remove('active');
-  const el=_modalReturnFocusById.get(id)||_modalReturnFocus;
-  _modalReturnFocusById.delete(id);
-  _modalReturnFocus=null;
-  if(!el||!el.focus)return;
-  const parentBg=el.closest&&el.closest('.modal-bg');
-  if(parentBg&&parentBg.classList.contains('active')){
-    const parentDialog=parentBg.querySelector('.modal')||parentBg;
-    if(!parentDialog.hasAttribute('tabindex'))parentDialog.setAttribute('tabindex','-1');
-    setTimeout(()=>{try{parentDialog.focus();}catch(_){}},0);
-    return;
-  }
-  setTimeout(()=>{try{el.focus();}catch(_){}},0);
-}
-
-// REM-106: confirmAction() replaces native confirm() for critical SA/org-
-// management operations (archive Wing/Squadron, maintenance mode, account
-// disable/reactivate/delete/restore/unlock) -- native confirm() blocks the
-// page entirely under browser automation (see .claude/rules/frontend.md).
-// Usage: confirmAction('message', () => { ...the code that used to run after
-// `if(!confirm(...))return;` ... }). Cancelling simply never calls onConfirm,
-// matching confirm()'s own early-return-on-Cancel behaviour exactly.
-let _confirmCb=null;
-function confirmAction(message, onConfirm, danger){
-  document.getElementById('confirm-msg').textContent=message;
-  const yesBtn=document.getElementById('confirm-yes-btn');
-  yesBtn.className='btn '+(danger?'btn-red':'btn-dk');
-  _confirmCb=onConfirm;
-  openModal('m-confirm');
-}
-function _confirmYes(){
-  closeModal('m-confirm');
-  const cb=_confirmCb; _confirmCb=null;
-  if(cb)cb();
-}
-function _confirmNo(){
-  closeModal('m-confirm');
-  _confirmCb=null;
-}
-
-// ── promptText() — non-blocking replacement for native prompt() ──────────────
-// Returns a Promise<string|null>: resolves to the trimmed input string, or null if
-// the user cancels. Accepts an options object: { context, defaultValue, okLabel,
-// validate(val)->errorString|null, danger }. danger=true renders the confirm button red.
-let _tiResolve=null, _tiValidate=null;
-function promptText(title,label,{context='',defaultValue='',okLabel='OK',validate=null,danger=false}={}){
-  return new Promise(resolve=>{
-    _tiResolve=resolve; _tiValidate=validate;
-    document.getElementById('ti-title').textContent=title;
-    document.getElementById('ti-label').textContent=label;
-    const ctx=document.getElementById('ti-context');
-    ctx.textContent=context; ctx.style.display=context?'':'none';
-    const inp=document.getElementById('ti-input');
-    inp.value=defaultValue; inp.setAttribute('aria-label',label);
-    document.getElementById('ti-err').textContent='';
-    const okBtn=document.getElementById('ti-ok-btn');
-    okBtn.textContent=okLabel; okBtn.className='btn '+(danger?'btn-red':'btn-dk');
-    openModal('m-text-input');
-    setTimeout(()=>{inp.focus();inp.select();},40);
-  });
-}
-function _tiSave(){
-  const val=document.getElementById('ti-input').value.trim();
-  if(!val){document.getElementById('ti-err').textContent='This field is required.';return;}
-  if(_tiValidate){const err=_tiValidate(val);if(err){document.getElementById('ti-err').textContent=err;return;}}
-  closeModal('m-text-input');
-  const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
-  if(cb)cb(val);
-}
-function _tiCancel(){
-  closeModal('m-text-input');
-  const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
-  if(cb)cb(null);
-}
 document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&document.getElementById('m-text-input').classList.contains('active')){
     e.preventDefault(); _tiSave();
@@ -18162,65 +18071,6 @@ async function promptOverrideConflict(cId, yearId){
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
   } catch(e){ showToast(apiErr(e),true); }
-}
-
-// ════════════════════════════
-//  CSV CURRICULUM IMPORT
-// ════════════════════════════
-
-function openCsvCurrImport(){
-  document.getElementById('csv-curr-file').value='';
-  document.getElementById('csv-curr-msg').textContent='';
-  document.getElementById('csv-curr-preview').style.display='none';
-  document.getElementById('csv-curr-result').style.display='none';
-  document.getElementById('csv-curr-commit-btn').style.display='none';
-  document.getElementById('csv-curr-preview-btn').style.display='inline-flex';
-  openModal('m-csv-curr-import');
-}
-const _CSV_CURR_ACTION_CLR={created:'color:var(--ok);font-weight:600',updated:'color:var(--royal);font-weight:600',skipped:'color:var(--muted)',failed:'color:var(--error);font-weight:600'};
-async function _csvCurrRequest(preview){
-  const msg=document.getElementById('csv-curr-msg');
-  const fileEl=document.getElementById('csv-curr-file');
-  const level=document.getElementById('csv-curr-level').value;
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return null; }
-  msg.textContent=preview?'Parsing…':'Importing…';
-  const form=new FormData();
-  form.append('file',fileEl.files[0]);
-  const res=await fetch(API_BASE+`/api/curriculum/import-csv?owning_level=${encodeURIComponent(level)}&preview=${preview}`,{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+tokenGet()},
-    body:form,
-  });
-  const d=await res.json();
-  if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Request failed.'; return null; }
-  msg.textContent='';
-  return d;
-}
-async function previewCsvCurr(){
-  const d=await _csvCurrRequest(true);
-  if(!d)return;
-  const summary=`${d.created} to create · ${d.updated} to update · ${d.skipped} unchanged${d.failed?' · '+d.failed+' failed':''}`;
-  document.getElementById('csv-curr-summary').textContent=summary;
-  document.getElementById('csv-curr-rows').innerHTML=(d.results||[]).map(r=>`<tr>
-    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.code||'')}</td>
-    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.title||'')}</td>
-    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.phase||'')}</td>
-    <td style="padding:3px 8px;border-bottom:1px solid var(--border);${_CSV_CURR_ACTION_CLR[r.status]||''}">${esc(r.status||'')}${r.error?' — '+esc(r.error):''}</td>
-  </tr>`).join('')||'<tr><td colspan="4" style="padding:8px;color:var(--muted)">No rows parsed.</td></tr>';
-  document.getElementById('csv-curr-preview').style.display='';
-  document.getElementById('csv-curr-commit-btn').style.display=(d.created+d.updated)>0?'inline-flex':'none';
-  if(d.parse_errors&&d.parse_errors.length){
-    document.getElementById('csv-curr-msg').innerHTML=`<span style="color:var(--warn-text)">${d.parse_errors.slice(0,5).map(e=>esc(e)).join('<br>')}</span>`;
-  }
-}
-async function commitCsvCurr(){
-  const d=await _csvCurrRequest(false);
-  if(!d)return;
-  const result=document.getElementById('csv-curr-result');
-  result.innerHTML=`<div class="alert a-ok">Import complete: ${d.created} created, ${d.updated} updated, ${d.skipped} unchanged.${d.failed?' '+d.failed+' failed.':''}</div>`;
-  result.style.display='block';
-  document.getElementById('csv-curr-commit-btn').style.display='none';
-  await reloadAndRender();
 }
 
 // ── Spreadsheet Export ──────────────────────────────────────
@@ -20184,6 +20034,7 @@ async function exportTrainingRecords(){
   }catch(e){showToast(apiErr(e),true);}
 }
 </script>
+<script src="js/curriculum-csv-import.js"></script>
 
 <!-- Command palette overlay (HELP-06) -->
 <div id="cmd-palette-overlay" role="dialog" aria-modal="true" aria-label="Command palette" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,30,60,.45);align-items:flex-start;justify-content:center;padding-top:10vh">

@@ -1060,6 +1060,20 @@ ok "Frontend build fingerprint: $FRONTEND_BUILD"
 assert_fingerprint_matches "$FRONTEND_BUILD" "Frontend"
 
 echo
+# Modules extracted from index.html into connected-frontend/js/ are separate
+# files: the fingerprint above proves only index.html. Every committed module
+# must be served and byte-identical, or the features it carries are broken.
+echo "  ── Frontend modules: served and byte-identical ──────────────────────"
+for _mod in connected-frontend/js/*.js; do
+  [ -e "$_mod" ] || continue
+  _name=$(basename "$_mod")
+  _want=$(shasum -a 256 "$_mod" | cut -d' ' -f1)
+  _got=$(curl -sf --connect-timeout 10 --max-time 30 -H 'Cache-Control: no-cache' \
+    "https://${EXPECTED_STAGING_FRONTEND_DOMAIN}/js/${_name}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+  [ "$_got" = "$_want" ] || die "Frontend module js/${_name} missing or not the committed version — HARD FAIL."
+  ok "Frontend module js/${_name} served (sha256 ${_want:0:12})"
+done
+
 echo "  ── Frontend gate 4/4: Playwright smoke ──────────────────────────────"
 require_playwright_smoke '\[Dashboard\]|\[Network\]' "Dashboard + Network" chromium
 require_playwright_smoke '\[Nav\] Mobile' "Mobile nav" mobile

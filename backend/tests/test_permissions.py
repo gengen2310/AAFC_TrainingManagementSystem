@@ -26,6 +26,8 @@ from app.permissions import (
     require_can_view_squadron,
     require_can_view_wing,
     require_role,
+    require_write_role,
+    resolve_view_squadron_id,
     require_system_admin,
     require_system_or_nat_admin,
 )
@@ -187,3 +189,66 @@ def test_require_audit_access_message_is_actionable_for_disallowed_role():
     with pytest.raises(HTTPException) as exc_info:
         require_audit_access(p)
     _detail(exc_info)
+
+
+
+class _FakeSquadron:
+    def __init__(self, squadron_id: str, wing_id: str):
+        self.id = squadron_id
+        self.wing_id = wing_id
+
+
+class _FakeDB:
+    def __init__(self, rows: dict[str, object]):
+        self.rows = rows
+
+    def get(self, _model, key):
+        return self.rows.get(key)
+
+
+def test_require_write_role_allows_every_write_role():
+    for role in ("sqn_admin", "wing_admin", "national_admin", "system_admin"):
+        p = _principal(role=role)
+        assert require_write_role(p) is None
+
+
+def test_require_write_role_denial_is_actionable():
+    p = _principal(role="wing_viewer")
+    with pytest.raises(HTTPException) as exc_info:
+        require_write_role(p)
+    d = _detail(exc_info)
+    assert d["error"] == "forbidden"
+
+
+def test_resolve_view_squadron_id_explicit_target_uses_central_scope_check():
+    db = _FakeDB({
+        "SQN-A": _FakeSquadron("SQN-A", "WING-A"),
+        "SQN-B": _FakeSquadron("SQN-B", "WING-B"),
+    })
+    p = _principal(role="wing_viewer", wing_id="WING-A")
+    assert resolve_view_squadron_id(p, "SQN-A", db) == "SQN-A"
+    with pytest.raises(HTTPException) as exc_info:
+        resolve_view_squadron_id(p, "SQN-B", db)
+    assert exc_info.value.status_code == 403
+
+
+def test_resolve_view_squadron_id_unknown_target_is_404_not_fallback():
+    p = _principal(role="sqn_admin", squadron_id="SQN-A")
+    with pytest.raises(HTTPException) as exc_info:
+        resolve_view_squadron_id(p, "MISSING", _FakeDB({}))
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.detail["error"] == "squadron_not_found"
+
+
+def test_resolve_view_squadron_id_without_target_uses_active_squadron():
+    home = _principal(role="sqn_admin", squadron_id="SQN-A")
+    assert resolve_view_squadron_id(home, None, _FakeDB({})) == "SQN-A"
+
+    proxied = _principal(
+        role="wing_admin", squadron_id=None, proxy_mode="proxy",
+        acting_squadron_id="SQN-B",
+    )
+    assert resolve_view_squadron_id(proxied, None, _FakeDB({})) == "SQN-B"
+
+    unselected = _principal(role="wing_viewer", squadron_id=None, acting_squadron_id=None)
+    assert resolve_view_squadron_id(unselected, None, _FakeDB({})) is None

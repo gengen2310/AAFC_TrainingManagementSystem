@@ -179,6 +179,35 @@ def require_role(p: Principal, *roles: str):
         })
 
 
+def require_write_role(p: Principal, message: str | None = None):
+    """Require one of the system's write-capable roles."""
+    if p.role not in WRITE_ROLES:
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": message or "This action requires write-capable administrator access.",
+        })
+
+
+def resolve_view_squadron_id(p: Principal, squadron_id: str | None, db) -> str | None:
+    """Resolve the Squadron an unqualified READ means.
+
+    An explicit Squadron is validated through the same central view-policy used
+    everywhere else. With no explicit target, a Squadron account reads its
+    home Squadron and a higher-scope account reads its current proxy/
+    intervention target (or None when no Squadron has been selected).
+
+    This helper intentionally performs no write authorization.
+    """
+    if squadron_id:
+        from .models import Squadron
+        squadron = db.get(Squadron, squadron_id)
+        if not squadron:
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        require_can_view_squadron(p, squadron.id, squadron.wing_id)
+        return squadron.id
+    return p.active_squadron_id
+
+
 def require_system_admin(p: Principal):
     if not p.is_system_admin:
         raise HTTPException(403, detail={

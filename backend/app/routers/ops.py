@@ -8,10 +8,10 @@ from ..database import get_db, utcnow, iso_z
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
                       Squadron, Wing, ImportLog, AuditLog, Cadet, CadetMemberImportBatch)
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing, require_can_write_squadron
+from ..permissions import (Principal, resolve_view_squadron_id, require_role,
+                           require_can_view_squadron, require_can_view_wing, require_can_write_squadron)
 from ..services import audit, score_parade
 from ..services_readiness import parade_night_readiness
-from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -59,7 +59,7 @@ def _coverage_for(db, sq_id):
 # ── REPORTS ──
 @router.get("/reports/summary")
 def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     sess = _all_sessions(db, sq)
     counts = {}
     for s in sess:
@@ -70,7 +70,7 @@ def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db),
 
 @router.get("/reports/readiness")
 def rep_readiness(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
+    sq = resolve_view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     today = date.today().isoformat()
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq, ParadeNight.date >= today).order_by(ParadeNight.date).all()
     out = []
@@ -91,7 +91,7 @@ def rep_readiness(squadron_id: str | None = None, db: DBSession = Depends(get_db
 
 @router.get("/reports/curriculum-coverage")
 def rep_coverage(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
+    sq = resolve_view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     items = db.query(CurriculumItem).filter(
         (CurriculumItem.owning_level == "national") | (CurriculumItem.squadron_id == sq),
         CurriculumItem.is_archived == False).all()  # noqa: E712
@@ -111,7 +111,7 @@ def rep_coverage(squadron_id: str | None = None, db: DBSession = Depends(get_db)
 
 @router.get("/reports/facilitator-load")
 def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     load = {}
     for s in _all_sessions(db, sq):
         name = s.facilitator_display_name_at_time
@@ -130,7 +130,7 @@ def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p:
 
 @router.get("/reports/not-delivered")
 def rep_nd(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     rows = [s for s in _all_sessions(db, sq) if s.status == "not_delivered"]
     return {"title": "Not delivered", "sessions": [{"id": s.id, "curriculum_code_at_time": s.curriculum_code_at_time,
             "not_delivered_reason": s.not_delivered_reason, "status": s.status} for s in rows],

@@ -62,40 +62,19 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-# ── Simple in-memory login rate limiter / lockout ──
-# Production: replace with Redis (REDIS_URL) so limits hold across workers.
-_attempts: dict[str, list[float]] = {}
-_lockouts: dict[str, float] = {}
-
-
-def login_blocked(key: str) -> bool:
-    until = _lockouts.get(key)
-    if until and time.time() < until:
-        return True
-    if until and time.time() >= until:
-        _lockouts.pop(key, None)
-        _attempts.pop(key, None)
-    return False
-
-
-def record_login_failure(key: str) -> None:
-    now = time.time()
-    window = settings.LOGIN_WINDOW_SEC
-    arr = [t for t in _attempts.get(key, []) if now - t < window]
-    arr.append(now)
-    _attempts[key] = arr
-    if len(arr) >= settings.LOGIN_MAX_ATTEMPTS:
-        _lockouts[key] = now + settings.LOGIN_LOCKOUT_SEC
-
-
-def record_login_success(key: str) -> None:
-    _attempts.pop(key, None)
-    _lockouts.pop(key, None)
+# The login limiter/lockout is database-backed (login_blocked_db and friends
+# below). An in-memory version that lived here had no callers and was removed.
 
 
 def reset_rate_limiter() -> None:
-    _attempts.clear()
-    _lockouts.clear()
+    """Clear shared rate-limit buckets (tests and the non-production reset endpoint)."""
+    from .database import SessionLocal
+    from .services_rate_limit import reset_all
+    db = SessionLocal()
+    try:
+        reset_all(db)
+    finally:
+        db.close()
 
 
 # ── Per-IP general API rate limiter (non-login endpoints) ───────────────────
@@ -118,36 +97,9 @@ def reset_api_rate_limiter() -> None:
     _api_hits.clear()
 
 
-# ── Idempotency-key deduplication (in-memory, single-worker) ────────────────
-# Same caveat as the rate limiters above: per-worker only, not shared across
-# gunicorn workers -- replace with Redis for true distribution in production.
-# Protects against a genuine network-level retry (client times out, resends
-# the same request) creating a duplicate write. Client-side button-disable
-# already covers the common double-click case; this covers the case that
-# doesn't -- a request the client believes failed but the server actually
-# completed.
-_idempotency_cache: dict[str, tuple[float, int, dict]] = {}
-_IDEMPOTENCY_TTL_SEC = 300
-
-
-def idempotency_get(key: str) -> tuple[int, dict] | None:
-    """Return the cached (status_code, body) for this key if present and unexpired."""
-    entry = _idempotency_cache.get(key)
-    if not entry:
-        return None
-    expires_at, status_code, body = entry
-    if time.time() > expires_at:
-        _idempotency_cache.pop(key, None)
-        return None
-    return status_code, body
-
-
-def idempotency_set(key: str, status_code: int, body: dict) -> None:
-    _idempotency_cache[key] = (time.time() + _IDEMPOTENCY_TTL_SEC, status_code, body)
-
-
-def reset_idempotency_cache() -> None:
-    _idempotency_cache.clear()
+# Idempotency-Key deduplication moved to app/services_idempotency.py
+# (database-backed: the per-process dict here missed retries that reached a
+# different gunicorn worker).
 
 
 # ── DB-backed per-IP rate limiter (works across gunicorn workers) ──────────────

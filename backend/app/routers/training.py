@@ -18,16 +18,18 @@ from ..models.faq import FaqEntry
 from ..richtext import sanitize_rich_text
 from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
                                SessionAssistantFacilitator)
-from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
-from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
-                          require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
+from ..permissions import (Principal, resolve_view_squadron_id,
+                          require_can_view_squadron, require_can_write_squadron,
+                          require_can_view_wing, require_can_write_activity, require_role, require_write_role, require_system_admin,
                           NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers,
                         resolve_national_id,
                         visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
 from ..services_readiness import parade_night_readiness
+from ..services_curriculum_progress import ITEM_STATUS_PRIORITY, class_curriculum_progress
+from ..services_timing import effective_template
 from ..services_year import ensure_year_context
 
 router = APIRouter(prefix="/api", tags=["training"])
@@ -82,34 +84,6 @@ def _active_squadron(p: Principal):
     return p.active_squadron_id
 
 
-def _view_squadron_id(p: Principal, squadron_id: str | None, db: DBSession) -> str | None:
-    """Resolve which squadron's data a READ should return. An explicit squadron_id
-    (validated via require_can_view_squadron, the same check dashboard charts and
-    /api/parade-nights already use) lets a wing/national viewer see a specific
-    squadron's operational pages WITHOUT needing to enter Proxy/Delegated
-    Intervention Mode — viewing is broad by design (permissions.py's
-    Principal.can_view_squadron), only writing is proxy-gated (see
-    require_can_write_squadron / Block 7's canWriteSquadron fix). Falls back to
-    _active_squadron() when no squadron_id is given, so existing squadron-scoped
-    callers are unaffected.
-
-    Master transformation plan Block 8: this closes the inconsistency where
-    /api/parade-nights and /api/dashboard/charts already supported this pattern
-    but /api/facilitators, /api/training-areas, /api/equipment, and /api/activities
-    did not — a wing/national viewer's squadron selector must behave the same way
-    on every squadron page, not degrade differently depending which one they're on."""
-    if squadron_id:
-        s = db.get(Squadron, squadron_id)
-        if not s:
-            # A bogus squadron_id must 404, never silently fall back to the
-            # caller's own scope — that would mask a broken link/typo as "no
-            # results" instead of a clear error.
-            raise HTTPException(404, detail={"error": "squadron_not_found"})
-        require_can_view_squadron(p, s.id, s.wing_id)
-        return s.id
-    return _active_squadron(p)
-
-
 def _sess_dict(s: Session) -> dict:
     d = {c.name: getattr(s, c.name) for c in s.__table__.columns}
     d["session_id"] = s.id  # alias for Night Builder compatibility
@@ -120,7 +94,7 @@ def _sess_dict(s: Session) -> dict:
 @router.get("/curriculum")
 def list_curriculum(squadron_id: str | None = None, include_archived: bool = False,
                     db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     # Resolve the wing for the acting scope
     wing_id: str | None = p.acting_wing_id or p.wing_id
     if sq_id:
@@ -486,7 +460,7 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
             raise HTTPException(422, detail={"error": "timing_template_expired"})
         effective_tmpl = explicit_tmpl
     else:
-        effective_tmpl = _effective_template(db, s.id, body.date)
+        effective_tmpl = effective_template(db, s.id, body.date)
 
     if effective_tmpl is None:
         raise HTTPException(422, detail={
@@ -1595,21 +1569,40 @@ def list_facs(squadron_id: str | None = None, include_archived: bool = False,
               db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     from datetime import date, timedelta
     from ..models.planning import PlanningFacilitatorLeave
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(Facilitator.is_archived == False)  # noqa: E712
     facs = q.all()
     today = date.today().isoformat()
     horizon = (date.today() + timedelta(days=90)).isoformat()
+
+    # Batch the 90-day leave window once. The previous implementation issued
+    # one SELECT per facilitator, which made this endpoint scale linearly in
+    # round-trips as Squadron staff lists grew.
+    leave_by_facilitator: dict[str, list] = {}
+    fac_ids = [f.id for f in facs]
+    if fac_ids:
+        leave_rows = (
+            db.query(PlanningFacilitatorLeave)
+            .filter(
+                PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
+                PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+                PlanningFacilitatorLeave.end_date >= today,
+                PlanningFacilitatorLeave.start_date <= horizon,
+            )
+            .order_by(
+                PlanningFacilitatorLeave.facilitator_id,
+                PlanningFacilitatorLeave.start_date,
+            )
+            .all()
+        )
+        for leave in leave_rows:
+            leave_by_facilitator.setdefault(leave.facilitator_id, []).append(leave)
+
     out = []
     for f in facs:
-        leave = (db.query(PlanningFacilitatorLeave)
-                 .filter(PlanningFacilitatorLeave.facilitator_id == f.id,
-                         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-                         PlanningFacilitatorLeave.end_date >= today,
-                         PlanningFacilitatorLeave.start_date <= horizon)
-                 .order_by(PlanningFacilitatorLeave.start_date).all())
+        leave = leave_by_facilitator.get(f.id, [])
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
                     "subject_areas": _parse_json_list(f.subject_areas), "is_archived": f.is_archived,
@@ -1621,18 +1614,39 @@ def list_facs(squadron_id: str | None = None, include_archived: bool = False,
 @router.post("/facilitators")
 def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
             idempotency_key: str | None = Header(None, alias="Idempotency-Key")):
-    from sqlalchemy import func
-    from ..security import idempotency_get, idempotency_set
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    from ..database import SessionLocal
+    from .. import services_idempotency as idem
+    require_write_role(p)
     # A retried POST after a client-perceived timeout must not create a second
     # facilitator, most importantly when confirm_duplicate=true (the "Add
     # anyway" resubmit) -- that path has no other duplicate protection at all.
-    idem_cache_key = f"{p.user_id}:facilitators:{idempotency_key}" if idempotency_key else None
-    if idem_cache_key:
-        cached = idempotency_get(idem_cache_key)
-        if cached is not None:
-            return cached[1]
+    # The claim is shared by every worker (database row), so a retry that
+    # reaches a different gunicorn worker is still recognised.
+    idem_key = f"{p.user_id}:facilitators:{idempotency_key}" if idempotency_key else None
+    if not idem_key:
+        return _add_fac(body, db, p)
+    idem_db = SessionLocal()
+    try:
+        state = idem.claim(idem_db, idem_key)
+        if state == "in_progress":
+            raise HTTPException(409, detail={
+                "error": "request_in_progress",
+                "message": "This request is already being processed. Try again in a moment."})
+        if state is not None:
+            return state[1]
+        try:
+            result = _add_fac(body, db, p)
+        except Exception:
+            idem.release(idem_db, idem_key)   # a fixed retry with the same key may run
+            raise
+        idem.complete(idem_db, idem_key, 200, result)
+        return result
+    finally:
+        idem_db.close()
+
+
+def _add_fac(body: "FacIn", db: DBSession, p: Principal) -> dict:
+    from sqlalchemy import func
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -1685,10 +1699,7 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=rank, effective_from=str(utcnow().date())))
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="create")
-    result = {"ok": True, "facilitator_id": f.id}
-    if idem_cache_key:
-        idempotency_set(idem_cache_key, 200, result)
-    return result
+    return {"ok": True, "facilitator_id": f.id}
 
 
 @router.get("/facilitators/import/template.csv")
@@ -1696,8 +1707,7 @@ def facilitator_import_template(p: Principal = Depends(get_principal)):
     """TRGO-05: downloadable CSV template matching the columns import_facilitators_csv accepts."""
     import io
     from fastapi.responses import StreamingResponse
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     bio = io.BytesIO(
         b"rank,first_name,last_name,type,subject_areas,active_status\r\n"
         b"FLTLT,Jordan,Smith,Staff,Drill;Air_Space,true\r\n"
@@ -1769,8 +1779,7 @@ async def import_facilitators_csv(
     trigger in Excel/Sheets) is neutralised before it ever reaches storage
     or a later export.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -1930,7 +1939,7 @@ def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(
 @router.get("/training-areas")
 def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
                db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(TrainingArea.is_archived == False)  # noqa: E712
@@ -1943,7 +1952,7 @@ def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
 @router.get("/equipment")
 def list_equipment(squadron_id: str | None = None, include_archived: bool = False,
                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(Equipment).filter(Equipment.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(Equipment.is_archived == False)  # noqa: E712
@@ -2160,8 +2169,7 @@ def add_cadet_class_membership(
     cadet_id: str, body: CadetClassMembershipIn,
     db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
 ):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     cadet = _require_cadet_and_squadron(db, p, cadet_id, write=True)
 
     tc = db.get(TrainingClass, body.training_class_id)
@@ -2273,7 +2281,7 @@ def parade_night_builder(pnid: str, db: DBSession = Depends(get_db), p: Principa
     if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2357,7 +2365,7 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
     if pn.timing_template_id:
         _tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not _tmpl and pn.squadron_id:
-        _tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        _tmpl = effective_template(db, pn.squadron_id, pn.date)
     tmpl_name = _tmpl.name if _tmpl else None
 
     # Resolve timing_block_id from the live template for both snapshot and template paths.
@@ -2768,8 +2776,7 @@ def absorb_fac(fid: str, body: FacAbsorbIn, db: DBSession = Depends(get_db),
     and leave records, then archive the source.  Both must belong to the same
     squadron and neither may already be archived."""
     from ..models.planning import PlanningFacilitatorLeave
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     target = db.get(Facilitator, fid)
     if not target or target.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -2823,13 +2830,11 @@ class TrainingAreaUpdateIn(BaseModel):
     capabilities: list[str] | None = None
 
 
-_WRITE_BLOCKED = ("sqn_general", "wing_viewer", "national_viewer", "auditor")
 
 
 @router.post("/training-areas")
 def create_room(body: TrainingAreaIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -2979,7 +2984,7 @@ class TrainingClassUpdateIn(BaseModel):
 def list_training_classes(squadron_id: str | None = None, training_year_id: str | None = None,
                            include_archived: bool = False,
                            db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     if not sq_id:
         return []
     q = db.query(TrainingClass).filter(TrainingClass.squadron_id == sq_id)
@@ -2994,8 +2999,7 @@ def list_training_classes(squadron_id: str | None = None, training_year_id: str 
 @router.post("/training-classes")
 def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db),
                            p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -3205,8 +3209,7 @@ def reassign_class_members(from_id: str, body: ReassignClassMembersIn,
     """Core split/move primitive: ends each named cadet's active membership in
     from_id and starts a new one in to_training_class_id, effective
     body.effective_date. Never touches SessionAudience."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     from_c = db.get(TrainingClass, from_id)
     if not from_c:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -3241,8 +3244,7 @@ def merge_training_class(source_id: str, body: MergeTrainingClassIn,
     above). SessionAudience rows referencing source are left completely
     untouched -- a past session's delivered-to class list is historical fact,
     not something a later merge may rewrite (addendum §62/§63)."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     source = db.get(TrainingClass, source_id)
     if not source or source.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -3273,83 +3275,17 @@ def merge_training_class(source_id: str, body: MergeTrainingClassIn,
 
 
 # ── CLASS-SPECIFIC CURRICULUM PROGRESS ──────────────────────────────────────
-# CLASS-04: curriculum progress derived PER Training Class, not blended
-# across every class sharing a Training Stage. Derived entirely from
-# existing operational data (CurriculumItem, Session, SessionAudience) --
-# no second, manually-maintained progress database (addendum §44). One
-# recorded fact (a Session's status, or its per-class outcome_override)
-# drives this read model; nothing here is itself written to directly.
-_ITEM_STATUS_PRIORITY = ["delivered", "delivered_with_issue", "not_delivered",
-                         "cancelled", "planned", "rescheduled"]
-
-
-def _class_curriculum_progress(db: DBSession, c: TrainingClass) -> dict:
-    stage = db.get(CurriculumPhase, c.training_stage_id) if c.training_stage_id else None
-    stage_name = stage.name if stage else None
-    s = db.get(Squadron, c.squadron_id)
-    wing_id = s.wing_id if s else None
-
-    from sqlalchemy import or_
-    conditions = [CurriculumItem.owning_level == "national"]
-    if wing_id:
-        conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
-    conditions.append(CurriculumItem.squadron_id == c.squadron_id)
-    items = db.query(CurriculumItem).filter(
-        CurriculumItem.is_archived == False,  # noqa: E712
-        CurriculumItem.phase == stage_name,
-        or_(*conditions),
-    ).order_by(CurriculumItem.recommended_sequence).all()
-
-    # One query for every Session linked to this class via SessionAudience,
-    # joined back to the Session row for its curriculum_item_id/status.
-    linked = (
-        db.query(SessionAudience, Session)
-        .join(Session, SessionAudience.session_id == Session.id)
-        .filter(SessionAudience.training_class_id == c.id, Session.is_archived == False)  # noqa: E712
-        .all()
-    )
-    from collections import defaultdict
-    by_item: dict[str, list[dict]] = defaultdict(list)
-    for aud, sess in linked:
-        if not sess.curriculum_item_id:
-            continue
-        effective = aud.outcome_override or sess.status or "planned"
-        by_item[sess.curriculum_item_id].append({"session_id": sess.id, "status": effective})
-
-    requirements = []
-    summary = {"total": 0, "delivered": 0, "planned": 0, "not_delivered": 0, "cancelled": 0, "not_started": 0}
-    for item in items:
-        sessions = by_item.get(item.id, [])
-        if not sessions:
-            status = "not_started"
-        else:
-            present = {row["status"] for row in sessions}
-            status = next((cand for cand in _ITEM_STATUS_PRIORITY if cand in present), "planned")
-        bucket = "delivered" if status in ("delivered", "delivered_with_issue") else status
-        summary["total"] += 1
-        summary[bucket] = summary.get(bucket, 0) + 1
-        requirements.append({
-            "curriculum_id": item.id, "code": item.code, "title": item.title,
-            "status": status, "sessions": sessions,
-        })
-
-    return {
-        "training_class_id": c.id,
-        "training_stage_id": c.training_stage_id,
-        "stage_name": stage_name,
-        "requirements": requirements,
-        "summary": summary,
-    }
-
+# Calculation lives in services_curriculum_progress.py so Training, Dashboard,
+# and Planning cannot drift.
 
 @router.get("/training-classes/{cid}/curriculum-progress")
-def get_class_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def getclass_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     c = db.get(TrainingClass, cid)
     if not c:
         raise HTTPException(404, detail={"error": "not_found"})
     s = db.get(Squadron, c.squadron_id)
     require_can_view_squadron(p, c.squadron_id, s.wing_id if s else None)
-    return _class_curriculum_progress(db, c)
+    return class_curriculum_progress(db, c)
 
 
 @router.get("/curriculum/class-matrix")
@@ -3449,7 +3385,7 @@ def get_class_matrix(
                 else:
                     present = {row["status"] for row in sessions}
                     status = next(
-                        (cand for cand in _ITEM_STATUS_PRIORITY if cand in present),
+                        (cand for cand in ITEM_STATUS_PRIORITY if cand in present),
                         "planned",
                     )
                 cells[tc.id] = {
@@ -3503,7 +3439,7 @@ def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = De
     healthy-looking blended number. Also returns the per-class breakdown so
     a Squadron dashboard can show both the aggregate and which class, if
     any, needs attention (addendum §75)."""
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     stage = db.get(CurriculumPhase, stage_id)
     if not stage:
         raise HTTPException(404, detail={"error": "training_stage_not_found"})
@@ -3516,7 +3452,7 @@ def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = De
     total_delivered = 0
     total_applicable = 0
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         delivered = prog["summary"]["delivered"]
         total = prog["summary"]["total"]
         total_delivered += delivered
@@ -3887,8 +3823,7 @@ class EquipUpdateIn(BaseModel):
 
 @router.post("/equipment")
 def create_equip(body: EquipIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -4287,7 +4222,7 @@ def list_activities(
 ):
     if not scope_type:
         # Backward-compatible path: existing single-squadron behaviour, unchanged.
-        sq_id = _view_squadron_id(p, squadron_id, db)
+        sq_id = resolve_view_squadron_id(p, squadron_id, db)
         rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
                                          Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
         return [_activity_out(a, p, "squadron") for a in rows]
@@ -4541,8 +4476,7 @@ def delete_activity_local_override(aid: str, db: DBSession = Depends(get_db), p:
 
 @router.post("/activities")
 def create_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -4780,8 +4714,8 @@ def generate_activities(
     if body.recurrence not in RECURRENCE_OPTS:
         raise HTTPException(400, detail={"error": "invalid_recurrence",
                                          "allowed": sorted(RECURRENCE_OPTS)})
-    if p.role in _WRITE_BLOCKED and not body.preview_only:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if not body.preview_only:
+        require_write_role(p)
 
     sq_id = _active_squadron(p)
     s = db.get(Squadron, sq_id) if sq_id else None
@@ -4901,9 +4835,7 @@ class ElementIn(BaseModel):
 def _can_create_element(p: Principal, scope_level: str,
                         wing_id: str | None = None, squadron_id: str | None = None) -> None:
     """Raise 403 if the actor cannot create an element at the requested scope."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create elements."})
+    require_write_role(p, message="Viewers and auditors cannot create elements.")
     if scope_level not in ELEMENT_SCOPE_LEVELS:
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(ELEMENT_SCOPE_LEVELS)}"})
@@ -5073,9 +5005,7 @@ def _can_create_phase(p: Principal, scope_level: str,
     active Proxy session targeting that squadron; national_admin/system_admin
     need active Delegated Intervention targeting that squadron.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create phases."})
+    require_write_role(p, message="Viewers and auditors cannot create phases.")
     if scope_level not in PHASE_SCOPE_LEVELS:
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(PHASE_SCOPE_LEVELS)}"})
@@ -5324,8 +5254,7 @@ def _find_existing_curriculum(db: DBSession, body: CurriculumIn,
 def create_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
                       p: Principal = Depends(get_principal)):
     """Create a squadron-owned curriculum item (owning_level=squadron)."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
@@ -5523,6 +5452,32 @@ def restore_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal =
 
 # ── CURRICULUM BULK IMPORT ────────────────────────────────────────────────────
 
+def _facilitator_name_index(facilitators) -> dict[str, str]:
+    """Lower-cased name -> facilitator id, for linking workbook rows by name.
+
+    Facilitator has no display_name (reading it crashed every squadron-scoped
+    import with 500). Each facilitator is indexed under the codebase's display
+    form "rank first last" and under "first last". A key two facilitators share
+    is dropped entirely, so an ambiguous name links nobody rather than the
+    wrong person.
+    """
+    index: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for f in facilitators:
+        names = {" ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x),
+                 " ".join(x for x in [f.first_name, f.last_name] if x)}
+        for name in names:
+            key = name.strip().lower()
+            if not key:
+                continue
+            if key in index and index[key] != f.id:
+                ambiguous.add(key)
+            index[key] = f.id
+    for key in ambiguous:
+        index.pop(key, None)
+    return index
+
+
 @router.post("/curriculum/import")
 def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                       p: Principal = Depends(get_principal)):
@@ -5586,10 +5541,8 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     fac_by_name: dict[str, str] = {}  # display_name -> id
     room_by_name: dict[str, str] = {}  # name -> id
     if sqn_id:
-        for f in db.query(Facilitator).filter(Facilitator.squadron_id == sqn_id).all():
-            key = (f.display_name or "").strip().lower()
-            if key:
-                fac_by_name[key] = f.id
+        fac_by_name = _facilitator_name_index(
+            db.query(Facilitator).filter(Facilitator.squadron_id == sqn_id).all())
         for r in db.query(TrainingArea).filter(TrainingArea.squadron_id == sqn_id).all():
             key = (r.name or "").strip().lower()
             if key:
@@ -6061,9 +6014,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
     changes -- so those roles could never create a tag at ANY scope,
     contradicting the ask outright.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create tags."})
+    require_write_role(p, message="Viewers and auditors cannot create tags.")
     if scope not in ("global", "wing", "squadron"):
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": "scope must be one of: global, wing, squadron"})
@@ -7228,7 +7179,7 @@ def sessions_needs_attention(
     """Past Sessions (parade_night.date < today) still in planned/published/cancelled-unresolved state."""
     if p.role == "sqn_general":
         raise HTTPException(403, detail={"error": "forbidden"})
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     today_str = str(_date.today())
 
     planned_sessions = (
@@ -7527,7 +7478,7 @@ def curriculum_item_previous_deliveries(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     sessions = (
         db.query(Session, ParadeNight)
         .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
