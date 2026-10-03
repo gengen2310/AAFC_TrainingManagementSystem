@@ -12,9 +12,12 @@ from app.services_year import current_year, wing_timezone
 
 
 def test_second_wing_seed_sets_a_resolvable_wing_timezone(client, monkeypatch):
-    # Unique codes so the shared test DB's own 1WG/101/102 fixtures are untouched.
-    for k, v in {"ENVIRONMENT": "development", "WING2_CODE": "9TZ", "WING2_NAME": "9TZ Test Wing",
-                 "SQN2A_CODE": "991", "SQN2B_CODE": "992"}.items():
+    # Pin every env var the seed reads: unique codes so the shared test DB's own
+    # 1WG/101/102 fixtures are untouched, and DRY_RUN=0 -- the seed honours
+    # DRY_RUN, so a caller's DRY_RUN=1 (e.g. deploy-staging.sh's dry run) made it
+    # write nothing and this test fail.
+    for k, v in {"ENVIRONMENT": "development", "DRY_RUN": "0", "WING2_CODE": "9TZ",
+                 "WING2_NAME": "9TZ Test Wing", "SQN2A_CODE": "991", "SQN2B_CODE": "992"}.items():
         monkeypatch.setenv(k, v)
     second_wing_seed()
 
