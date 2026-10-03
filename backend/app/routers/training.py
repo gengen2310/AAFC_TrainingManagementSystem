@@ -1576,14 +1576,33 @@ def list_facs(squadron_id: str | None = None, include_archived: bool = False,
     facs = q.all()
     today = date.today().isoformat()
     horizon = (date.today() + timedelta(days=90)).isoformat()
+
+    # Batch the 90-day leave window once. The previous implementation issued
+    # one SELECT per facilitator, which made this endpoint scale linearly in
+    # round-trips as Squadron staff lists grew.
+    leave_by_facilitator: dict[str, list] = {}
+    fac_ids = [f.id for f in facs]
+    if fac_ids:
+        leave_rows = (
+            db.query(PlanningFacilitatorLeave)
+            .filter(
+                PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
+                PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+                PlanningFacilitatorLeave.end_date >= today,
+                PlanningFacilitatorLeave.start_date <= horizon,
+            )
+            .order_by(
+                PlanningFacilitatorLeave.facilitator_id,
+                PlanningFacilitatorLeave.start_date,
+            )
+            .all()
+        )
+        for leave in leave_rows:
+            leave_by_facilitator.setdefault(leave.facilitator_id, []).append(leave)
+
     out = []
     for f in facs:
-        leave = (db.query(PlanningFacilitatorLeave)
-                 .filter(PlanningFacilitatorLeave.facilitator_id == f.id,
-                         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-                         PlanningFacilitatorLeave.end_date >= today,
-                         PlanningFacilitatorLeave.start_date <= horizon)
-                 .order_by(PlanningFacilitatorLeave.start_date).all())
+        leave = leave_by_facilitator.get(f.id, [])
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
                     "subject_areas": _parse_json_list(f.subject_areas), "is_archived": f.is_archived,
