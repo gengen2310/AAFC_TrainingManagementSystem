@@ -2,6 +2,15 @@
 
 ## Project overview
 
+## Current engineering phase — stabilisation
+
+As of 2026-10-03 the product owner has moved the system into a **predictability and sustainability** phase. Read `docs/stabilisation/README.md` before structural work.
+
+- Do not start major net-new feature programmes while stabilisation is active unless the product owner explicitly overrides the freeze.
+- Security, data-integrity, release-blocking and already-authorised workflow fixes remain in scope.
+- Run `python tools/architecture/guard.py` before committing structural work. The guard is a ratchet: the connected-frontend monolith and router-local role-policy debt may shrink but must not silently grow.
+- Prefer behaviour-preserving extraction over rewrites. Refactor and behaviour redesign belong in separate commits/PRs whenever practical.
+
 AAFC Training Management System (TMS) — national connected pilot, v17.1.
 FastAPI backend, PostgreSQL (Supabase-hosted) in deployed environments, SQLite for local dev/tests.
 Two deployed frontends, both intentionally kept separate (see Frontend below).
