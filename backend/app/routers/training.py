@@ -20,7 +20,8 @@ from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_C
                                SessionAssistantFacilitator)
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
-from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
+from ..permissions import (Principal, resolve_view_squadron_id,
+                          require_can_view_squadron, require_can_write_squadron,
                           require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
                           NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers,
@@ -82,34 +83,6 @@ def _active_squadron(p: Principal):
     return p.active_squadron_id
 
 
-def _view_squadron_id(p: Principal, squadron_id: str | None, db: DBSession) -> str | None:
-    """Resolve which squadron's data a READ should return. An explicit squadron_id
-    (validated via require_can_view_squadron, the same check dashboard charts and
-    /api/parade-nights already use) lets a wing/national viewer see a specific
-    squadron's operational pages WITHOUT needing to enter Proxy/Delegated
-    Intervention Mode — viewing is broad by design (permissions.py's
-    Principal.can_view_squadron), only writing is proxy-gated (see
-    require_can_write_squadron / Block 7's canWriteSquadron fix). Falls back to
-    _active_squadron() when no squadron_id is given, so existing squadron-scoped
-    callers are unaffected.
-
-    Master transformation plan Block 8: this closes the inconsistency where
-    /api/parade-nights and /api/dashboard/charts already supported this pattern
-    but /api/facilitators, /api/training-areas, /api/equipment, and /api/activities
-    did not — a wing/national viewer's squadron selector must behave the same way
-    on every squadron page, not degrade differently depending which one they're on."""
-    if squadron_id:
-        s = db.get(Squadron, squadron_id)
-        if not s:
-            # A bogus squadron_id must 404, never silently fall back to the
-            # caller's own scope — that would mask a broken link/typo as "no
-            # results" instead of a clear error.
-            raise HTTPException(404, detail={"error": "squadron_not_found"})
-        require_can_view_squadron(p, s.id, s.wing_id)
-        return s.id
-    return _active_squadron(p)
-
-
 def _sess_dict(s: Session) -> dict:
     d = {c.name: getattr(s, c.name) for c in s.__table__.columns}
     d["session_id"] = s.id  # alias for Night Builder compatibility
@@ -120,7 +93,7 @@ def _sess_dict(s: Session) -> dict:
 @router.get("/curriculum")
 def list_curriculum(squadron_id: str | None = None, include_archived: bool = False,
                     db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     # Resolve the wing for the acting scope
     wing_id: str | None = p.acting_wing_id or p.wing_id
     if sq_id:
@@ -1595,7 +1568,7 @@ def list_facs(squadron_id: str | None = None, include_archived: bool = False,
               db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     from datetime import date, timedelta
     from ..models.planning import PlanningFacilitatorLeave
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(Facilitator.is_archived == False)  # noqa: E712
@@ -1930,7 +1903,7 @@ def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(
 @router.get("/training-areas")
 def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
                db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(TrainingArea.is_archived == False)  # noqa: E712
@@ -1943,7 +1916,7 @@ def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
 @router.get("/equipment")
 def list_equipment(squadron_id: str | None = None, include_archived: bool = False,
                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     q = db.query(Equipment).filter(Equipment.squadron_id == sq_id)
     if not include_archived:
         q = q.filter(Equipment.is_archived == False)  # noqa: E712
@@ -2979,7 +2952,7 @@ class TrainingClassUpdateIn(BaseModel):
 def list_training_classes(squadron_id: str | None = None, training_year_id: str | None = None,
                            include_archived: bool = False,
                            db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     if not sq_id:
         return []
     q = db.query(TrainingClass).filter(TrainingClass.squadron_id == sq_id)
@@ -3503,7 +3476,7 @@ def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = De
     healthy-looking blended number. Also returns the per-class breakdown so
     a Squadron dashboard can show both the aggregate and which class, if
     any, needs attention (addendum §75)."""
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     stage = db.get(CurriculumPhase, stage_id)
     if not stage:
         raise HTTPException(404, detail={"error": "training_stage_not_found"})
@@ -4287,7 +4260,7 @@ def list_activities(
 ):
     if not scope_type:
         # Backward-compatible path: existing single-squadron behaviour, unchanged.
-        sq_id = _view_squadron_id(p, squadron_id, db)
+        sq_id = resolve_view_squadron_id(p, squadron_id, db)
         rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
                                          Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
         return [_activity_out(a, p, "squadron") for a in rows]
@@ -7228,7 +7201,7 @@ def sessions_needs_attention(
     """Past Sessions (parade_night.date < today) still in planned/published/cancelled-unresolved state."""
     if p.role == "sqn_general":
         raise HTTPException(403, detail={"error": "forbidden"})
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     today_str = str(_date.today())
 
     planned_sessions = (
@@ -7527,7 +7500,7 @@ def curriculum_item_previous_deliveries(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     sessions = (
         db.query(Session, ParadeNight)
         .join(ParadeNight, Session.parade_night_id == ParadeNight.id)

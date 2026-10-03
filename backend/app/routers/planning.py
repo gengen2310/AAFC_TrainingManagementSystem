@@ -48,7 +48,8 @@ from ..models.training import (
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import (Principal, require_role, require_write_role,
+from ..permissions import (Principal, resolve_view_squadron_id,
+                           require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
 from ..services import audit
 from ..services import (visible_curriculum_item, scoped_facilitator,
@@ -2954,15 +2955,14 @@ def list_planning_facilitators(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    # Aligned to the same _view_squadron_id() resolution every other resource
+    # Aligned to the same resolve_view_squadron_id() resolution every other resource
     # endpoint in training.py already standardizes on (GET /api/facilitators,
     # /api/training-areas, /api/equipment, /api/activities) -- this endpoint
     # previously had its own bespoke role filter with no national_admin/
     # system_admin branch at all (silently unfiltered = every facilitator in
     # the system) and no proxy/acting-squadron awareness, so it could disagree
     # with what a squadron's own facilitator list actually shows.
-    from .training import _view_squadron_id
-    sq_id = _view_squadron_id(p, unit_id, db)
+    sq_id = resolve_view_squadron_id(p, unit_id, db)
     q = db.query(Facilitator).filter(
         Facilitator.active_status == True,  # noqa: E712
         Facilitator.squadron_id == sq_id,

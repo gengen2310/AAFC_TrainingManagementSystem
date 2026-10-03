@@ -31,9 +31,10 @@ from ..models import (
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
     CurriculumPhase, CurriculumElement, TrainingClass, AuditLog, Activity,
 )
-from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
+from ..permissions import (Principal, resolve_view_squadron_id, require_role,
+                           require_can_view_squadron, require_can_view_wing)
 from ..services_readiness import parade_night_readiness, session_requirements
-from .training import _view_squadron_id, _class_curriculum_progress
+from .training import _class_curriculum_progress
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -2315,8 +2316,8 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
 
 def _view_squadron_id_for_dashboard(p: Principal, squadron_id: str, db: DBSession) -> str | None:
     """Validate a wing/national viewer's requested squadron_id the same way
-    /api/facilitators, /api/curriculum etc. already do (_view_squadron_id in
-    training.py) — view access only, no proxy/intervention required. Returns
+    /api/facilitators, /api/curriculum etc. already do (resolve_view_squadron_id in
+    permissions.py) — view access only, no proxy/intervention required. Returns
     None (never raises) for a squadron outside the caller's view scope, so an
     unrelated bad id degrades to "no squadron charts" rather than a hard error
     on a read-heavy dashboard endpoint; a squadron that simply doesn't exist
@@ -2719,7 +2720,7 @@ def get_facilitator_schedule(
     squadron is resolved, matching the "select a squadron" empty-state
     convention already used across Calendar/Curriculum/Facilitators/Resources.
     """
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     w_start, w_end = _date_window(window)
     if not sq_id:
         return {
