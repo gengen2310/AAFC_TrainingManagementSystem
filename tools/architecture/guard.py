@@ -8,6 +8,7 @@ This is a ratchet, not a style checker:
 Intentional baseline increases require an explicit baseline edit and PR rationale.
 """
 from __future__ import annotations
+import ast
 import json
 import re
 import sys
@@ -17,6 +18,34 @@ ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = Path(__file__).with_name("architecture-baseline.json")
 DIRECT_ROLE_RE = re.compile(r"\bp\.role\s*(?:==|!=|in\b|not\s+in\b)")
 NAMED_FUNCTION_RE = re.compile(r"\bfunction\s+[A-Za-z_$][\w$]*\s*\(")
+
+
+def router_imports(text: str, router_names: set[str], self_name: str) -> set[str]:
+    """Sibling router modules imported by this router source, in any form.
+
+    Parsed with ast, so only real import statements count (never strings or
+    comments), at any indentation. Covers `from .x import`, `from . import x`,
+    `from ..routers(.x) import`, `from app.routers(.x) import`, `import app.routers.x`.
+    A regex once used here could not match any import at all (see test_guard.py).
+    """
+    found: set[str] = set()
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.ImportFrom):
+            mod = node.module or ""
+            if node.level == 1:
+                pkg_names = [mod] if mod else [a.name for a in node.names]
+            elif node.level == 2 and (mod == "routers" or mod.startswith("routers.")):
+                pkg_names = [mod.split(".", 1)[1]] if "." in mod else [a.name for a in node.names]
+            elif node.level == 0 and (mod == "app.routers" or mod.startswith("app.routers.")):
+                pkg_names = [mod.split(".")[2]] if mod.count(".") >= 2 else [a.name for a in node.names]
+            else:
+                continue
+            found.update(n.split(".")[0] for n in pkg_names)
+        elif isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.startswith("app.routers."):
+                    found.add(a.name.split(".")[2])
+    return {n for n in found if n in router_names and n != self_name}
 
 def main() -> int:
     baseline=json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
@@ -42,15 +71,11 @@ def main() -> int:
     # router dependencies must be rejected in favour of permissions/services.
     router_dir=ROOT/"backend"/"app"/"routers"
     router_names={p.stem for p in router_dir.glob("*.py")}
-    import_re=re.compile(r"^\\s*from\\s+\\.(\\w+)\\s+import\\s+", re.MULTILINE)
     expected_edges=baseline.get("router_cross_imports", {})
     actual_edges={}
     for file in sorted(router_dir.glob("*.py")):
         rel=file.relative_to(ROOT).as_posix()
-        deps=sorted({
-            module for module in import_re.findall(file.read_text(encoding="utf-8"))
-            if module in router_names
-        })
+        deps=sorted(router_imports(file.read_text(encoding="utf-8"), router_names, file.stem))
         if deps:
             actual_edges[rel]=deps
         allowed=set(expected_edges.get(rel, []))
