@@ -1,6 +1,6 @@
 # Operational Workflow Audit
 
-**Audited:** 2026-10-03  
+**Audited:** 2026-10-03
 **Branch:** `stabilise/predictable-architecture-post-pr68`
 
 This note records the current code-level behaviour of the operational workflows
