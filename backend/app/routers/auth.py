@@ -97,6 +97,7 @@ class LookupIn(BaseModel):
 class ChangeCodeIn(BaseModel):
     user_id: str
     new_code: str
+    current_code: str | None = None
 
 
 @router.post("/lookup")
@@ -378,7 +379,20 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "not_found"})
     # Scope check: the actor must have management authority over the target account.
     # (Mirrors the check in accounts.py:reset_code — prevents cross-scope code takeover.)
-    if not is_self:
+    if is_self:
+        # A stolen session token alone must not be sufficient to permanently
+        # rotate the account credential. Re-authenticate against the live code
+        # for both normal self-service and first-login forced rotation.
+        active_codes = db.query(AccessCode).filter(
+            AccessCode.user_id == target.id,
+            AccessCode.active_status == True,  # noqa: E712
+        ).all()
+        if not any(verify_code(body.current_code or "", row.code_hash) for row in active_codes):
+            raise HTTPException(403, detail={
+                "error": "reauth_required",
+                "message": "Enter your current access code to change it.",
+            })
+    else:
         from .accounts import _require_manage_authority
         _require_manage_authority(p, target, db)
     # Validate the new code: strip, non-empty, minimum length, maximum length.
@@ -403,6 +417,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     target.token_version = (target.token_version or 0) + 1
+    target.must_change_code = not is_self
     db.commit()
     action = "change_own_code" if is_self else "reset_access"
     new_info = {} if is_self else {"target_display_name": target.display_name, "target_role": target.role}
@@ -455,6 +470,7 @@ def _me(user: User, db: DBSession | None = None) -> dict:
             "wing_id": user.wing_id, "wing_code": wing_code, "wing_name": wing_name,
             "squadron_id": user.squadron_id, "squadron_code": squadron_code,
             "national_id": user.national_id,
+            "must_change_code": bool(getattr(user, "must_change_code", False)),
             "is_wing": user.role in ("wing_viewer", "wing_admin"),
             "is_national": user.role in ("national_viewer", "national_admin", "system_admin", "auditor")}
 
@@ -518,8 +534,13 @@ def forgot_code(body: ForgotCodeIn, request: Request, db: DBSession = Depends(ge
         # would itself confirm that an address is worth guessing at.
         return _FORGOT_RESPONSE
 
-    u = db.query(User).filter(User.recovery_email == addr).first() if addr else None
-    if is_recovery_eligible(u):
+    matches = db.query(User).filter(User.recovery_email == addr).all() if addr else []
+    eligible = [candidate for candidate in matches if is_recovery_eligible(candidate)]
+    # A recovery address is a credential-reset destination and therefore must
+    # identify exactly one eligible account. Legacy duplicate rows fail closed:
+    # no token is minted and the outward response remains indistinguishable.
+    u = eligible[0] if len(eligible) == 1 else None
+    if u is not None:
         raw = mint_token(db, u, "reset", RESET_TTL_MINUTES, ip)
         db.commit()
         sent = send_mail(
@@ -571,6 +592,9 @@ def reset_code_by_token(body: ResetByTokenIn, db: DBSession = Depends(get_db)):
 
     # Every live JWT dies here: dependencies.py rejects a tv mismatch.
     u.token_version = (u.token_version or 0) + 1
+    # Recovery already proves mailbox possession and asks the holder to choose
+    # the replacement credential, so no second forced rotation is necessary.
+    u.must_change_code = False
     db.commit()
     audit(db, None, object_type="user", object_id=u.id, action="recovery_completed")
     return {"ok": True, "message": "Your access code has been changed. Sign in with it now."}

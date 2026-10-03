@@ -347,7 +347,7 @@ def test_national_admin_can_patch_any_ticket(client):
 
     h = login(client, "ADMINNATIONAL")
     r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
-                     json={"status": "in_progress", "assigned_to_name": "Maj Smith"}, headers=h)
+                     json={"status": "in_progress"}, headers=h)
     assert r.status_code == 200, r.text
 
 
@@ -457,20 +457,45 @@ def test_create_ticket_no_squadron_no_unit_name_rejected(client):
     assert r.status_code == 422
 
 
-def test_assigned_to_name_field(client):
+def test_legacy_assigned_to_name_resolves_real_account(client):
+    """Pre-v70 name-only clients may resolve a unique real support account,
+    but the server still stores canonical ownership by user id."""
     sqn703 = _sqn_id("703SQN")
     h_sys = login(client, "SYSADMIN2026")
 
-    created = _make_ticket(client, sqn703, description="Assignee field test ticket here.")
+    created = _make_ticket(client, sqn703, description="Assignee compatibility test ticket.")
     ticket_id = created["ticket_id"]
 
-    r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
-                     json={"assigned_to_name": "Capt Jones"}, headers=h_sys)
-    assert r.status_code == 200
+    accounts = client.get("/api/accounts", headers=h_sys).json()
+    assignee = next(
+        a for a in accounts
+        if a["role"] in ("system_admin", "national_admin")
+        and a["active_status"] and not a["is_archived"]
+    )
+    r = client.patch(
+        f"/api/service-desk/tickets/{ticket_id}",
+        json={"assigned_to_name": assignee["display_name"]},
+        headers=h_sys,
+    )
+    assert r.status_code == 200, r.text
 
     tickets = client.get("/api/service-desk/tickets", headers=h_sys).json()
-    t = next((x for x in tickets if x["ticket_id"] == ticket_id), None)
-    assert t["assigned_to_name"] == "Capt Jones"
+    t = next(x for x in tickets if x["ticket_id"] == ticket_id)
+    assert t["assigned_to_name"] == assignee["display_name"]
+    assert t["assigned_to_user_id"] == assignee["user_id"]
+
+
+def test_legacy_assigned_to_name_rejects_free_text(client):
+    sqn703 = _sqn_id("703SQN")
+    h_sys = login(client, "SYSADMIN2026")
+    created = _make_ticket(client, sqn703, description="Reject free text assignee test.")
+    r = client.patch(
+        f"/api/service-desk/tickets/{created['ticket_id']}",
+        json={"assigned_to_name": "Not A Real Support Account"},
+        headers=h_sys,
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "invalid_assignee"
 
 
 # ── Public units endpoint ─────────────────────────────────────────────────────
@@ -605,3 +630,164 @@ def test_national_viewer_cannot_patch_ticket(client):
     r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
                      json={"status": "resolved"}, headers=h)
     assert r.status_code == 403
+
+
+# ── Post-PR65 operational regressions ─────────────────────────────────────────
+
+def test_direct_wing_ticket_preserves_authoritative_scope_and_is_visible_to_wing_admin(client):
+    """A Wing selected in the public form is a real Wing relationship, not display text."""
+    db = SessionLocal()
+    try:
+        wing = db.query(Wing).filter(Wing.code == "7WG", Wing.is_archived == False).first()  # noqa: E712
+        assert wing is not None
+        wing_id, wing_name = wing.id, wing.name
+    finally:
+        db.close()
+
+    created = client.post("/api/service-desk/tickets", json={
+        "rank": "FLTLT",
+        "first_name": "Wing",
+        "last_name": "Reporter",
+        "email": "wing.reporter@example.com",
+        "wing_id": wing_id,
+        "unit_name": "spoofed display text must not win",
+        "category": "technical_error",
+        "description": "Direct Wing ticket scope regression check.",
+    })
+    assert created.status_code == 201, created.text
+    ticket_id = created.json()["ticket_id"]
+
+    h_wing = login(client, "ADMIN7WG")
+    listed = client.get("/api/service-desk/tickets", headers=h_wing)
+    assert listed.status_code == 200, listed.text
+    ticket = next(x for x in listed.json() if x["ticket_id"] == ticket_id)
+    assert ticket["wing_id"] == wing_id
+    assert ticket["unit_name"] == wing_name
+    assert ticket["squadron_id"] is None
+
+
+def test_ticket_rejects_squadron_wing_scope_mismatch(client):
+    """Clients cannot pair a real Squadron with an arbitrary Wing."""
+    sqn_id = _sqn_id("703SQN")
+    db = SessionLocal()
+    try:
+        sqn = db.get(Squadron, sqn_id)
+        other = Wing(
+            national_id=db.query(Wing).filter(Wing.id == sqn.wing_id).first().national_id,
+            code=f"TSTW{uuid.uuid4().hex[:5].upper()}",
+            name="Temporary Other Wing",
+            short_name="TOW",
+            timezone="Australia/Perth",
+            active_status=True,
+        )
+        db.add(other)
+        db.commit()
+        other_id = other.id
+    finally:
+        db.close()
+
+    try:
+        r = client.post("/api/service-desk/tickets", json={
+            "rank": "FLTLT",
+            "first_name": "Scope",
+            "last_name": "Mismatch",
+            "email": "scope.mismatch@example.com",
+            "squadron_id": sqn_id,
+            "wing_id": other_id,
+            "description": "The supplied Squadron and Wing do not belong together.",
+        })
+        assert r.status_code == 422, r.text
+        assert r.json()["detail"]["error"] == "unit_scope_mismatch"
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(Wing).filter(Wing.id == other_id).delete()
+            db.commit()
+        finally:
+            db.close()
+
+
+def test_canonical_assignee_can_be_set_and_explicit_null_clears_it(client):
+    """Assigned To uses a real User relation and JSON null is an intentional clear."""
+    sqn703 = _sqn_id("703SQN")
+    h_sys = login(client, "SYSADMIN2026")
+    created = _make_ticket(client, sqn703, description="Canonical assignment clear regression.")
+    ticket_id = created["ticket_id"]
+
+    from app.models import User
+    db = SessionLocal()
+    try:
+        wing_id = db.get(Squadron, sqn703).wing_id
+        assignee = db.query(User).filter(
+            User.role == "wing_admin",
+            User.wing_id == wing_id,
+            User.active_status == True,  # noqa: E712
+            User.is_archived == False,   # noqa: E712
+        ).first()
+        assert assignee is not None
+        assignee_id, assignee_name = assignee.id, assignee.display_name
+    finally:
+        db.close()
+
+    r = client.patch(
+        f"/api/service-desk/tickets/{ticket_id}",
+        json={"assigned_to_user_id": assignee_id},
+        headers=h_sys,
+    )
+    assert r.status_code == 200, r.text
+
+    ticket = next(
+        x for x in client.get("/api/service-desk/tickets", headers=h_sys).json()
+        if x["ticket_id"] == ticket_id
+    )
+    assert ticket["assigned_to_user_id"] == assignee_id
+    assert ticket["assigned_to_name"] == assignee_name
+
+    cleared = client.patch(
+        f"/api/service-desk/tickets/{ticket_id}",
+        json={"assigned_to_user_id": None},
+        headers=h_sys,
+    )
+    assert cleared.status_code == 200, cleared.text
+    ticket = next(
+        x for x in client.get("/api/service-desk/tickets", headers=h_sys).json()
+        if x["ticket_id"] == ticket_id
+    )
+    assert ticket["assigned_to_user_id"] is None
+    assert ticket["assigned_to_name"] is None
+
+
+def test_wing_admin_cannot_be_assigned_to_unscoped_legacy_ticket(client):
+    """A Wing assignee must not acquire an unscoped free-text support ticket."""
+    h_sys = login(client, "SYSADMIN2026")
+    created = client.post("/api/service-desk/tickets", json={
+        "rank": "CIV",
+        "first_name": "External",
+        "last_name": "Reporter",
+        "email": "external.reporter@example.com",
+        "unit_name": "External Support Context",
+        "description": "Legacy free-text unit ticket without authoritative Wing scope.",
+    })
+    assert created.status_code == 201, created.text
+    ticket_id = created.json()["ticket_id"]
+
+    from app.models import User
+    db = SessionLocal()
+    try:
+        assignee = db.query(User).filter(
+            User.role == "wing_admin",
+            User.active_status == True,  # noqa: E712
+            User.is_archived == False,   # noqa: E712
+        ).first()
+        assert assignee is not None
+        assignee_id = assignee.id
+    finally:
+        db.close()
+
+    r = client.patch(
+        f"/api/service-desk/tickets/{ticket_id}",
+        json={"assigned_to_user_id": assignee_id},
+        headers=h_sys,
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "assignee_out_of_scope"

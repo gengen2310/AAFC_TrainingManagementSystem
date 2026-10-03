@@ -22,7 +22,7 @@ from app.main import _5xx_times             # noqa: E402
 from app.seeds.seed_all import seed_all     # noqa: E402
 from app.security import reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
-from app.models import IpLoginAttempt, IpApiRequest, UserApiRequest, AccessCode, PlanningYear  # noqa: E402
+from app.models import IpLoginAttempt, IpApiRequest, UserApiRequest, AccessCode, PlanningYear, User  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -75,6 +75,11 @@ def _reset_shared_state():
         for ac in db.query(AccessCode).all():
             ac.failed_attempts = 0
             ac.locked_until = None
+        # Account-rotation tests intentionally mutate User.must_change_code.
+        # The suite reuses one seeded DB for performance, so restore this
+        # per-account credential state before every test just like lockout state.
+        # Tests that exercise forced rotation set it again within their own case.
+        db.query(User).update({"must_change_code": False}, synchronize_session=False)
         # K-001 year context: delete PlanningYear rows for near-future years
         # materialised by other tests via ensure_year_context or direct API calls.
         # Safe range: above the seed's 2026 year, below the test-year-counter floor
@@ -119,5 +124,23 @@ def next_test_year() -> int:
 def login(client, code):
     r = client.post("/api/auth/login", json={"code": code})
     assert r.status_code == 200, r.text
-    token = r.json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    payload = r.json()
+    token = payload["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    # Feature tests frequently create fixture accounts with a known explicit
+    # code and then call this helper. Production correctly forces those accounts
+    # through first-login rotation; the generic test helper acknowledges that
+    # onboarding step with the fixture code itself so unrelated tests keep
+    # exercising their intended feature. Tests for the rotation UX use raw
+    # /api/auth/login and are therefore unaffected.
+    if payload.get("session", {}).get("must_change_code"):
+        changed = client.post(
+            "/api/auth/change-code",
+            json={"user_id": payload["session"]["user_id"], "new_code": code, "current_code": code},
+            headers=headers,
+        )
+        assert changed.status_code == 200, changed.text
+        r = client.post("/api/auth/login", json={"code": code})
+        assert r.status_code == 200, r.text
+        headers = {"Authorization": f"Bearer {r.json()['token']}"}
+    return headers

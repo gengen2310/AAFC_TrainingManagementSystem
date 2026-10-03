@@ -1,7 +1,8 @@
 """Staging bootstrap seeder.
 
-Creates a single system_admin account using the access code supplied via the
-STAGING_BOOTSTRAP_SYSADMIN_CODE environment variable. Idempotent: does nothing
+Creates a single system_admin account using the access code and recovery email
+supplied via STAGING_BOOTSTRAP_SYSADMIN_CODE and
+STAGING_BOOTSTRAP_SYSADMIN_RECOVERY_EMAIL. Idempotent: does nothing
 if a system_admin already exists.
 
 No access codes, credentials or secrets are ever written to stdout, stderr,
@@ -31,10 +32,20 @@ from ..security import hash_code
 
 def staging_seed() -> None:
     bootstrap_code = os.environ.get("STAGING_BOOTSTRAP_SYSADMIN_CODE", "").strip()
+    recovery_email = os.environ.get(
+        "STAGING_BOOTSTRAP_SYSADMIN_RECOVERY_EMAIL", ""
+    ).strip().lower()
     if not bootstrap_code:
         print("[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_CODE not set — skipping bootstrap.",
               file=sys.stderr)
         return
+    if not recovery_email or "@" not in recovery_email or len(recovery_email) > 254:
+        print(
+            "[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_RECOVERY_EMAIL must be set "
+            "to a valid recovery address for the first system_admin.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
     db = SessionLocal()
     try:
@@ -59,6 +70,8 @@ def staging_seed() -> None:
             role="system_admin",
             national_id=nat.id,
             active_status=True,
+            must_change_code=True,
+            recovery_email=recovery_email,
         )
         db.add(sysadmin)
         db.flush()
@@ -68,9 +81,13 @@ def staging_seed() -> None:
 
         print("[staging_seed] Bootstrap complete: system_admin account created.",
               file=sys.stderr)
-        print("[staging_seed] Log in, reset the code via System Console, then remove",
+        print("[staging_seed] Log in, change the temporary code and verify the recovery email.",
               file=sys.stderr)
-        print("[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_CODE from the Render environment.",
+        print("[staging_seed] Then remove both bootstrap environment variables:",
+              file=sys.stderr)
+        print("[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_CODE and",
+              file=sys.stderr)
+        print("[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_RECOVERY_EMAIL.",
               file=sys.stderr)
     finally:
         db.close()

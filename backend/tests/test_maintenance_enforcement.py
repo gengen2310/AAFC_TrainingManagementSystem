@@ -463,3 +463,65 @@ def test_disable_maintenance_clears_block_flags(client):
     assert d["enabled"] is False
     assert d["block_reads"] is False
     assert d["block_logins"] is False
+
+
+def test_expired_maintenance_cache_refresh_is_single_flight(monkeypatch):
+    """Concurrent requests at one cache boundary must cause one DB checkout.
+
+    This is the regression guard for the pool-stampede failure mode: fresh
+    reads stay lock-free, while every waiter after expiry observes the first
+    thread's refreshed cache instead of opening another SessionLocal.
+    """
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    import app.main as main_module
+
+    snapshot = dict(main_module._maint_cache)
+    session_opens = 0
+    count_lock = threading.Lock()
+    worker_count = 16
+    barrier = threading.Barrier(worker_count)
+
+    class FakeSession:
+        def __enter__(self):
+            # Keep the elected refresher busy briefly so the other workers all
+            # reach the refresh boundary while it owns the single-flight lock.
+            time.sleep(0.05)
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, model, key):
+            return None
+
+    def fake_session_local():
+        nonlocal session_opens
+        with count_lock:
+            session_opens += 1
+        return FakeSession()
+
+    monkeypatch.setattr(main_module, "SessionLocal", fake_session_local)
+    main_module._maint_cache.update({
+        "active": False,
+        "msg": "",
+        "block_reads": False,
+        "block_logins": False,
+        "pending_until": None,
+        "expires": 0.0,
+    })
+
+    def read_at_boundary():
+        barrier.wait(timeout=5)
+        return main_module._maintenance_active()
+
+    try:
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            results = list(pool.map(lambda _: read_at_boundary(), range(worker_count)))
+        assert session_opens == 1
+        assert all(result[0] is False for result in results)
+        assert all(result[4] == "normal" for result in results)
+    finally:
+        main_module._maint_cache.clear()
+        main_module._maint_cache.update(snapshot)

@@ -172,106 +172,59 @@ def test_delete_empty_planning_year_succeeds(client):
     assert client.get(f"/api/planning/years/{yr_id}", headers=hdr).status_code == 404
 
 
-def test_delete_planning_year_with_archived_pn_and_session_children(client):
-    """Regression: permanently deleting a year that has archived parade nights
-    with session children must delete every child first.
-    Several session-child FKs have no ondelete=CASCADE — PostgreSQL raises
-    ForeignKeyViolation without the explicit child-delete.  In SQLite (FK
-    enforcement off) the bug silently leaves orphaned rows; the assertion that
-    rows are gone catches that regression here too."""
+def test_delete_planning_year_with_archived_pn_and_recorded_outcome_is_blocked(client):
+    """Recorded cadet outcomes are operational history and must never be cascaded."""
     hdr = _sqn_admin_hdr(client)
     year = _make_year(client, hdr)
     yr_id = year["planning_year_id"]
-    audience_year = _make_year(client, hdr)
 
     rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
                      json={"parade_date": "2030-01-10"}, headers=hdr)
     assert rp.status_code == 200, rp.text
     pn_id = rp.json()["parade_night_id"]
 
-    # Archive the parade night and insert a session + SessionStatusHistory child
-    # directly via DB — the API blocks parade-night deletion while sessions exist,
-    # so direct manipulation reproduces the exact state delete_planning_year sees.
     db = SessionLocal()
     try:
         pn = db.get(ParadeNight, pn_id)
         pn.is_archived = True
-        sqn_id = pn.squadron_id
-
-        audience_classes = db.query(TrainingClass).filter(
-            TrainingClass.squadron_id == sqn_id,
-            TrainingClass.training_year_id == audience_year["planning_year_id"],
-        ).all()
-        training_class = TrainingClass(
-            id=str(uuid.uuid4()),
-            squadron_id=sqn_id,
-            training_year_id=audience_year["planning_year_id"],
-            display_name="FK test audience",
-            class_number=max((tc.class_number for tc in audience_classes), default=0) + 1,
-        )
-        cadet = Cadet(id=str(uuid.uuid4()), squadron_id=sqn_id)
-        sess_id = str(uuid.uuid4())
+        cadet = Cadet(id=str(uuid.uuid4()), squadron_id=pn.squadron_id)
         sess = TrainingSession(
-            id=sess_id,
+            id=str(uuid.uuid4()),
             parade_night_id=pn_id,
-            squadron_id=sqn_id,
-            custom_title="fk-test session",
+            squadron_id=pn.squadron_id,
+            custom_title="legacy outcome session",
         )
-        db.add_all([training_class, cadet, sess])
+        db.add_all([cadet, sess])
         db.flush()
-
-        hist = SessionStatusHistory(
-            id=str(uuid.uuid4()),
-            session_id=sess_id,
-            old_status="draft",
-            new_status="confirmed",
-        )
-        audience = SessionAudience(
-            id=str(uuid.uuid4()),
-            session_id=sess_id,
-            training_class_id=training_class.id,
-        )
         outcome = CadetSessionOutcome(
             id=str(uuid.uuid4()),
             cadet_id=cadet.id,
-            session_id=sess_id,
+            session_id=sess.id,
             status="completed",
         )
-        assistant = SessionAssistantFacilitator(
-            id=str(uuid.uuid4()),
-            session_id=sess_id,
-            user_id=str(uuid.uuid4()),
-        )
-        db.add_all([hist, audience, outcome, assistant])
+        db.add(outcome)
         db.commit()
-        child_ids = {
-            SessionStatusHistory: hist.id,
-            SessionAudience: audience.id,
-            CadetSessionOutcome: outcome.id,
-            SessionAssistantFacilitator: assistant.id,
-        }
+        outcome_id = outcome.id
+        session_id = sess.id
     finally:
         db.close()
 
     r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
-    assert r.status_code == 200, r.text
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert detail["error"] == "has_dependents"
+    assert detail["dependents"]["cadet_session_outcomes"] == 1
 
-    # Verify the child rows were explicitly deleted, not merely orphaned.
     db2 = SessionLocal()
     try:
-        for child_model, child_id in child_ids.items():
-            assert db2.query(child_model).filter(
-                child_model.id == child_id
-            ).count() == 0, f"{child_model.__name__} row not deleted — FK child-delete logic is missing"
+        assert db2.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.id == outcome_id
+        ).count() == 1
         assert db2.query(TrainingSession).filter(
-            TrainingSession.id == sess_id
-        ).count() == 0, "TrainingSession row not deleted"
-        assert db2.query(TrainingClass).filter(
-            TrainingClass.training_year_id == yr_id
-        ).count() == 0, "TrainingClass rows for the deleted year were not deleted"
+            TrainingSession.id == session_id
+        ).count() == 1
     finally:
         db2.close()
-
 
 def test_delete_planning_year_blocked_by_class_history_and_timing_overrides(client):
     hdr = _sqn_admin_hdr(client)

@@ -103,9 +103,16 @@ def _cadet_group_for_class(db: DBSession, tc: "TrainingClass | None") -> str | N
     if tc.training_stage_id:
         phase = db.get(CurriculumPhase, tc.training_stage_id)
         if phase:
-            name = (phase.display_name or phase.name or "").lower()
+            # Canonical name is the governed semantic key; display_name is UI
+            # copy and may be something generic such as "Stage A". Check both
+            # independently so a non-empty display label never masks a useful
+            # canonical value such as "A. Orientation".
+            phase_names = [
+                (phase.name or "").lower(),
+                (phase.display_name or "").lower(),
+            ]
             for cg in _STAGE_CODE_CADET_GROUP.values():
-                if cg in name:
+                if any(cg in phase_name for phase_name in phase_names):
                     return cg
     return None
 
@@ -968,6 +975,16 @@ def delete_planning_year(
                 ).filter(ParadeNight.planning_year_id == year_id)
             ),
         ).count(),
+        # Cadet outcomes are operational training history, not disposable planning
+        # children. Any recorded outcome blocks permanent deletion even when the
+        # parade night is archived or the legacy session has no class audience.
+        "cadet_session_outcomes": db.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.session_id.in_(
+                db.query(TrainingSession.id).join(
+                    ParadeNight, TrainingSession.parade_night_id == ParadeNight.id
+                ).filter(ParadeNight.planning_year_id == year_id)
+            )
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
         "parade_night_prep_plans": db.query(AnchorPrepPlan).join(
@@ -1010,7 +1027,6 @@ def delete_planning_year(
                 SessionStatusHistory,
                 SessionAudience,
                 SessionCustomPhaseAudience,
-                CadetSessionOutcome,
             ):
                 db.query(child_model).filter(
                     child_model.session_id.in_(session_ids)

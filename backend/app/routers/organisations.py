@@ -11,7 +11,10 @@ from ..models import (
 )
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
-from ..permissions import Principal, require_role, require_can_view_squadron, require_can_write_squadron, require_system_or_nat_admin
+from ..permissions import (
+    Principal, require_role, require_can_view_squadron, require_can_write_squadron,
+    require_system_or_nat_admin, require_audit_access,
+)
 from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
@@ -690,16 +693,11 @@ def current_proxy(p: Principal = Depends(get_principal)):
     return {"active": True, "mode": p.proxy_mode, "acting_squadron_id": p.acting_squadron_id}
 
 
-# sqn_general reads its own squadron's audit rows read-only (2026-09-28 product
-# decision); the query below scopes non-national, non-wing actors to squadron_id.
-_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "sqn_general", "wing_admin", "national_admin", "national_viewer", "system_admin"})
-
-# ── Audit (read-only; auditor + wing/national admins) ──
+# ── Audit (read-only; centrally authorized, scoped below) ──
 @router.get("/audit")
 def get_audit(object_type: str | None = None, object_id: str | None = None, batch_id: str | None = None,
               limit: int = 300, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _AUDIT_READ_ROLES:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_audit_access(p)
     q = db.query(AuditLog)
     if not p.is_national:
         if p.is_wing:

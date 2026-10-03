@@ -195,10 +195,25 @@ def require_system_or_nat_admin(p: Principal):
         })
 
 
+AUDIT_READ_ROLES = frozenset({
+    "auditor",
+    "sqn_admin",
+    "sqn_general",
+    "wing_admin",
+    "national_admin",
+    "national_viewer",
+    "system_admin",
+})
+
+
 def require_audit_access(p: Principal):
-    """Roles permitted to read audit logs."""
-    if p.role not in ("system_admin", "national_admin", "auditor"):
+    """Central policy for read-only audit-log access.
+
+    Scope filtering remains the caller's responsibility; this helper answers
+    only whether the role may read audit records at all.
+    """
+    if p.role not in AUDIT_READ_ROLES:
         raise HTTPException(403, detail={
             "error": "forbidden",
-            "message": "Audit log access is restricted to System Administrator, National Administrator, or Auditor roles.",
+            "message": "This role does not have audit-log read access.",
         })

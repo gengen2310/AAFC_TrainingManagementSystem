@@ -33,55 +33,59 @@ _maint_cache: dict = {
     "pending_until": None,  # ISO timestamp; None = no drain period / immediate lock
     "expires": 0.0,
 }
+# Only the expired-cache refresher takes this lock. Fresh-cache reads remain
+# lock-free, while expiry boundaries collapse concurrent refreshes to one DB
+# checkout instead of stampeding the connection pool.
+_maint_refresh_lock = threading.Lock()
 
 def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
     """Returns (is_active, message, block_reads, block_logins, phase, pending_until).
 
-    phase is one of:
-      "normal"  — maintenance not active
-      "pending" — maintenance enabled but still within the drain window; writes NOT yet blocked
-      "locked"  — maintenance active and drain window has passed; writes blocked
+    Fresh-cache reads are lock-free. Once expired, a double-checked single-flight
+    lock allows exactly one thread per worker to refresh from the database.
     """
-    import datetime as _dt
-    now = _time.monotonic()
-    if now < _maint_cache["expires"]:
-        active = _maint_cache["active"]
-        pending_until_iso = _maint_cache["pending_until"]
-        phase = _compute_phase(active, pending_until_iso)
-        return (active, _maint_cache["msg"], _maint_cache["block_reads"],
-                _maint_cache["block_logins"], phase, pending_until_iso)
-    try:
-        from .models.operations import SystemSetting
-        with SessionLocal() as db:
-            row = db.get(SystemSetting, "maintenance_mode")
-            msg_row = db.get(SystemSetting, "maintenance_message")
-            br_row = db.get(SystemSetting, "maintenance_block_reads")
-            bl_row = db.get(SystemSetting, "maintenance_block_logins")
-            pu_row = db.get(SystemSetting, "maintenance_pending_until")
-            active = (row.value == "on") if row else False
-            msg = msg_row.value if msg_row else "System under maintenance. Please try again later."
-            block_reads = (br_row.value == "true") if br_row else False
-            block_logins = (bl_row.value == "true") if bl_row else False
-            pending_until_iso = pu_row.value if pu_row else None
-        _maint_cache["active"] = active
-        _maint_cache["msg"] = msg
-        _maint_cache["block_reads"] = block_reads
-        _maint_cache["block_logins"] = block_logins
-        _maint_cache["pending_until"] = pending_until_iso
-        _maint_cache["expires"] = now + 10.0
-    except Exception:
-        # Pool exhaustion / DB blip: keep the last known state and back off
-        # briefly. Retrying on every request (the old behaviour) re-waited
-        # DB_POOL_TIMEOUT each time, and returning "not active" failed open
-        # during a real maintenance window.
-        _maint_cache["expires"] = now + 2.0
+    def cached_result():
         active = _maint_cache["active"]
         pending_until_iso = _maint_cache["pending_until"]
         return (active, _maint_cache["msg"], _maint_cache["block_reads"],
                 _maint_cache["block_logins"], _compute_phase(active, pending_until_iso),
                 pending_until_iso)
-    phase = _compute_phase(active, pending_until_iso)
-    return active, msg, block_reads, block_logins, phase, pending_until_iso
+
+    now = _time.monotonic()
+    if now < _maint_cache["expires"]:
+        return cached_result()
+
+    with _maint_refresh_lock:
+        # Another request may have refreshed while this thread waited.
+        now = _time.monotonic()
+        if now < _maint_cache["expires"]:
+            return cached_result()
+        try:
+            from .models.operations import SystemSetting
+            with SessionLocal() as db:
+                row = db.get(SystemSetting, "maintenance_mode")
+                msg_row = db.get(SystemSetting, "maintenance_message")
+                br_row = db.get(SystemSetting, "maintenance_block_reads")
+                bl_row = db.get(SystemSetting, "maintenance_block_logins")
+                pu_row = db.get(SystemSetting, "maintenance_pending_until")
+                active = (row.value == "on") if row else False
+                msg = msg_row.value if msg_row else "System under maintenance. Please try again later."
+                block_reads = (br_row.value == "true") if br_row else False
+                block_logins = (bl_row.value == "true") if bl_row else False
+                pending_until_iso = pu_row.value if pu_row else None
+            _maint_cache["active"] = active
+            _maint_cache["msg"] = msg
+            _maint_cache["block_reads"] = block_reads
+            _maint_cache["block_logins"] = block_logins
+            _maint_cache["pending_until"] = pending_until_iso
+            _maint_cache["expires"] = now + 10.0
+        except Exception:
+            # Keep the last known state and briefly back off. The same lock also
+            # prevents an error boundary from turning into repeated pool waits.
+            _maint_cache["expires"] = now + 2.0
+            return cached_result()
+        return (active, msg, block_reads, block_logins,
+                _compute_phase(active, pending_until_iso), pending_until_iso)
 
 
 def _compute_phase(active: bool, pending_until_iso: str | None) -> str:

@@ -440,16 +440,64 @@ def test_audit_summary_filter_by_action(client):
         assert entry["action"] == "login"
 
 
-def test_audit_summary_forbidden_sqn(client):
+def test_audit_summary_sqn_admin_allowed_read_only(client):
+    """Squadron admins may read audit evidence scoped to their own squadron."""
     hdr = _sqn_admin(client)
     r = client.get("/api/system/audit-summary", headers=hdr)
-    assert r.status_code == 403
+    assert r.status_code == 200
 
 
-def test_audit_summary_forbidden_general(client):
+def test_audit_summary_sqn_general_allowed_read_only(client):
+    """sqn_general has the same deliberately read-only audit visibility."""
     hdr = _general(client)
     r = client.get("/api/system/audit-summary", headers=hdr)
-    assert r.status_code == 403
+    assert r.status_code == 200
+
+
+def test_audit_summary_squadron_reader_is_tenant_scoped(client):
+    """Granting read-only audit access must not expose another squadron's rows."""
+    import uuid
+    from app.database import SessionLocal
+    from app.models import AuditLog
+
+    hdr = _sqn_admin(client)
+    me = client.get("/api/auth/me", headers=hdr)
+    assert me.status_code == 200
+    squadron_id = me.json()["session"]["squadron_id"]
+    own_id = str(uuid.uuid4())
+    foreign_id = str(uuid.uuid4())
+
+    db = SessionLocal()
+    try:
+        db.add(AuditLog(
+            id=own_id, role="sqn_admin", scope="squadron",
+            squadron_id=squadron_id, action="scope_probe_own",
+            object_type="test", object_id=str(uuid.uuid4()),
+        ))
+        db.add(AuditLog(
+            id=foreign_id, role="sqn_admin", scope="squadron",
+            squadron_id=str(uuid.uuid4()), action="scope_probe_foreign",
+            object_type="test", object_id=str(uuid.uuid4()),
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        r = client.get("/api/system/audit-summary?limit=500", headers=hdr)
+        assert r.status_code == 200, r.text
+        ids = {row["audit_id"] for row in r.json()["logs"]}
+        assert own_id in ids
+        assert foreign_id not in ids
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(AuditLog).filter(AuditLog.id.in_([own_id, foreign_id])).delete(
+                synchronize_session=False
+            )
+            db.commit()
+        finally:
+            db.close()
 
 
 def test_audit_summary_limit_cap(client):
@@ -480,6 +528,10 @@ def test_backup_create_sysadmin(client):
     assert "size_bytes" in d
     assert d["size_bytes"] > 0
     assert "backup_" in d["filename"]
+    overview = client.get("/api/system/overview", headers=hdr)
+    assert overview.status_code == 200
+    assert overview.json()["last_backup_source"] == "system_console_sqlite"
+    assert overview.json()["last_backup_scope"] == "manual_application_backup"
 
 
 def test_backup_create_forbidden_sqn(client):
@@ -790,3 +842,62 @@ def test_recent_changes_change_entry_has_required_fields(client):
         assert "label" in entry
         assert "object_type" in entry
         assert "object_id" in entry
+
+
+def test_pg_dump_failure_does_not_record_successful_backup(client, monkeypatch):
+    """A failed PostgreSQL dump must not advance the System Console backup timestamp."""
+    from types import SimpleNamespace
+    from app.config import settings
+    import app.routers.system as system_router
+
+    hdr = _sysadmin(client)
+    before = client.get("/api/system/overview", headers=hdr)
+    assert before.status_code == 200
+    before_json = before.json()
+
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql://user:pass@example.invalid:5432/aafc")
+    monkeypatch.setattr(
+        system_router.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=1, stderr=b"synthetic pg_dump failure"),
+    )
+
+    failed = client.get("/api/system/backups/pg-dump", headers=hdr)
+    assert failed.status_code == 502, failed.text
+    assert failed.json()["detail"]["error"] == "pg_dump_failed"
+
+    after = client.get("/api/system/overview", headers=hdr)
+    assert after.status_code == 200
+    after_json = after.json()
+    assert after_json["last_backup_at"] == before_json["last_backup_at"]
+    assert after_json["last_backup_source"] == before_json["last_backup_source"]
+
+
+def test_pg_dump_records_manual_backup_only_after_verified_nonempty_dump(client, monkeypatch):
+    """Successful manual pg_dump is verified before last_backup_at is recorded."""
+    from pathlib import Path
+    from types import SimpleNamespace
+    from app.config import settings
+    import app.routers.system as system_router
+
+    hdr = _sysadmin(client)
+    monkeypatch.setattr(settings, "DATABASE_URL", "postgresql://user:pass@example.invalid:5432/aafc")
+
+    def fake_run(cmd, **kwargs):
+        output = cmd[cmd.index("--file") + 1]
+        Path(output).write_bytes(b"PGDMP synthetic verified backup")
+        return SimpleNamespace(returncode=0, stderr=b"")
+
+    monkeypatch.setattr(system_router.subprocess, "run", fake_run)
+
+    response = client.get("/api/system/backups/pg-dump", headers=hdr)
+    assert response.status_code == 200, response.text
+    assert response.content.startswith(b"PGDMP")
+    assert int(response.headers["content-length"]) == len(response.content)
+
+    overview = client.get("/api/system/overview", headers=hdr)
+    assert overview.status_code == 200
+    body = overview.json()
+    assert body["last_backup_at"]
+    assert body["last_backup_source"] == "system_console_pg_dump"
+    assert body["last_backup_scope"] == "manual_application_backup"
