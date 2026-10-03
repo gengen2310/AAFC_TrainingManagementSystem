@@ -179,12 +179,12 @@ def require_role(p: Principal, *roles: str):
         })
 
 
-def require_write_role(p: Principal):
+def require_write_role(p: Principal, message: str | None = None):
     """Require one of the system's write-capable roles."""
     if p.role not in WRITE_ROLES:
         raise HTTPException(403, detail={
             "error": "forbidden",
-            "message": "This action requires write-capable administrator access.",
+            "message": message or "This action requires write-capable administrator access.",
         })
 
 

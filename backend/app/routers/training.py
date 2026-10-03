@@ -22,7 +22,7 @@ from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
-                          require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
+                          require_can_view_wing, require_can_write_activity, require_role, require_write_role, require_system_admin,
                           NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers,
                         resolve_national_id,
@@ -1596,8 +1596,7 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
             idempotency_key: str | None = Header(None, alias="Idempotency-Key")):
     from sqlalchemy import func
     from ..security import idempotency_get, idempotency_set
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     # A retried POST after a client-perceived timeout must not create a second
     # facilitator, most importantly when confirm_duplicate=true (the "Add
     # anyway" resubmit) -- that path has no other duplicate protection at all.
@@ -1669,8 +1668,7 @@ def facilitator_import_template(p: Principal = Depends(get_principal)):
     """TRGO-05: downloadable CSV template matching the columns import_facilitators_csv accepts."""
     import io
     from fastapi.responses import StreamingResponse
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     bio = io.BytesIO(
         b"rank,first_name,last_name,type,subject_areas,active_status\r\n"
         b"FLTLT,Jordan,Smith,Staff,Drill;Air_Space,true\r\n"
@@ -1742,8 +1740,7 @@ async def import_facilitators_csv(
     trigger in Excel/Sheets) is neutralised before it ever reaches storage
     or a later export.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -2133,8 +2130,7 @@ def add_cadet_class_membership(
     cadet_id: str, body: CadetClassMembershipIn,
     db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
 ):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     cadet = _require_cadet_and_squadron(db, p, cadet_id, write=True)
 
     tc = db.get(TrainingClass, body.training_class_id)
@@ -2741,8 +2737,7 @@ def absorb_fac(fid: str, body: FacAbsorbIn, db: DBSession = Depends(get_db),
     and leave records, then archive the source.  Both must belong to the same
     squadron and neither may already be archived."""
     from ..models.planning import PlanningFacilitatorLeave
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     target = db.get(Facilitator, fid)
     if not target or target.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -2796,13 +2791,11 @@ class TrainingAreaUpdateIn(BaseModel):
     capabilities: list[str] | None = None
 
 
-_WRITE_BLOCKED = ("sqn_general", "wing_viewer", "national_viewer", "auditor")
 
 
 @router.post("/training-areas")
 def create_room(body: TrainingAreaIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -2967,8 +2960,7 @@ def list_training_classes(squadron_id: str | None = None, training_year_id: str 
 @router.post("/training-classes")
 def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db),
                            p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -3178,8 +3170,7 @@ def reassign_class_members(from_id: str, body: ReassignClassMembersIn,
     """Core split/move primitive: ends each named cadet's active membership in
     from_id and starts a new one in to_training_class_id, effective
     body.effective_date. Never touches SessionAudience."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     from_c = db.get(TrainingClass, from_id)
     if not from_c:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -3214,8 +3205,7 @@ def merge_training_class(source_id: str, body: MergeTrainingClassIn,
     above). SessionAudience rows referencing source are left completely
     untouched -- a past session's delivered-to class list is historical fact,
     not something a later merge may rewrite (addendum §62/§63)."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     source = db.get(TrainingClass, source_id)
     if not source or source.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -3860,8 +3850,7 @@ class EquipUpdateIn(BaseModel):
 
 @router.post("/equipment")
 def create_equip(body: EquipIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -4514,8 +4503,7 @@ def delete_activity_local_override(aid: str, db: DBSession = Depends(get_db), p:
 
 @router.post("/activities")
 def create_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -4753,8 +4741,8 @@ def generate_activities(
     if body.recurrence not in RECURRENCE_OPTS:
         raise HTTPException(400, detail={"error": "invalid_recurrence",
                                          "allowed": sorted(RECURRENCE_OPTS)})
-    if p.role in _WRITE_BLOCKED and not body.preview_only:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if not body.preview_only:
+        require_write_role(p)
 
     sq_id = _active_squadron(p)
     s = db.get(Squadron, sq_id) if sq_id else None
@@ -4874,9 +4862,7 @@ class ElementIn(BaseModel):
 def _can_create_element(p: Principal, scope_level: str,
                         wing_id: str | None = None, squadron_id: str | None = None) -> None:
     """Raise 403 if the actor cannot create an element at the requested scope."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create elements."})
+    require_write_role(p, message="Viewers and auditors cannot create elements.")
     if scope_level not in ELEMENT_SCOPE_LEVELS:
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(ELEMENT_SCOPE_LEVELS)}"})
@@ -5046,9 +5032,7 @@ def _can_create_phase(p: Principal, scope_level: str,
     active Proxy session targeting that squadron; national_admin/system_admin
     need active Delegated Intervention targeting that squadron.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create phases."})
+    require_write_role(p, message="Viewers and auditors cannot create phases.")
     if scope_level not in PHASE_SCOPE_LEVELS:
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(PHASE_SCOPE_LEVELS)}"})
@@ -5297,8 +5281,7 @@ def _find_existing_curriculum(db: DBSession, body: CurriculumIn,
 def create_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
                       p: Principal = Depends(get_principal)):
     """Create a squadron-owned curriculum item (owning_level=squadron)."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
@@ -6034,9 +6017,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
     changes -- so those roles could never create a tag at ANY scope,
     contradicting the ask outright.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden",
-                                          "message": "Viewers and auditors cannot create tags."})
+    require_write_role(p, message="Viewers and auditors cannot create tags.")
     if scope not in ("global", "wing", "squadron"):
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": "scope must be one of: global, wing, squadron"})
