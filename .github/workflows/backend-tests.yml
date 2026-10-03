@@ -88,6 +88,9 @@ jobs:
       - name: Verify shared design-token sync
         run: python scripts/check_token_sync.py
 
+      - name: Enforce architecture stabilisation ratchets
+        run: python tools/architecture/guard.py
+
       - name: Verify frontend security hygiene
         shell: bash
         run: |
