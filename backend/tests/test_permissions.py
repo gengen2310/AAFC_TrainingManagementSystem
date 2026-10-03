@@ -177,8 +177,13 @@ def test_require_system_or_nat_admin_message_is_actionable():
     _detail(exc_info)
 
 
-def test_require_audit_access_message_is_actionable():
+def test_require_audit_access_allows_squadron_admin_read_scope():
     p = _principal(role="sqn_admin", wing_id="WING-A", squadron_id="SQN-A")
+    assert require_audit_access(p) is None
+
+
+def test_require_audit_access_message_is_actionable_for_disallowed_role():
+    p = _principal(role="cadet", wing_id="WING-A", squadron_id="SQN-A")
     with pytest.raises(HTTPException) as exc_info:
         require_audit_access(p)
     _detail(exc_info)

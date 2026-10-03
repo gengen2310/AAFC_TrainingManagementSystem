@@ -2218,7 +2218,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print" style="gap:6px">
             <div class="seg-tabs" role="tablist" aria-label="Cadet management views">
               <button type="button" class="tab-btn active" id="cadets-tab-roster" role="tab" aria-selected="true" onclick="showCadetSubview('roster',this)">Cadets</button>
-              <button type="button" class="tab-btn" id="cadets-tab-cea" role="tab" aria-selected="false" onclick="showCadetSubview('cea',this)">CEA Import</button>
+              <button type="button" class="tab-btn plan-write-el" id="cadets-tab-cea" role="tab" aria-selected="false" style="display:none" onclick="showCadetSubview('cea',this)">CEA Import</button>
             </div>
             <select id="cadets-class-select" style="font-size:var(--fs-sm);padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface)" onchange="loadCadetRoster()"><option value="">— Select class —</option></select>
             <button class="btn btn-primary btn-sm plan-write-el" onclick="openAddCadetModal()">Add Cadet</button>
@@ -2473,14 +2473,29 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card no-ro">
           <h2 class="ctitle">🔑 Access Code</h2>
-          <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
+          <div class="alert a-info">Change your own sign-in code. Re-enter your current code to confirm the change. Existing codes cannot be viewed and the previous code cannot be recovered once changed.</div>
           <div class="form-row">
+            <div class="ff"><label for="cc-current">Current access code</label><input id="cc-current" type="password" autocomplete="current-password" placeholder="Enter current code"></div>
             <div class="ff"><label for="cc-new">New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
             <div class="ff"><label for="cc-confirm">Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
           </div>
           <button class="btn btn-dk admin-el" onclick="changeMyCode()">Change My Access Code</button>
           <div id="cc-msg" style="font-size:var(--fs-xs);margin-top:10px;font-weight:700"></div>
           <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are recorded in the audit log.</div>
+        </div>
+        <div class="card no-ro" id="settings-recovery-card" style="display:none">
+          <h2 class="ctitle">Recovery Email</h2>
+          <div class="alert a-info" style="font-size:var(--fs-xs)">A verified recovery email lets eligible administrator accounts recover a forgotten access code. Changing the address requires your current access code.</div>
+          <div class="form-row">
+            <div class="ff"><label for="recovery-email-new">Recovery email</label><input id="recovery-email-new" type="email" autocomplete="email" placeholder="name@example.com"></div>
+            <div class="ff"><label for="recovery-current-code">Current access code</label><input id="recovery-current-code" type="password" autocomplete="current-password" placeholder="Required to change email"></div>
+          </div>
+          <button class="btn btn-dk" onclick="saveMyRecoveryEmail()">Send verification code</button>
+          <div class="form-row" style="margin-top:12px">
+            <div class="ff"><label for="recovery-verify-token">Verification code</label><input id="recovery-verify-token" autocomplete="one-time-code" placeholder="From the verification email"></div>
+            <div class="ff" style="align-self:end"><button class="btn btn-out" onclick="verifyMyRecoveryEmail()">Verify email</button></div>
+          </div>
+          <div id="recovery-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700"></div>
         </div>
         <!-- Admin: user directory for code resets -->
         <div class="card admin-el" id="user-dir-card" style="display:none">
@@ -2796,11 +2811,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Curriculum import card — upload workbook or paste JSON to import curriculum items -->
         <div class="card sc-card" id="sc-curriculum-import-card">
           <div class="sc-section-hdr">Curriculum Import</div>
-          <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Safe to run multiple times without creating duplicates.</div>
+          <div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to preview all curriculum changes from <em>zz - Program backend</em>. Nothing is written until you review the preview and choose <strong>Commit import</strong>.</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <label class="btn" style="cursor:pointer;background:#0678a0;color:#fff;border:none">
               Select Workbook (.xlsm)
-              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scImportCurriculum()">
+              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scPreviewCurriculum()">
             </label>
             <span id="sc-curr-import-filename" style="font-size:var(--fs-sm);color:var(--muted)"></span>
           </div>
@@ -4324,6 +4339,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div id="ca-fixed-scope" class="alert a-info" style="display:none;font-size:var(--fs-sm);margin-top:8px"></div>
+      <div class="ff" id="ca-recovery-row" style="display:none;margin-top:8px">
+        <label for="ca-recovery-email">Recovery email <span id="ca-recovery-required" style="color:var(--red);display:none">*</span></label>
+        <input id="ca-recovery-email" type="email" autocomplete="email" placeholder="name@example.com">
+        <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:4px">Used only for access-code recovery. The address must be verified before recovery is enabled.</div>
+      </div>
       <div class="card" style="background:var(--hover);padding:12px;margin-top:8px">
         <div style="font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">🔑 Initial Access Code</div>
         <label style="display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);cursor:pointer;margin-bottom:8px">
@@ -5272,6 +5292,44 @@ function showAuthStep1(){
   onAuthFieldChange();
 }
 
+async function completeRequiredCodeChange(session,currentCode){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  const next=await promptText(
+    'Change temporary access code',
+    'New access code',
+    {
+      context:'This is an initial or administrator-issued code. Choose your own access code before continuing.',
+      okLabel:'Change access code',
+      validate:(v)=>v.length<6?'Use at least 6 characters.':null,
+    }
+  );
+  if(!next){
+    await doLogout();
+    return false;
+  }
+  try{
+    await api('/api/auth/change-code',{
+      method:'POST',
+      body:{user_id:session.user_id,new_code:next,current_code:currentCode},
+    });
+    tokenClear();
+    document.getElementById('app').style.display='none';
+    document.getElementById('auth-screen').style.display='flex';
+    _authPanels('auth-step2');
+    document.getElementById('auth-code').value='';
+    const err=document.getElementById('auth-err');
+    err.style.display='block';
+    err.textContent='Access code changed. Sign in again with your new code.';
+    document.getElementById('auth-code').focus();
+    return false;
+  }catch(e){
+    showToast(apiErr(e),true);
+    await doLogout();
+    return false;
+  }
+}
+
 async function doLogin(){
   const code=document.getElementById('auth-code').value.trim();
   const err=document.getElementById('auth-err');
@@ -5299,6 +5357,10 @@ async function doLogin(){
     tokenSet(out.token);
     S.session=out.session;
     applySession(out.session);
+    if(out.session&&out.session.must_change_code){
+      await completeRequiredCodeChange(out.session,code);
+      return;
+    }
     await loadData();
     bootApp();
   }catch(e){
@@ -5344,6 +5406,18 @@ async function tryRestoreSession(){
     const out=await api('/api/auth/me');
     S.session=out.session;
     applySession(out.session);
+    if(out.session&&out.session.must_change_code){
+      // A restored JWT is not enough to rotate credentials. The user must
+      // re-enter the temporary/current access code so the change-code endpoint
+      // can re-authenticate the credential itself.
+      tokenClear();
+      restoring.style.display='none';
+      showAuthStep1();
+      const err=document.getElementById('auth-err');
+      err.style.display='block';
+      err.textContent='Sign in again with your current access code to complete the required code change.';
+      return;
+    }
     await loadData();
     bootApp();
   }catch(e){
@@ -6016,8 +6090,8 @@ function applyNavScope(){
     let show=target&&allowed.has(target);
     // sqn_general sees Unit Settings read-only (2026-09-28 product decision).
     if(target==='settings')show=show&&['sqn_admin','sqn_general'].includes(S.role);
-    // AUD-2: the backend denies wing_viewer and sqn_general the audit log
-    // (403). Do not offer a nav entry to a page the role cannot read.
+    // Audit visibility follows the centralized backend policy; wing_viewer
+    // remains excluded while squadron roles are scoped to their own audit rows.
     if(target==='audit')show=show&&!['wing_viewer'].includes(S.role);
     if(target==='accounts')show=show&&['sqn_admin','sqn_general','wing_admin','wing_viewer','national_admin','national_viewer','system_admin','auditor'].includes(S.role);
     // system_admin's System Console must stay reachable regardless of which
@@ -6158,12 +6232,18 @@ function _consumeTmsSetupHandoff(){
   window.history.replaceState(null,'',url.pathname+url.search+url.hash);
   const existing=(P.years||[]).find(y=>Number(y.year)===year&&y.active_status!==false);
   if(existing)return existing;
-  const logical={
-    year, planning_year_id:null, active_status:true, materialised:false,
-    state:year<new Date().getFullYear()?'past':year>new Date().getFullYear()?'future':'current',
-  };
+  // Remembered so the year survives the refetch Settings does on open; without
+  // it the logical row vanished and the landing had no Set up action (T08).
+  P._handoffYear=year;
+  const logical=_ynLogicalYear(year);
   P.years=[...(P.years||[]).filter(y=>Number(y.year)!==year),logical];
   return logical;
+}
+
+function _ynLogicalYear(year){
+  const now=new Date().getFullYear();
+  return {year, planning_year_id:null, active_status:true, materialised:false,
+          state:year<now?'past':year>now?'future':'current'};
 }
 
 function bootApp(){
@@ -6230,6 +6310,10 @@ function bootApp(){
   });
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
+  const recoveryCard=document.getElementById('settings-recovery-card');
+  if(recoveryCard){
+    recoveryCard.style.display=['system_admin','national_admin','wing_admin','sqn_admin'].includes(S.role)?'':'none';
+  }
   // Planning-write controls: visible for sqn_admin + wing_admin (own calendar, no proxy needed).
   const canPlanWrite = canWritePlan();
   document.querySelectorAll('.plan-write-el').forEach(el=>{el.style.display=canPlanWrite?'inline-flex':'none';});
@@ -6470,7 +6554,8 @@ async function scLoadOverview(){
       <dt>Users (total)</dt><dd>${d.users_total}</dd>
       <dt>Users (active)</dt><dd>${d.users_active}</dd>
       <dt>Maintenance mode</dt><dd>${d.maintenance_mode?'<span class="sc-status-warn">ENABLED</span>':'<span class="sc-status-ok">Off</span>'}</dd>
-      <dt>Last backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No backup recorded</span>'}</dd>
+      <dt>Last manual app backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No manual app backup recorded</span>'}</dd>
+      <dt>Backup source</dt><dd>${d.last_backup_source?esc(d.last_backup_source):'<span class="muted">Scheduled GitHub backups are tracked separately</span>'}</dd>
     </dl>`;
   } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Could not load System Overview: ${esc(apiErr(e))}</div>`; }
 }
@@ -6820,45 +6905,121 @@ async function scSaveSdEmail(scope, email, wingId){
   } catch(e){ showToast(apiErr(e),true); }
 }
 
-async function scImportCurriculum(){
+let _scCurriculumPreviewReady=false;
+
+async function _scCurriculumXlsmRequest(preview){
+  const input=document.getElementById('sc-curr-import-file');
+  if(!input||!input.files||!input.files[0]) throw new Error('Select a workbook first.');
+  const file=input.files[0];
+  const form=new FormData();
+  form.append('file',file);
+  const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
+  const token=tokenGet();
+  const suffix=preview?'?preview=true':'';
+  const r=await fetch(base+'/api/curriculum/import-xlsm'+suffix,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token},
+    body:form,
+  });
+  let d={};
+  try{ d=await r.json(); }catch(_){}
+  if(!r.ok){
+    const msg=d.detail?.message||d.detail?.error||'An error occurred. Check the file format.';
+    throw new Error(msg);
+  }
+  return d;
+}
+
+function _scRenderCurriculumSummary(d, preview){
+  const results=document.getElementById('sc-curr-import-results');
+  const failed=(d.results||[]).filter(x=>x.status==='failed');
+  let html='<div style="margin-top:4px">';
+  html+=`<strong>${preview?'Preview':'Committed'}:</strong> created ${Number(d.created||0)}, updated ${Number(d.updated||0)}, skipped ${Number(d.skipped||0)}, failed ${Number(d.failed||0)} of ${Number(d.total||0)}.`;
+  if(failed.length){
+    html+='<div style="color:var(--red);margin-top:6px">Failures:<br>'+
+      failed.map(x=>`${esc(x.identifier||x.code||'row')}: ${esc(x.error||'Import failed')}`).join('<br>')+'</div>';
+  }
+  if(preview){
+    html+='<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button type="button" class="btn btn-primary" id="sc-curr-import-commit" onclick="scCommitCurriculum()">Commit import</button>'+
+      '<button type="button" class="btn btn-secondary" onclick="scCancelCurriculumPreview()">Cancel</button>'+
+      '</div>';
+  }
+  html+='</div>';
+  results.innerHTML=html;
+}
+
+async function scPreviewCurriculum(){
   const input=document.getElementById('sc-curr-import-file');
   const msg=document.getElementById('sc-curr-import-msg');
   const results=document.getElementById('sc-curr-import-results');
   const fname=document.getElementById('sc-curr-import-filename');
-  if(!input||!input.files||!input.files[0])return;
-  const file=input.files[0];
-  fname.textContent=file.name;
-  msg.textContent='Uploading and parsing…'; msg.style.color='var(--muted)';
+  if(!input||!input.files||!input.files[0]) return;
+  _scCurriculumPreviewReady=false;
+  fname.textContent=input.files[0].name;
+  msg.textContent='Parsing and previewing — no changes will be written…';
+  msg.style.color='var(--muted)';
   results.innerHTML='';
-  const form=new FormData();
-  form.append('file',file);
   try{
-    const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
-    const token=tokenGet();
-    const r=await fetch(base+'/api/curriculum/import-xlsm',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+token},
-      body:form,
-    });
-    const d=await r.json();
-    if(!r.ok){
-      msg.textContent='Import failed: '+(d.detail?.message||d.detail?.error||'An error occurred. Check the file format.');
-      msg.style.color='var(--red)'; return;
-    }
-    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
-    msg.style.color=d.failed>0?'var(--amber)':'var(--ok)';
-    if(d.failed>0){
-      const failed=(d.results||[]).filter(x=>x.status==='failed');
-      results.innerHTML='<div style="color:var(--red);margin-top:4px">Failures:<br>'+
-        failed.map(x=>`${esc(x.identifier||x.code)}: ${esc(x.error)}`).join('<br>')+'</div>';
-    }
-    // Reload curriculum in state
-    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);}catch(_){}
+    const d=await _scCurriculumXlsmRequest(true);
+    _scCurriculumPreviewReady=true;
+    msg.textContent='Preview ready. Review the counts below before committing.';
+    msg.style.color=Number(d.failed||0)>0?'var(--amber)':'var(--ok)';
+    _scRenderCurriculumSummary(d,true);
   }catch(e){
-    msg.textContent='Upload error: '+apiErr(e); msg.style.color='var(--red)';
-  } finally {
+    msg.textContent='Preview failed: '+apiErr(e);
+    msg.style.color='var(--red)';
     input.value='';
+    fname.textContent='';
   }
+}
+
+// Backward-compatible name retained for any automation/bookmark that called the
+// old function directly. It now performs the safe preview stage only.
+async function scImportCurriculum(){
+  return scPreviewCurriculum();
+}
+
+async function scCommitCurriculum(){
+  const input=document.getElementById('sc-curr-import-file');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  const fname=document.getElementById('sc-curr-import-filename');
+  if(!_scCurriculumPreviewReady||!input||!input.files||!input.files[0]){
+    msg.textContent='Preview the workbook before committing.';
+    msg.style.color='var(--red)';
+    return;
+  }
+  const btn=document.getElementById('sc-curr-import-commit');
+  if(btn){btn.disabled=true;btn.textContent='Committing…';}
+  msg.textContent='Committing reviewed curriculum changes…';
+  msg.style.color='var(--muted)';
+  try{
+    const d=await _scCurriculumXlsmRequest(false);
+    _scCurriculumPreviewReady=false;
+    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
+    msg.style.color=Number(d.failed||0)>0?'var(--amber)':'var(--ok)';
+    _scRenderCurriculumSummary(d,false);
+    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);}catch(_){}
+    input.value='';
+    fname.textContent='';
+  }catch(e){
+    msg.textContent='Import failed: '+apiErr(e);
+    msg.style.color='var(--red)';
+    if(btn){btn.disabled=false;btn.textContent='Commit import';}
+  }
+}
+
+function scCancelCurriculumPreview(){
+  const input=document.getElementById('sc-curr-import-file');
+  _scCurriculumPreviewReady=false;
+  if(input) input.value='';
+  const fname=document.getElementById('sc-curr-import-filename');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  if(fname) fname.textContent='';
+  if(msg) msg.textContent='Preview cancelled. No curriculum changes were written.';
+  if(results) results.innerHTML='';
 }
 
 async function scBootstrapStaging(){
@@ -7305,7 +7466,7 @@ function _renderAccountTable(){
       return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button> `+
         `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteAccount('${u.user_id}','${dn}')">Delete Permanently…</button>`;
     }
-    const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
+    const resetBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
     const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
       ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
@@ -7753,6 +7914,9 @@ async function openCreateAccountModal(preselectedSqnId){
 
   document.querySelector('[name="ca-code-mode"][value="auto"]').checked=true;
   document.getElementById('ca-manual-code').value='';
+  document.getElementById('ca-recovery-email').value='';
+  document.getElementById('ca-recovery-row').style.display='none';
+  document.getElementById('ca-recovery-required').style.display='none';
   openModal('m-create-account');
 }
 
@@ -7806,6 +7970,12 @@ function onCreateAccountRoleChange(){
     fixed.textContent=`Scope: ${sqn?.code||sqn?.short_name||sqn?.name||'your Squadron'}${wing?` — ${wing.code||wing.name}`:''}`;
     fixed.style.display='';
   }
+  const recoveryRoles=['system_admin','national_admin','wing_admin','sqn_admin'];
+  const recoveryRow=document.getElementById('ca-recovery-row');
+  const recoveryRequired=document.getElementById('ca-recovery-required');
+  if(recoveryRow) recoveryRow.style.display=recoveryRoles.includes(role)?'':'none';
+  if(recoveryRequired) recoveryRequired.style.display=role==='system_admin'?'inline':'none';
+
   // Wing admin: when role is sqn-scope, filter sqn list by wing
   if(_ROLES_SQN_SCOPE.includes(role)&&S.isWing&&S.session&&S.session.wing_id){
     _populateCreateSqns(S.session.wing_id);
@@ -7846,6 +8016,11 @@ async function doCreateAccount(){
     const sid=(fixedSquadron?(S.session&&S.session.squadron_id):document.getElementById('ca-sqn').value)||undefined;
     if(!sid){ msg.textContent='Select a Squadron or Specialist Unit.'; return; }
     payload.squadron_id=sid;
+  }
+  if(['system_admin','national_admin','wing_admin','sqn_admin'].includes(role)){
+    const recovery=(document.getElementById('ca-recovery-email').value||'').trim();
+    if(role==='system_admin'&&!recovery){ msg.textContent='A recovery email is required for System Administrator accounts.'; return; }
+    if(recovery) payload.recovery_email=recovery;
   }
   const codeMode=document.querySelector('[name="ca-code-mode"]:checked').value;
   if(codeMode==='manual'){
@@ -8569,11 +8744,12 @@ function renderUserDir(){
     national_viewer:'NAT Viewer',national_admin:'NAT Admin',system_admin:'System',auditor:'Auditor'};
   const ROLE_CLS={sqn_general:'b-blue',sqn_admin:'b-blue',wing_viewer:'b-ok',wing_admin:'b-ok',
     national_viewer:'b-amber',national_admin:'b-amber',system_admin:'b-amber',auditor:'b-grey'};
-  const rows=(S.users||[]).filter(u=>!flt||
+  const myUid=S.session&&S.session.user_id;
+  const rows=(S.users||[]).filter(u=>u.user_id!==myUid && (!flt||
     (u.display_name||'').toLowerCase().includes(flt)||
     (u.role||'').includes(flt)||
     (u.squadron_code||'').toLowerCase().includes(flt)||
-    (u.wing_code||'').toLowerCase().includes(flt));
+    (u.wing_code||'').toLowerCase().includes(flt)));
   if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:var(--fs-xs);padding:8px 0">'+(!(S.users||[]).length?'No users in scope.':'No users match the filter.')+'</div>'; return; }
   const unit=u=>u.squadron_code?'SQN '+u.squadron_code:u.wing_code?'Wing '+u.wing_code:u.national_id?'NAT HQ':'—';
   el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th></th></tr></thead><tbody>'+
@@ -12780,21 +12956,14 @@ function _ynRenderYearList(el, years, opts){
     el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
     return;
   }
-  // Logical years have no row, so archive/restore/export have nothing to act
-  // on. They belong in the year bar, not in this administrative list.
-  years = years.filter(function(y){ return y.planning_year_id; });
-  if(!years.length){
-    el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
-    return;
-  }
   const curId = (typeof P!=='undefined') ? P.currentYearId : null;
-  // Archived years are kept out of the way. A unit accumulates one year per
-  // year, and this list is otherwise unbounded -- the dev database holds 118,
-  // which would make the card taller than the rest of Unit Setup combined.
+  const logical = years.filter(function(y){ return !y.planning_year_id; });
+  const materialised = years.filter(function(y){ return !!y.planning_year_id; });
   const showArch = !!opts.showArchived;
-  const active = years.filter(function(y){return y.active_status;});
-  const archived = years.filter(function(y){return !y.active_status;});
-  const visible = showArch ? years : active;
+  const active = materialised.filter(function(y){return y.active_status;});
+  const archived = materialised.filter(function(y){return !y.active_status;});
+  const visible = logical.concat(showArch ? materialised : active)
+    .sort((a,b)=> b.year - a.year);
   const archNote = archived.length
     ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
       + 'onclick="ynToggleArchived(this)" aria-expanded="'+(showArch?'true':'false')+'">'
@@ -12808,26 +12977,33 @@ function _ynRenderYearList(el, years, opts){
   }
   el.innerHTML = '<div class="yn-year-list">' + visible.map(function(y){
     const id = y.planning_year_id;
-    const isCur = id === curId;
-    const active = !!y.active_status;
-    const cls = 'yn-year-row' + (isCur?' is-current':'') + (active?'':' is-arch');
-    // The name is only worth a line of its own when it says something the year
-    // number does not.
+    const isLogical = !id;
+    const isCur = isLogical
+      ? Number(y.year) === Number((typeof P!=='undefined') ? P.currentYearInt : null)
+      : id === curId;
+    const activeRow = isLogical ? true : !!y.active_status;
+    const cls = 'yn-year-row' + (isCur?' is-current':'') + (activeRow?'':' is-arch');
     const nameLine = (y.name && String(y.name) !== String(y.year))
       ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
     const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
-    const stateLabel = y.state==='current'?'Current':y.state==='past'?'Record':'Upcoming';
-    const meta = [ stateLabel, created?('Created '+created):'' ]
-      .filter(Boolean).join(' \u00b7 ');
+    const stateLabel = isLogical ? 'Not set up'
+      : y.state==='current'?'Current':y.state==='past'?'Record':'Upcoming';
+    const meta = [stateLabel, created?('Created '+created):''].filter(Boolean).join(' \u00b7 ');
     let acts = '';
-    acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
-    const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
-    if(canRemediate){
-      acts += active
-        ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
-        : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
-      if(!active){
-        acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+    if(isLogical){
+      if(canWrite){
+        acts += '<button class="btn btn-xs btn-dk" onclick="ynSetUpYear('+(+y.year)+')">Set up '+esc(String(y.year))+'</button>';
+      }
+    }else{
+      acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
+      const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
+      if(canRemediate){
+        acts += activeRow
+          ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
+          : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+        if(!activeRow){
+          acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+        }
       }
     }
     return '<div class="'+cls+'">'
@@ -12856,9 +13032,15 @@ async function _ynFetchYears(){
   // nobody has written to has no row. Every P.years assignment goes through
   // here -- six call sites used to refetch without the flag, and the first one
   // to run after a step silently dropped the future years back out of the bar.
-  const all = await api('/api/planning/years?include_unmaterialised=true');
-  if(typeof P!=='undefined') P.years = all || [];
-  return all || [];
+  let all = await api('/api/planning/years?include_unmaterialised=true') || [];
+  // Keep a year handed off from Planning Workspace selectable until it exists.
+  if(typeof P!=='undefined' && P._handoffYear){
+    const hy = P._handoffYear;
+    if(all.some(y => Number(y.year) === hy && y.active_status !== false && y.planning_year_id)) P._handoffYear = null;
+    else if(!all.some(y => Number(y.year) === hy && y.active_status !== false)) all = [...all, _ynLogicalYear(hy)];
+  }
+  if(typeof P!=='undefined') P.years = all;
+  return all;
 }
 
 // Repaint every year surface that is currently in the DOM.
@@ -15079,20 +15261,61 @@ async function _pdayPropApply(sessionScope){
     await reloadAndRender();
   }catch(e){ body.innerHTML=`<p style="color:var(--red)">${esc(apiErr(e))}</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">Close</button></div>`; }
 }
+async function saveMyRecoveryEmail(){
+  const msg=document.getElementById('recovery-msg');
+  const email=(document.getElementById('recovery-email-new').value||'').trim();
+  const current=(document.getElementById('recovery-current-code').value||'').trim();
+  const show=(text,ok)=>{msg.textContent=text;msg.style.color=ok?'var(--ok)':'var(--red)';};
+  if(!email){show('Enter a recovery email.',false);return;}
+  if(!current){show('Enter your current access code.',false);return;}
+  const uid=S.session&&S.session.user_id;
+  if(!uid){show('No active session.',false);return;}
+  try{
+    const r=await api('/api/accounts/'+uid+'/recovery-email',{
+      method:'POST',body:JSON.stringify({email,current_code:current})
+    });
+    document.getElementById('recovery-current-code').value='';
+    show(r.verification_sent
+      ? 'Verification code sent. Enter it below to activate recovery.'
+      : 'Email saved, but delivery could not be confirmed. Check SMTP configuration before relying on recovery.',
+      !!r.verification_sent);
+  }catch(e){show('Could not update recovery email: '+apiErr(e),false);}
+}
+
+async function verifyMyRecoveryEmail(){
+  const msg=document.getElementById('recovery-msg');
+  const token=(document.getElementById('recovery-verify-token').value||'').trim();
+  if(!token){msg.textContent='Enter the verification code from the email.';msg.style.color='var(--red)';return;}
+  try{
+    await api('/api/auth/verify-recovery-email',{
+      method:'POST',body:JSON.stringify({token})
+    });
+    document.getElementById('recovery-verify-token').value='';
+    msg.textContent='Recovery email verified.';
+    msg.style.color='var(--ok)';
+  }catch(e){
+    msg.textContent='That verification code is invalid or expired.';
+    msg.style.color='var(--red)';
+  }
+}
+
 async function changeMyCode(){
   const msg=document.getElementById('cc-msg');
+  const current=(document.getElementById('cc-current').value||'').trim();
   const nw=(document.getElementById('cc-new').value||'').trim();
   const cf=(document.getElementById('cc-confirm').value||'').trim();
   const show=(t,ok)=>{ if(msg){ msg.textContent=t; msg.style.color=ok?'var(--ok)':'var(--red)'; } };
+  if(!current){ show('Enter your current access code.',false); return; }
   if(!nw||!cf){ show('Enter and confirm the new code.',false); return; }
   if(nw!==cf){ show('Codes do not match.',false); return; }
   if(nw.length<6){ show('Use at least 6 characters.',false); return; }
   const uid=S.session&&S.session.user_id;
   if(!uid){ show('No active session.',false); return; }
   try{
-    await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:uid,new_code:nw})});
-    document.getElementById('cc-new').value=''; document.getElementById('cc-confirm').value='';
-    show('✅ Access code changed. Use it at next sign-in.',true);
+    await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:uid,new_code:nw,current_code:current})});
+    document.getElementById('cc-current').value=''; document.getElementById('cc-new').value=''; document.getElementById('cc-confirm').value='';
+    show('Access code changed. Signing you out so you can use the new code.',true);
+    setTimeout(()=>doLogout(),900);
   }catch(e){ show('Could not change code: '+apiErr(e),false); }
 }
 
@@ -15969,34 +16192,35 @@ async function exitMode(){
 //  MODALS
 // ═══════════════════════════════════════════════════════════
 let _modalReturnFocus=null;
+const _modalReturnFocusById=new Map();
 function openModal(id){
-  _modalReturnFocus=document.activeElement;
   const bg=document.getElementById(id);
+  if(!bg)return;
+  const returnTarget=document.activeElement;
+  _modalReturnFocus=returnTarget;
+  _modalReturnFocusById.set(id,returnTarget);
   bg.classList.add('active');
-  // Move focus to first focusable element inside the modal for keyboard/AT users
   const first=bg.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled)')||bg.querySelector('button:not(:disabled),[tabindex]:not([tabindex="-1"]),[href]');
   if(first)setTimeout(()=>first.focus(),200);
 }
 function closeModal(id){
-  document.getElementById(id).classList.remove('active');
-  // Defer focus restoration via setTimeout(0) to prevent WebKit from firing
-  // a spurious 'change' event on the previously-focused element (e.g. #or-reason)
-  // before the current call stack unwinds, which would re-open a promptText() modal.
-  if(_modalReturnFocus&&_modalReturnFocus.focus){
-    const el=_modalReturnFocus; _modalReturnFocus=null;
-    // Skip focus restoration if the target is still inside an active modal — e.g.
-    // #act-override-clear-btn inside still-active #m-act-override when
-    // closeModal('m-confirm') fires. Firefox/WebKit trigger a spurious synthetic
-    // click on a re-focused button inside a visible modal, which re-invokes the
-    // caller (clearActivityLocalOverride) and loops without ever closing the parent.
-    const parentBg=el.closest&&el.closest('.modal-bg');
-    if(!parentBg||!parentBg.classList.contains('active')){
-      setTimeout(()=>{try{el.focus();}catch(_){}},0);
-    }
-  }else{
-    _modalReturnFocus=null;
+  const bg=document.getElementById(id);
+  if(!bg)return;
+  bg.classList.remove('active');
+  const el=_modalReturnFocusById.get(id)||_modalReturnFocus;
+  _modalReturnFocusById.delete(id);
+  _modalReturnFocus=null;
+  if(!el||!el.focus)return;
+  const parentBg=el.closest&&el.closest('.modal-bg');
+  if(parentBg&&parentBg.classList.contains('active')){
+    const parentDialog=parentBg.querySelector('.modal')||parentBg;
+    if(!parentDialog.hasAttribute('tabindex'))parentDialog.setAttribute('tabindex','-1');
+    setTimeout(()=>{try{parentDialog.focus();}catch(_){}},0);
+    return;
   }
+  setTimeout(()=>{try{el.focus();}catch(_){}},0);
 }
+
 // REM-106: confirmAction() replaces native confirm() for critical SA/org-
 // management operations (archive Wing/Squadron, maintenance mode, account
 // disable/reactivate/delete/restore/unlock) -- native confirm() blocks the
@@ -16064,7 +16288,7 @@ document.addEventListener('keydown',function(e){
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){
   if(e.target!==this)return;
   if(this.id==='m-fac-dup'){_facDupCancel();return;}
-  this.classList.remove('active');
+  closeModal(this.id);
 });});
 // m-add-pn: modal backdrop handled by the shared .modal-bg click handler above
 window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
@@ -18664,9 +18888,14 @@ document.addEventListener('keydown',function(e){
     // Close the topmost active modal-bg (excluding the outcome-reason modal which has its own handler)
     const activeModals=Array.from(document.querySelectorAll('.modal-bg.active:not(#m-outcome-reason)'));
     if(activeModals.length){
-      const top=activeModals[activeModals.length-1];
+      // Most recently OPENED dialog (openModal's Map keeps open order). DOM
+      // order -- the old rule -- closed the OUTER dialog whenever the inner one
+      // (e.g. #m-confirm) sat earlier in the markup. DOM order remains the
+      // fallback for dialogs shown without openModal().
+      const opened=[..._modalReturnFocusById.keys()].map(id=>document.getElementById(id)).filter(m=>m&&activeModals.includes(m));
+      const top=opened.length?opened[opened.length-1]:activeModals[activeModals.length-1];
       const xBtn=top.querySelector('.modal-x');
-      if(xBtn){xBtn.click();}else{top.classList.remove('active');if(_modalReturnFocus&&_modalReturnFocus.focus)try{_modalReturnFocus.focus();}catch(_){}_modalReturnFocus=null;}
+      if(xBtn){xBtn.click();}else{closeModal(top.id);}
     }
   }
 });
@@ -19042,6 +19271,7 @@ async function sdSubmit(event) {
     body.squadron_id = _sdUnitSelected.unit_id;
     body.unit_name = _sdUnitSelected.name;
   } else {
+    body.wing_id = _sdUnitSelected.unit_id;
     body.unit_name = _sdUnitSelected.name;
   }
 
@@ -19054,7 +19284,7 @@ async function sdSubmit(event) {
 
     if (r.status === 201) {
       sdCloseModal();
-      showToast('Ticket submitted — your Wing and a system administrator will follow up.');
+      showToast('Ticket submitted.');
       return;
     }
 
@@ -19080,6 +19310,7 @@ let _sdActiveCategoryFilter = '';
 let _sdActiveUnitFilter = '';
 let _sdEditStatus = null;
 let _sdSelectedTicketId = null;
+let _sdAssignableAccounts = [];
 
 /* The API returns naive UTC timestamps with no zone marker (2026-08-22T22:55:19).
    Date() reads those as LOCAL time, which is eight hours out in Perth and puts
@@ -19140,8 +19371,16 @@ async function loadServiceDesk() {
   tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:var(--fs-sm)">Loading…</td></tr>';
 
   try {
-    const r = await api('/api/service-desk/tickets');
+    const canAssign = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
+    const [r, accounts] = await Promise.all([
+      api('/api/service-desk/tickets'),
+      canAssign ? api('/api/accounts') : Promise.resolve([]),
+    ]);
     _sdAllTickets = r;
+    _sdAssignableAccounts = (accounts||[]).filter(a =>
+      a.active_status && !a.is_archived &&
+      ['system_admin','national_admin','wing_admin'].includes(a.role)
+    );
     sdRenderList();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:var(--fs-sm)">${esc(apiErr(e))}</td></tr>`;
@@ -19300,7 +19539,17 @@ function sdOpenDetail(ticketId) {
     : `<div style="font-size:var(--fs-sm);color:var(--text)">${t.admin_notes ? esc(t.admin_notes) : '<span style="color:var(--muted)">No notes yet</span>'}</div>`;
 
   const assigneeHtml = canEdit
-    ? `<input id="sd-assignee-input" type="text" aria-label="Assigned to" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:32px" placeholder="e.g. SQNLDR Reid" value="${esc(t.assigned_to_name || '')}">`
+    ? (() => {
+        const legacy = t.assigned_to_name && !t.assigned_to_user_id
+          ? `<option value="__legacy__" selected>${esc(t.assigned_to_name)} (legacy assignment)</option>`
+          : '';
+        const options = _sdAssignableAccounts.map(a =>
+          `<option value="${esc(a.user_id)}" ${a.user_id===t.assigned_to_user_id?'selected':''}>${esc(a.display_name)} — ${esc(a.role.replaceAll('_',' '))}</option>`
+        ).join('');
+        return `<select id="sd-assignee-input" aria-label="Assigned to" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:32px">
+          <option value="">Unassigned</option>${legacy}${options}
+        </select>`;
+      })()
     : `<div style="font-size:var(--fs-sm)">${t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">Unassigned</span>'}</div>`;
 
   const statusHtml = canEdit
@@ -19373,8 +19622,10 @@ async function sdSave(ticketId) {
   const body = {
     status: _sdEditStatus,
     admin_notes: notesInput ? notesInput.value : undefined,
-    assigned_to_name: assigneeInput ? assigneeInput.value.trim() : undefined,
   };
+  if(assigneeInput && assigneeInput.value !== '__legacy__'){
+    body.assigned_to_user_id = assigneeInput.value;
+  }
 
   try {
     await api(`/api/service-desk/tickets/${ticketId}`, {method:'PATCH', body});
@@ -19382,7 +19633,11 @@ async function sdSave(ticketId) {
     if (t) {
       if (body.status) t.status = body.status;
       if (body.admin_notes !== undefined) t.admin_notes = body.admin_notes;
-      if (body.assigned_to_name !== undefined) t.assigned_to_name = body.assigned_to_name;
+      if (body.assigned_to_user_id !== undefined) {
+        t.assigned_to_user_id = body.assigned_to_user_id || null;
+        const assignee = _sdAssignableAccounts.find(a => a.user_id === body.assigned_to_user_id);
+        t.assigned_to_name = assignee ? assignee.display_name : null;
+      }
       if (body.status === 'resolved') t.resolved_at = new Date().toISOString();
       else if (body.status) t.resolved_at = null;
     }
@@ -19755,6 +20010,10 @@ async function showCadetTrainingRecord(cadetId){
 let _ceaBatchId=null;
 
 function showCadetSubview(view, button){
+  if(view==='cea'&&!canWritePlan()){
+    view='roster';
+    button=document.getElementById('cadets-tab-roster');
+  }
   const roster=document.getElementById('cadets-roster-wrap');
   const cea=document.getElementById('cadets-cea-wrap');
   const source=document.getElementById('page-cea-import');

@@ -116,6 +116,23 @@ def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principa
         raise HTTPException(401, detail={"error": "invalid_user"})
     if payload.get("tv", 0) != user.token_version:
         raise HTTPException(401, detail={"error": "session_revoked"})
+
+    if getattr(user, "must_change_code", False):
+        # Initial/admin-reset codes are temporary credentials. Authentication is
+        # allowed only far enough to rotate the code, inspect the session, or
+        # sign out; all application data/actions stay inaccessible.
+        allowed = {
+            "/api/auth/me",
+            "/api/auth/logout",
+            "/api/auth/change-code",
+            f"/api/accounts/{user.id}/reset-code",
+        }
+        if request.url.path not in allowed:
+            raise HTTPException(403, detail={
+                "error": "code_change_required",
+                "message": "Change your temporary access code before continuing.",
+            })
+
     # DEF-11: per-account rate limiting in production/staging (complements per-IP check).
     if settings.ENVIRONMENT.lower() in ("production", "prod", "staging"):
         if check_user_api_rate_db(user.id, db):

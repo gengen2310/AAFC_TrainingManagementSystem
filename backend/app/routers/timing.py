@@ -174,7 +174,15 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
     leaves the template's current blocks untouched rather than being torn
     down partway through a failed save.
     """
-    ip_counter = 0
+    # Missing period numbers must be allocated *after* all explicit numbers.
+    # Otherwise editing a saved template with periods 1..N and adding one new
+    # Training Period (period_number=None) incorrectly reuses 1 and fails as a
+    # duplicate. Preserve explicit numbering and extend from its current max.
+    explicit_period_numbers = [
+        bd.period_number for bd in block_data
+        if bd.block_type == "training_period" and bd.period_number is not None
+    ]
+    ip_counter = max(explicit_period_numbers, default=0)
     resolved: list[tuple[int, "BlockIn", bool, int | None]] = []
     seen_period_numbers: set[int] = set()
     for i, bd in enumerate(block_data):

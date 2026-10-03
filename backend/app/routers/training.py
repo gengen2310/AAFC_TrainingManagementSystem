@@ -16,7 +16,8 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
 from ..models.planning import ActivityLocalOverride
 from ..models.faq import FaqEntry
 from ..richtext import sanitize_rich_text
-from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES
+from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
+                               SessionAssistantFacilitator)
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
@@ -351,6 +352,7 @@ def list_parades(squadron_id: str | None = None, planning_year_id: str | None = 
     # reads sessions from) rather than adding a db param to that shared
     # helper for every caller.
     classes_by_session: dict[str, list[dict]] = defaultdict(list)
+    assistants_by_session: dict[str, list[dict]] = defaultdict(list)
     if all_sess:
         aud_rows = (
             db.query(SessionAudience, TrainingClass)
@@ -361,6 +363,21 @@ def list_parades(squadron_id: str | None = None, planning_year_id: str | None = 
         for aud, tc in aud_rows:
             classes_by_session[aud.session_id].append(
                 {"training_class_id": tc.id, "display_name": tc.display_name})
+        assistant_rows = (
+            db.query(SessionAssistantFacilitator, Facilitator)
+            .join(Facilitator, SessionAssistantFacilitator.user_id == Facilitator.id)
+            .filter(SessionAssistantFacilitator.session_id.in_([x.id for x in all_sess]))
+            .all()
+        )
+        for rel, fac in assistant_rows:
+            display_name = " ".join(
+                part for part in [fac.current_rank, fac.first_name, fac.last_name] if part
+            ).strip() or fac.id
+            assistants_by_session[rel.session_id].append({
+                "user_id": fac.id,
+                "facilitator_id": fac.id,
+                "display_name": display_name,
+            })
 
     out = []
     for pn in pns:
@@ -368,6 +385,7 @@ def list_parades(squadron_id: str | None = None, planning_year_id: str | None = 
         for x in sess_by_pn.get(pn.id, []):
             d = _sess_dict(x)
             d["training_classes"] = classes_by_session.get(x.id, [])
+            d["assistant_facilitators"] = assistants_by_session.get(x.id, [])
             sess_dicts.append(d)
         out.append({**_pn_dict(pn), "sessions": sess_dicts})
     return out
@@ -811,6 +829,10 @@ class SessionIn(BaseModel):
     curriculum_item_id: str | None = None
     custom_title: str | None = None
     facilitator_id: str | None = None
+    # Canonical plural assistant relationship. None means "leave unchanged" on edit;
+    # [] explicitly clears all assistants. This is shared by Main TMS Quick Edit and
+    # Planning Workspace so successful saves cannot silently drop assistant changes.
+    assistant_facilitator_ids: list[str] | None = None
     training_area_id: str | None = None
     expected_attendance: int | None = None
     version: int | None = None
@@ -915,16 +937,51 @@ def _is_parallel_delivery(body, sib) -> bool:
     return True
 
 
+def _resolve_session_assistants(
+    db: DBSession,
+    assistant_ids: list[str],
+    squadron_id: str,
+    lead_id: str | None = None,
+) -> list[str]:
+    """Validate/deduplicate assistant facilitator IDs for a session.
+
+    Assistant IDs are Facilitator IDs despite the historical join-column name
+    user_id. A lead facilitator is automatically removed from the assistant
+    list so a promotion cannot leave one person in both roles.
+    """
+    seen: set[str] = set()
+    validated: list[str] = []
+    for assistant_id in assistant_ids:
+        if not assistant_id or assistant_id == lead_id or assistant_id in seen:
+            continue
+        seen.add(assistant_id)
+        fac = db.get(Facilitator, assistant_id)
+        if fac is None or fac.is_archived:
+            raise HTTPException(422, detail={"error": "invalid_assistant", "facilitator_id": assistant_id})
+        if fac.squadron_id != squadron_id:
+            raise HTTPException(422, detail={"error": "foreign_assistant", "facilitator_id": assistant_id})
+        validated.append(fac.id)
+    return validated
+
+
+def _replace_session_assistants(
+    db: DBSession, session_id: str, assistant_ids: list[str]
+) -> None:
+    """Replace the canonical SessionAssistantFacilitator rows atomically."""
+    db.query(SessionAssistantFacilitator).filter(
+        SessionAssistantFacilitator.session_id == session_id
+    ).delete(synchronize_session=False)
+    for assistant_id in assistant_ids:
+        db.add(SessionAssistantFacilitator(session_id=session_id, user_id=assistant_id))
+
+
 def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body,
                         exclude_session_id: str | None = None) -> list[dict]:
-    """Facilitator/room double-bookings against other sessions in the same period.
+    """Return lead/assistant/room collisions for the target period.
 
-    Shared by create_session and edit_session, which previously carried two
-    identical copies of this loop. Also checks assistant-facilitator double-booking
-    via the SessionAssistantFacilitator join table.
+    Uses the incoming plural assistant list when supplied. On edits where the
+    field is omitted, the currently persisted assistants are used instead.
     """
-    from ..models.training import SessionAssistantFacilitator
-
     q = db.query(Session).filter(
         Session.parade_night_id == parade_night_id,
         Session.period_number == period_number,
@@ -933,53 +990,53 @@ def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body
     if exclude_session_id:
         q = q.filter(Session.id != exclude_session_id)
     sibling_sessions = q.all()
+    sibling_ids = [s.id for s in sibling_sessions]
+
+    if getattr(body, "assistant_facilitator_ids", None) is not None:
+        our_asst_ids = set(body.assistant_facilitator_ids or [])
+    elif exclude_session_id:
+        our_asst_ids = {
+            row.user_id for row in db.query(SessionAssistantFacilitator).filter(
+                SessionAssistantFacilitator.session_id == exclude_session_id
+            ).all()
+        }
+    else:
+        our_asst_ids = set()
+
+    sibling_asst_by_session: dict[str, set[str]] = {}
+    if sibling_ids:
+        for row in db.query(SessionAssistantFacilitator).filter(
+            SessionAssistantFacilitator.session_id.in_(sibling_ids)
+        ).all():
+            sibling_asst_by_session.setdefault(row.session_id, set()).add(row.user_id)
 
     conflicts: list[dict] = []
     for sib in sibling_sessions:
         if _is_parallel_delivery(body, sib):
             continue
+        sibling_assts = sibling_asst_by_session.get(sib.id, set())
         if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
             conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
                               "resource_id": sib.facilitator_id,
                               "resource_name": sib.facilitator_display_name_at_time})
+        if body.facilitator_id and body.facilitator_id in sibling_assts:
+            conflicts.append({"type": "facilitator_double_booked", "session_id": sib.id,
+                              "resource_id": body.facilitator_id,
+                              "resource_name": body.facilitator_id})
         if body.training_area_id and sib.training_area_id == body.training_area_id:
             conflicts.append({"type": "room_clash", "session_id": sib.id,
                               "resource_id": sib.training_area_id,
                               "resource_name": sib.training_area_name_at_time})
-
-    # Check assistant facilitator double-booking if we have a session to check against
-    if exclude_session_id:
-        our_asst_rows = db.query(SessionAssistantFacilitator).filter_by(
-            session_id=exclude_session_id
-        ).all()
-        our_asst_ids = {row.user_id for row in our_asst_rows}
-        if our_asst_ids:
-            sib_ids = [s.id for s in sibling_sessions]
-            # Check if any of our assistants are main facilitators on sibling sessions
-            for sib in sibling_sessions:
-                if sib.facilitator_id in our_asst_ids:
-                    conflicts.append({
-                        "type": "facilitator_double_booked",
-                        "session_id": sib.id,
-                        "resource_id": sib.facilitator_id,
-                        "resource_name": sib.facilitator_display_name_at_time,
-                    })
-            # Check if any of our assistants are assistant facilitators on sibling sessions
-            if sib_ids:
-                other_asst_rows = db.query(SessionAssistantFacilitator).filter(
-                    SessionAssistantFacilitator.session_id.in_(sib_ids),
-                    SessionAssistantFacilitator.user_id.in_(our_asst_ids),
-                ).all()
-                for row in other_asst_rows:
-                    conflicts.append({
-                        "type": "facilitator_double_booked",
-                        "session_id": row.session_id,
-                        "resource_id": row.user_id,
-                        "resource_name": row.user_id,
-                    })
+        if sib.facilitator_id and sib.facilitator_id in our_asst_ids:
+            conflicts.append({"type": "facilitator_double_booked", "session_id": sib.id,
+                              "resource_id": sib.facilitator_id,
+                              "resource_name": sib.facilitator_display_name_at_time})
+        for assistant_id in sorted(our_asst_ids & sibling_assts):
+            conflicts.append({"type": "facilitator_double_booked", "session_id": sib.id,
+                              "resource_id": assistant_id,
+                              "resource_name": assistant_id})
 
     return conflicts
-
 
 def _validate_timing_block(db: DBSession, pn, block_id: str | None) -> None:
     """Reject a program period the parade night does not actually offer.
@@ -1017,6 +1074,11 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
 
+    validated_assistants = _resolve_session_assistants(
+        db, body.assistant_facilitator_ids or [], pn.squadron_id, body.facilitator_id
+    )
+    body.assistant_facilitator_ids = validated_assistants
+
     # ── Same synchronous resource-conflict check as edit_session below (Stage 8) --
     # previously only PUT /sessions/{sid} was checked, so a facilitator/room could
     # still be double-booked with zero warning by creating a brand new session
@@ -1050,7 +1112,10 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
                 expected_attendance=body.expected_attendance, status=initial_status,
                 timing_block_id=body.timing_block_id, created_by=p.user_id)
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
-    db.add(s); db.commit()
+    db.add(s)
+    db.flush()
+    _replace_session_assistants(db, s.id, validated_assistants)
+    db.commit()
     _recompute(db, pn)
     audit(db, p, object_type="session", object_id=s.id, action="create")
     return {"ok": True, "session_id": s.id}
@@ -1084,6 +1149,12 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
         raise HTTPException(400, detail={"error": "invalid_facilitator"})
     if body.training_area_id and not scoped_training_area(db, body.training_area_id, s.squadron_id):
         raise HTTPException(400, detail={"error": "invalid_training_area"})
+    validated_assistants = None
+    if body.assistant_facilitator_ids is not None:
+        validated_assistants = _resolve_session_assistants(
+            db, body.assistant_facilitator_ids, s.squadron_id, body.facilitator_id
+        )
+        body.assistant_facilitator_ids = validated_assistants
     status_changing = body.status is not None and body.status != s.status
     if status_changing and body.status not in VALID_STATUS:
         raise HTTPException(400, detail={"error": "invalid_status"})
@@ -1127,6 +1198,8 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     _validate_timing_block(db, target_pn, body.timing_block_id)
     s.timing_block_id = body.timing_block_id
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
+    if validated_assistants is not None:
+        _replace_session_assistants(db, s.id, validated_assistants)
     s.version += 1
 
     old_status = s.status
@@ -2522,8 +2595,19 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
     ) if session_ids else []
     asst_by_session: dict[str, list[dict]] = {}
     for a in asst_rows:
+        fac = db.get(Facilitator, a.user_id)
+        display_name = (
+            " ".join(part for part in [
+                getattr(fac, "current_rank", None),
+                getattr(fac, "first_name", None),
+                getattr(fac, "last_name", None),
+            ] if part).strip()
+            if fac else a.user_id
+        )
         asst_by_session.setdefault(a.session_id, []).append({
+            "user_id": a.user_id,
             "facilitator_id": a.user_id,
+            "display_name": display_name,
         })
 
     sessions_out = []
@@ -5197,6 +5281,7 @@ class CurriculumImportIn(BaseModel):
     items: List[CurriculumImportItem]
     squadron_id: str | None = None  # if provided, link scheduled items to this sqn
     owning_level: str = "national"  # national | wing | squadron
+    wing_id: str | None = None      # required when owning_level == "wing"
     # Phase 3.4: compute and return the create/update/skip/failed breakdown
     # without writing anything -- default False preserves this endpoint's
     # original immediate-commit behaviour for every existing caller.
@@ -5468,10 +5553,31 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     owning_level = body.owning_level if body.owning_level in {"national", "wing", "squadron"} else "national"
     sqn_id = body.squadron_id
 
+    sqn = None
     if sqn_id:
-        if not db.get(Squadron, sqn_id):
+        sqn = db.get(Squadron, sqn_id)
+        if not sqn:
             raise HTTPException(404, detail={"error": "squadron_not_found",
                                              "message": "The referenced squadron does not exist."})
+
+    # A unit-level import must name its unit. Without one, "wing" items were
+    # created with wing_id NULL (owned by no Wing) and a re-import matched and
+    # overwrote a same-code item of ANY Wing; "squadron" items without a
+    # squadron_id were owned by no squadron.
+    target_wing_id: str | None = None
+    if owning_level == "wing":
+        w = db.get(Wing, body.wing_id) if body.wing_id else None
+        if not w or w.is_archived:
+            raise HTTPException(422, detail={
+                "error": "wing_required",
+                "message": "A Wing-level import needs the Wing it belongs to (wing_id)."})
+        target_wing_id = w.id
+    elif owning_level == "squadron":
+        if not sqn:
+            raise HTTPException(422, detail={
+                "error": "squadron_required",
+                "message": "A Squadron-level import needs the Squadron it belongs to (squadron_id)."})
+        target_wing_id = sqn.wing_id
 
     created = updated = skipped = failed = 0
     results = []
@@ -5497,6 +5603,8 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 CurriculumItem.is_archived == False)  # noqa: E712
             if owning_level == "squadron":
                 q = q.filter(CurriculumItem.squadron_id == sqn_id)
+            elif owning_level == "wing":
+                q = q.filter(CurriculumItem.wing_id == target_wing_id)
 
             existing: CurriculumItem | None = None
             if item.identifier:
@@ -5515,6 +5623,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 ci = CurriculumItem(
                     owning_level=owning_level,
                     squadron_id=sqn_id if owning_level == "squadron" else None,
+                    wing_id=target_wing_id,
                     identifier=item.identifier,
                     code=item.code,
                     part_number=item.part_number,
@@ -5645,13 +5754,16 @@ def _link_session(db: DBSession, ci: CurriculumItem, sqn_id: str,
 async def import_curriculum_xlsm(
     file: UploadFile = File(...),
     squadron_id: str | None = None,
+    preview: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Accept an .xlsm workbook upload and import curriculum from 'zz - Program backend' sheet.
+    """Preview or import an .xlsm workbook from 'zz - Program backend'.
 
     Header row: 4. Unique key: Identifier (col 4), fallback (Module_Code, Part).
     Non-curriculum rows (missing Module_Code or Title) are silently skipped.
+    preview=true executes the same downstream classification as commit and
+    rolls the transaction back, matching the JSON and CSV import contracts.
     """
     if p.role not in _NAT_ADMIN_ROLES:
         raise HTTPException(403, detail={"error": "forbidden",
@@ -5679,7 +5791,12 @@ async def import_curriculum_xlsm(
     ws = wb[sheet_name]
     items = _parse_program_backend_sheet(ws)
 
-    body = CurriculumImportIn(items=items, squadron_id=squadron_id, owning_level="national")
+    body = CurriculumImportIn(
+        items=items,
+        squadron_id=squadron_id,
+        owning_level="national",
+        preview=preview,
+    )
     return import_curriculum(body, db=db, p=p)
 
 
@@ -5807,6 +5924,8 @@ async def import_curriculum_csv(
     file: UploadFile = File(...),
     owning_level: str = "national",
     preview: bool = False,
+    wing_id: str | None = None,       # required for owning_level=wing
+    squadron_id: str | None = None,   # required for owning_level=squadron
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -5880,7 +5999,8 @@ async def import_curriculum_csv(
         msg = "No valid rows found. " + "; ".join(parse_errors[:5]) if parse_errors else "File is empty or contains no data rows."
         raise HTTPException(400, detail={"error": "csv_parse_failed", "message": msg})
 
-    import_body = CurriculumImportIn(items=items, owning_level=owning_level, preview=preview)
+    import_body = CurriculumImportIn(items=items, owning_level=owning_level, preview=preview,
+                                     wing_id=wing_id, squadron_id=squadron_id)
     result = import_curriculum(import_body, db, p)
     result["parse_errors"] = parse_errors
     return result
