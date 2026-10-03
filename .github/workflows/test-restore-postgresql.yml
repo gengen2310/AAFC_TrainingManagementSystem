@@ -377,7 +377,9 @@ jobs:
               'users', 'wings', 'squadrons', 'audit_logs', 'system_settings',
               'access_codes', 'proxy_sessions', 'phases', 'program_packages',
               'curriculum_items', 'planning_years', 'sessions',
-              'training_classes', 'session_audiences', 'cadet_class_memberships',
+              # 'session_audience' (singular) is SessionAudience.__tablename__;
+              # 'session_audiences' never existed, so this list failed forever.
+              'training_classes', 'session_audience', 'cadet_class_memberships',
               'ip_api_requests', 'user_api_requests',
               'facilitators', 'parade_nights', 'ip_login_attempts',
           ]
@@ -421,6 +423,31 @@ jobs:
               sys.exit(1)
           else:
               print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
+          PYEOF
+
+      - name: Verify every application model table exists after the upgrade
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          # Derived from the ORM, so it cannot go stale the way a hand-written
+          # table list did ('session_audiences' was never a real table).
+          import sys
+          from sqlalchemy import inspect
+          from app.database import Base, engine
+          import app.models  # noqa: F401  (registers every model)
+          have = set(inspect(engine).get_table_names())
+          want = set(Base.metadata.tables)
+          missing = sorted(want - have)
+          if missing:
+              print("::error::Model tables missing after upgrade: " + ", ".join(missing))
+              sys.exit(1)
+          print(f"PASS  all {len(want)} application model tables present after upgrade")
           PYEOF
 
       # ── 8b. Application-level restore proof ──────────────────────────────────
