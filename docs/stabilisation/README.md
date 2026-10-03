@@ -1,7 +1,7 @@
 # TMS Stabilisation Programme — Predictable Before Clever
 
-**Authorised:** 2026-10-03  
-**Working integration base:** PR #68 tip `9f24d42b61e1a8d775d5c4f0a24465d145fe0e85`  
+**Authorised:** 2026-10-03
+**Working integration base:** PR #68 tip `9f24d42b61e1a8d775d5c4f0a24465d145fe0e85`
 **Canonical repository:** `gengen2310/AAFC_TrainingManagementSystem`
 
 ## Objective
