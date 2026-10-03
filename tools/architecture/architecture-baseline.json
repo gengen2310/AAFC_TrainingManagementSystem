@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "captured_from": "9f24d42b61e1a8d775d5c4f0a24465d145fe0e85",
+  "captured_at": "2026-10-03",
+  "connected_frontend": {
+    "path": "connected-frontend/index.html",
+    "max_bytes": 1255839,
+    "max_lines": 20273,
+    "max_named_function_declarations": 800
+  },
+  "router_direct_role_checks": {
+    "backend/app/routers/__init__.py": 0,
+    "backend/app/routers/accounts.py": 21,
+    "backend/app/routers/auth.py": 1,
+    "backend/app/routers/custom_phases.py": 9,
+    "backend/app/routers/dashboard.py": 0,
+    "backend/app/routers/export_import.py": 1,
+    "backend/app/routers/health.py": 0,
+    "backend/app/routers/jobs.py": 1,
+    "backend/app/routers/ops.py": 1,
+    "backend/app/routers/organisations.py": 16,
+    "backend/app/routers/planning.py": 20,
+    "backend/app/routers/search.py": 4,
+    "backend/app/routers/service_desk.py": 10,
+    "backend/app/routers/setup.py": 1,
+    "backend/app/routers/system.py": 0,
+    "backend/app/routers/timing.py": 6,
+    "backend/app/routers/training.py": 85,
+    "backend/app/routers/wing_calendar.py": 9
+  }
+}
