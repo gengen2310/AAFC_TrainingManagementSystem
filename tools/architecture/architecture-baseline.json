@@ -28,9 +28,5 @@
     "backend/app/routers/training.py": 69,
     "backend/app/routers/wing_calendar.py": 9
   },
-  "router_cross_imports": {
-    "backend/app/routers/auth.py": [
-      "accounts"
-    ]
-  }
+  "router_cross_imports": {}
 }

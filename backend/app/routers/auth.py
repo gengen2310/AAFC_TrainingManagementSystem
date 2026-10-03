@@ -14,6 +14,7 @@ from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySess
 from ..dependencies import get_principal, client_meta, real_client_ip
 from ..permissions import Principal, require_write_role
 from ..services import audit
+from ..services_accounts import require_manage_authority
 from ..services_recovery import (
     RESET_TTL_MINUTES, consume_token, hash_token, is_recovery_eligible, mint_token,
 )
@@ -393,8 +394,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
                 "message": "Enter your current access code to change it.",
             })
     else:
-        from .accounts import _require_manage_authority
-        _require_manage_authority(p, target, db)
+        require_manage_authority(p, target, db)
     # Validate the new code: strip, non-empty, minimum length, maximum length.
     plain = (body.new_code or "").strip()
     if not plain:
