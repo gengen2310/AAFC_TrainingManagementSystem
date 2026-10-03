@@ -14,6 +14,7 @@ from app.models.planning import PlanningFacilitatorLeave
 from app.permissions import Principal
 from app.routers.training import list_facs
 from app.services_data_quality import data_freshness
+from tests.conftest import login, next_test_year
 
 
 def _count_selects(db, action):
@@ -115,3 +116,46 @@ def test_national_data_freshness_uses_constant_query_count():
         assert len(selects) <= 2, "\n\n".join(selects)
     finally:
         db.close()
+
+
+def test_long_range_batches_conflicts_across_parade_nights(client):
+    headers = login(client, "ADMIN703")
+    year = next_test_year()
+    created = client.post(
+        "/api/planning/years",
+        json={"year": year, "name": f"{year} Query Bound Year"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+    year_id = created.json()["planning_year_id"]
+
+    dates = [f"{year}-08-{day:02d}" for day in (1, 8, 15, 22)]
+    for parade_date in dates:
+        response = client.post(
+            f"/api/planning/years/{year_id}/parade-dates",
+            json={"parade_date": parade_date},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+
+    db = SessionLocal()
+    statements: list[str] = []
+
+    def before_cursor_execute(_conn, _cursor, statement, _params, _context, _many):
+        if "planning_conflicts" in statement.lower() and statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    event.listen(db.bind, "before_cursor_execute", before_cursor_execute)
+    try:
+        response = client.get(
+            f"/api/planning/years/{year_id}/long-range"
+            f"?from_date={year}-08-01&end_date={year}-08-31",
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert len(response.json()["parade_dates"]) == 4
+    finally:
+        event.remove(db.bind, "before_cursor_execute", before_cursor_execute)
+        db.close()
+
+    assert len(statements) == 1, "\n\n".join(statements)
