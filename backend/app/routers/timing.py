@@ -26,7 +26,10 @@ from ..models import (TimingTemplate, TimingBlock, ParadeNightTimingOverride,
 from ..models.training import SessionAudience, TrainingClass
 from ..models.training import BLOCK_TYPES
 from ..dependencies import get_principal, client_meta
-from ..permissions import (Principal, WRITE_ROLES, require_role,\n                           require_can_view_squadron, require_can_write_squadron)
+from ..permissions import (
+    Principal, WRITE_ROLES, require_role,
+    require_can_view_squadron, require_can_write_squadron,
+)
 from ..services import audit
 
 
