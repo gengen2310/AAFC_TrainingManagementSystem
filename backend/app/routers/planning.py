@@ -2233,8 +2233,8 @@ def create_session(
     # canonical schedule/print endpoint can place the session on its real row.
     placement_template_id = pn.timing_template_id
     if not placement_template_id:
-        effective_template = effective_template(db, pn.squadron_id, pn.date)
-        placement_template_id = effective_template.id if effective_template else None
+        effective_tmpl = effective_template(db, pn.squadron_id, pn.date)
+        placement_template_id = effective_tmpl.id if effective_tmpl else None
     if placement_template_id:
         period_block = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == placement_template_id,
