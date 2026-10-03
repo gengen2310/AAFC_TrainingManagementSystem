@@ -86,25 +86,27 @@ def data_freshness(
             sq_q = sq_q.filter(Squadron.wing_id == wing_id)
         active_squadrons = sq_q.all()
         if active_squadrons:
-            covered = 0
-            for squadron in active_squadrons:
-                pn_ids_sub = select(ParadeNight.id).where(
-                    ParadeNight.squadron_id == squadron.id,
-                    ParadeNight.date >= sixty_days_ago,
-                    ParadeNight.is_archived == False,  # noqa: E712
-                )
-                has_delivery = (
-                    db.query(Session.id)
+            active_ids = [squadron.id for squadron in active_squadrons]
+            # One set-based query replaces the old per-Squadron existence
+            # check. Wing/National aggregation therefore stays at a constant
+            # query count as the organisation grows.
+            delivered_sq_ids = {
+                squadron_id
+                for (squadron_id,) in (
+                    db.query(ParadeNight.squadron_id)
+                    .join(Session, Session.parade_night_id == ParadeNight.id)
                     .filter(
-                        Session.parade_night_id.in_(pn_ids_sub),
+                        ParadeNight.squadron_id.in_(active_ids),
+                        ParadeNight.date >= sixty_days_ago,
+                        ParadeNight.is_archived == False,  # noqa: E712
                         Session.status.in_(list(_DELIVERED)),
                         Session.is_archived == False,  # noqa: E712
                     )
-                    .first()
+                    .distinct()
+                    .all()
                 )
-                if has_delivery:
-                    covered += 1
-            coverage_pct = round(covered / len(active_squadrons) * 100)
+            }
+            coverage_pct = round(len(delivered_sq_ids) / len(active_squadrons) * 100)
             if coverage_pct < 80:
                 issues.append(
                     f"Only {coverage_pct}% of squadrons have recent training delivery"
