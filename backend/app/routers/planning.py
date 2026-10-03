@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
@@ -499,27 +499,71 @@ def _location_out(loc: TrainingArea) -> dict:
     }
 
 
+def _session_out_context(db: DBSession, sessions: list) -> dict:
+    """Pre-load everything _real_session_out() needs for MANY sessions in a
+    constant number of queries. Serialising one session at a time issued ~5
+    queries per session (measured: term planner 26 queries for 4 sessions, 66
+    for 12), so a full training year cost ~1,200 queries per request. Output
+    is identical with or without the context (pinned by a parity test)."""
+    from ..models.training import SessionAssistantFacilitator as _SAF
+    ids = [s.id for s in sessions]
+    ctx: dict = {"rooms": {}, "facs": {}, "saf": {}, "ci": {}, "aud": {}, "cpa": {}}
+    if not ids:
+        return ctx
+    room_ids = {s.training_area_id for s in sessions if s.training_area_id and not s.training_area_name_at_time}
+    if room_ids:
+        ctx["rooms"] = {r.id: r.name for r in db.query(TrainingArea).filter(TrainingArea.id.in_(room_ids)).all()}
+    saf_rows = db.query(_SAF).filter(_SAF.session_id.in_(ids)).all()
+    for row in saf_rows:
+        ctx["saf"].setdefault(row.session_id, []).append(row)
+    fac_ids = {s.assistant_facilitator_id for s in sessions if s.assistant_facilitator_id} | {r.user_id for r in saf_rows}
+    if fac_ids:
+        ctx["facs"] = {f.id: f for f in db.query(Facilitator).filter(Facilitator.id.in_(fac_ids)).all()}
+    ci_ids = {s.curriculum_item_id for s in sessions if s.curriculum_item_id}
+    if ci_ids:
+        ctx["ci"] = {c.id: c for c in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids)).all()}
+    ctx["aud"] = dict(db.query(SessionAudience.session_id, func.count(SessionAudience.id))
+                      .filter(SessionAudience.session_id.in_(ids))
+                      .group_by(SessionAudience.session_id).all())
+    for sid, cp in (db.query(SessionCustomPhaseAudience.session_id, CustomTrainingPhase)
+                    .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
+                    .filter(SessionCustomPhaseAudience.session_id.in_(ids)).all()):
+        ctx["cpa"].setdefault(sid, []).append(cp)
+    return ctx
+
+
 def _real_session_out(
     s: TrainingSession, db: DBSession,
     ci_tier: "dict[str, dict] | None" = None,
+    ctx: "dict | None" = None,
 ) -> dict:
-    """Serialize a real training Session in the builder grid format."""
+    """Serialize a real training Session in the builder grid format.
+
+    Bulk callers pass ctx from _session_out_context() (constant queries for the
+    whole batch); single-session callers omit it and it queries directly."""
     room_name = s.training_area_name_at_time
     if not room_name and s.training_area_id:
-        ra = db.get(TrainingArea, s.training_area_id)
-        if ra:
-            room_name = ra.name
+        if ctx is not None:
+            room_name = ctx["rooms"].get(s.training_area_id) or room_name
+        else:
+            ra = db.get(TrainingArea, s.training_area_id)
+            if ra:
+                room_name = ra.name
     from ..models.training import SessionAssistantFacilitator as _SAF
+
+    def _fac(fid):
+        return ctx["facs"].get(fid) if ctx is not None else db.get(Facilitator, fid)
+
     asst_name: str | None = None
     if s.assistant_facilitator_id:
-        af = db.get(Facilitator, s.assistant_facilitator_id)
+        af = _fac(s.assistant_facilitator_id)
         if af:
             asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
     # Build assistant_facilitators list from the join table
-    asst_rows = db.query(_SAF).filter_by(session_id=s.id).all()
+    asst_rows = ctx["saf"].get(s.id, []) if ctx is not None else db.query(_SAF).filter_by(session_id=s.id).all()
     assistant_facilitators_list: list[dict] = []
     for row in asst_rows:
-        f = db.get(Facilitator, row.user_id)
+        f = _fac(row.user_id)
         if f:
             disp = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
         else:
@@ -537,7 +581,7 @@ def _real_session_out(
                 core_status = t["core_status"]
                 is_optional = t.get("is_optional", False)
         else:
-            ci_obj = db.get(CurriculumItem, s.curriculum_item_id)
+            ci_obj = ctx["ci"].get(s.curriculum_item_id) if ctx is not None else db.get(CurriculumItem, s.curriculum_item_id)
             if ci_obj:
                 core_status = ci_obj.core_status
                 is_optional = ci_obj.is_optional
@@ -561,13 +605,15 @@ def _real_session_out(
         "location_name": room_name,
         "status": s.status,
         "notes": s.delivery_notes,
-        "is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1,
+        "is_combined": (ctx["aud"].get(s.id, 0) if ctx is not None
+                        else db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count()) > 1,
         "custom_phase_audiences": [
             {"custom_phase_id": cp.id, "name": cp.name}
-            for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
-            .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
-            .filter(SessionCustomPhaseAudience.session_id == s.id)
-            .all()
+            for cp in (ctx["cpa"].get(s.id, []) if ctx is not None else [
+                cp for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
+                .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
+                .filter(SessionCustomPhaseAudience.session_id == s.id)
+                .all()])
         ],
         "override_conflict": False,
         "created_at": iso_z(s.created_at) if s.created_at else None,
@@ -2024,8 +2070,9 @@ def get_term_planner(
         ts_by_night: dict[str, list] = {}
         for s in ts_rows:
             ts_by_night.setdefault(s.parade_night_id, []).append(s)
+        ctx = _session_out_context(db, ts_rows)   # one batch for the whole year
         for pn in all_dates:
-            sessions_by_date[pn.id] = [_real_session_out(s, db) for s in ts_by_night.get(pn.id, [])]
+            sessions_by_date[pn.id] = [_real_session_out(s, db, ctx=ctx) for s in ts_by_night.get(pn.id, [])]
     else:
         for pn in all_dates:
             sessions_by_date[pn.id] = []
@@ -2100,7 +2147,8 @@ def get_builder(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == False,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    real_sessions = [_real_session_out(s, db) for s in ts]
+    ctx = _session_out_context(db, ts)
+    real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
     conflicts = db.query(PlanningConflict).filter(
         PlanningConflict.parade_night_id == date_id,
@@ -2576,7 +2624,8 @@ def list_archived_sessions(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == True,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    return {"sessions": [_real_session_out(s, db) for s in ts]}
+    ctx = _session_out_context(db, ts)
+    return {"sessions": [_real_session_out(s, db, ctx=ctx) for s in ts]}
 
 
 @router.get("/parade-dates/{date_id}/weekly-program")
@@ -2598,7 +2647,8 @@ def get_weekly_program(
             TrainingSession.parade_night_id == pn.id,
             TrainingSession.is_archived == False,  # noqa: E712
         ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-        real_sessions = [_real_session_out(s, db) for s in ts]
+        ctx = _session_out_context(db, ts)
+        real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
         # CLASS-06: which Training Class(es) each session targets, additive
         # to _real_session_out()'s own output. Attached here rather than
@@ -2771,12 +2821,13 @@ def get_long_range(
         snaps_by_pn_lr = {}
         conflicts_by_pn_lr = {}
 
+    ctx_lr = _session_out_context(db, [s for v in ts_by_night_lr.values() for s in v])  # whole range, once
     rows = []
     for pn_obj in parade_dates:
         real_sessions: list[dict] = []
         ts = sorted(ts_by_night_lr.get(pn_obj.id, []),
                     key=lambda s: (s.period_number, s.cadet_group or ""))
-        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
+        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr, ctx=ctx_lr) for s in ts]
         for sess_out, s in zip(real_sessions, ts):
             sess_out["training_classes"] = classes_by_session_lr.get(s.id, [])
 
