@@ -37,8 +37,31 @@ def main() -> int:
             f"(baseline max {cfg['max_named_function_declarations']}). Extract instead of growing the monolith."
         )
 
-    expected=baseline["router_direct_role_checks"]
+    # Router-to-router coupling is another form of hidden shared state.
+    # Existing dependency edges are allowed while we extract them, but new
+    # router dependencies must be rejected in favour of permissions/services.
     router_dir=ROOT/"backend"/"app"/"routers"
+    router_names={p.stem for p in router_dir.glob("*.py")}
+    import_re=re.compile(r"^\\s*from\\s+\\.(\\w+)\\s+import\\s+", re.MULTILINE)
+    expected_edges=baseline.get("router_cross_imports", {})
+    actual_edges={}
+    for file in sorted(router_dir.glob("*.py")):
+        rel=file.relative_to(ROOT).as_posix()
+        deps=sorted({
+            module for module in import_re.findall(file.read_text(encoding="utf-8"))
+            if module in router_names
+        })
+        if deps:
+            actual_edges[rel]=deps
+        allowed=set(expected_edges.get(rel, []))
+        unexpected=sorted(set(deps)-allowed)
+        if unexpected:
+            failures.append(
+                f"{rel} added router-to-router import(s): {', '.join(unexpected)}. "
+                "Move reusable logic into permissions/services/domain modules instead."
+            )
+
+    expected=baseline["router_direct_role_checks"]
     seen=set()
     for file in sorted(router_dir.glob("*.py")):
         rel=file.relative_to(ROOT).as_posix()
@@ -66,6 +89,8 @@ def main() -> int:
     )
     print("ARCHITECTURE GUARD: PASS")
     print(f" - connected frontend: {byte_count:,} bytes, {line_count:,} lines, {fn_count} named functions")
+    edge_count=sum(len(v) for v in actual_edges.values())
+    print(f" - router-to-router dependency edges: {edge_count} (ratcheted, no increase)")
     print(f" - router-local direct role checks: {total} (ratcheted, no increase)")
     return 0
 
