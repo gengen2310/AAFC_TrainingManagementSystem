@@ -75,6 +75,14 @@ class SystemSetting(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 
+class RateLimitBucket(Base):
+    """Fixed-window hit counter shared by every worker (e.g. forgot-code)."""
+    __tablename__ = "rate_limit_buckets"
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class IdempotencyKey(Base):
     """One row per (user, endpoint, Idempotency-Key) claim, shared by every
     worker. The primary key makes the claim atomic: the first insert wins and

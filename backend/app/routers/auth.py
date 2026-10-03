@@ -23,20 +23,23 @@ from ..models import RecoveryToken
 
 # In-memory recovery limiter. Deliberately separate from the login limiter so a
 # recovery attempt never consumes a legitimate user's login budget.
-_recovery_hits: dict[str, list[float]] = {}
-
-
-def _recovery_rate_ok(key: str, limit_per_hour: int) -> bool:
-    import time
-    now = time.time()
-    hits = [t for t in _recovery_hits.get(key, []) if now - t < 3600]
-    hits.append(now)
-    _recovery_hits[key] = hits
-    return len(hits) <= limit_per_hour
+def _recovery_rate_ok(db: DBSession, key: str, limit_per_hour: int) -> bool:
+    # Database-backed so the limit holds across gunicorn workers and restarts
+    # (a per-process dict doubled it with 2 workers and reset on deploy).
+    from ..services_rate_limit import hit
+    return hit(db, f"recovery:{key}", limit=limit_per_hour, window_seconds=3600)
 
 
 def reset_recovery_limiter() -> None:
-    _recovery_hits.clear()
+    """Test/E2E helper: clear every recovery bucket."""
+    from ..database import SessionLocal
+    from ..models import RateLimitBucket
+    db = SessionLocal()
+    try:
+        db.query(RateLimitBucket).filter(RateLimitBucket.key.like("recovery:%")).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
 from ..services import audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -544,7 +547,7 @@ def forgot_code(body: ForgotCodeIn, request: Request, db: DBSession = Depends(ge
     ip = real_client_ip(request) or "unknown"
     addr = (body.email or "").strip().lower()
 
-    if not _recovery_rate_ok(f"ip:{ip}", 5) or (addr and not _recovery_rate_ok(f"em:{addr}", 3)):
+    if not _recovery_rate_ok(db, f"ip:{ip}", 5) or (addr and not _recovery_rate_ok(db, f"em:{addr}", 3)):
         # Even the rate-limit response is the constant body: a distinct 429
         # would itself confirm that an address is worth guessing at.
         return _FORGOT_RESPONSE

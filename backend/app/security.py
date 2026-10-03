@@ -62,40 +62,19 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-# ── Simple in-memory login rate limiter / lockout ──
-# Production: replace with Redis (REDIS_URL) so limits hold across workers.
-_attempts: dict[str, list[float]] = {}
-_lockouts: dict[str, float] = {}
-
-
-def login_blocked(key: str) -> bool:
-    until = _lockouts.get(key)
-    if until and time.time() < until:
-        return True
-    if until and time.time() >= until:
-        _lockouts.pop(key, None)
-        _attempts.pop(key, None)
-    return False
-
-
-def record_login_failure(key: str) -> None:
-    now = time.time()
-    window = settings.LOGIN_WINDOW_SEC
-    arr = [t for t in _attempts.get(key, []) if now - t < window]
-    arr.append(now)
-    _attempts[key] = arr
-    if len(arr) >= settings.LOGIN_MAX_ATTEMPTS:
-        _lockouts[key] = now + settings.LOGIN_LOCKOUT_SEC
-
-
-def record_login_success(key: str) -> None:
-    _attempts.pop(key, None)
-    _lockouts.pop(key, None)
+# The login limiter/lockout is database-backed (login_blocked_db and friends
+# below). An in-memory version that lived here had no callers and was removed.
 
 
 def reset_rate_limiter() -> None:
-    _attempts.clear()
-    _lockouts.clear()
+    """Clear shared rate-limit buckets (tests and the non-production reset endpoint)."""
+    from .database import SessionLocal
+    from .services_rate_limit import reset_all
+    db = SessionLocal()
+    try:
+        reset_all(db)
+    finally:
+        db.close()
 
 
 # ── Per-IP general API rate limiter (non-login endpoints) ───────────────────

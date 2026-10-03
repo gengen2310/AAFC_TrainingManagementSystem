@@ -23,7 +23,7 @@ from .training import (
 )
 from .operations import (
     ActionItem, Exception, AuditLog, ImportLog, ExportLog, SystemSetting, CadetMemberImportBatch,
-    IdempotencyKey,
+    IdempotencyKey, RateLimitBucket,
 )
 from .program import (
     Phase, ProgramPackage, ProgramItem, LearningHubResource, ProgramItemDeployment,
