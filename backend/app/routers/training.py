@@ -5433,6 +5433,32 @@ def restore_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal =
 
 # ── CURRICULUM BULK IMPORT ────────────────────────────────────────────────────
 
+def _facilitator_name_index(facilitators) -> dict[str, str]:
+    """Lower-cased name -> facilitator id, for linking workbook rows by name.
+
+    Facilitator has no display_name (reading it crashed every squadron-scoped
+    import with 500). Each facilitator is indexed under the codebase's display
+    form "rank first last" and under "first last". A key two facilitators share
+    is dropped entirely, so an ambiguous name links nobody rather than the
+    wrong person.
+    """
+    index: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for f in facilitators:
+        names = {" ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x),
+                 " ".join(x for x in [f.first_name, f.last_name] if x)}
+        for name in names:
+            key = name.strip().lower()
+            if not key:
+                continue
+            if key in index and index[key] != f.id:
+                ambiguous.add(key)
+            index[key] = f.id
+    for key in ambiguous:
+        index.pop(key, None)
+    return index
+
+
 @router.post("/curriculum/import")
 def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                       p: Principal = Depends(get_principal)):
@@ -5496,10 +5522,8 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     fac_by_name: dict[str, str] = {}  # display_name -> id
     room_by_name: dict[str, str] = {}  # name -> id
     if sqn_id:
-        for f in db.query(Facilitator).filter(Facilitator.squadron_id == sqn_id).all():
-            key = (f.display_name or "").strip().lower()
-            if key:
-                fac_by_name[key] = f.id
+        fac_by_name = _facilitator_name_index(
+            db.query(Facilitator).filter(Facilitator.squadron_id == sqn_id).all())
         for r in db.query(TrainingArea).filter(TrainingArea.squadron_id == sqn_id).all():
             key = (r.name or "").strip().lower()
             if key:
