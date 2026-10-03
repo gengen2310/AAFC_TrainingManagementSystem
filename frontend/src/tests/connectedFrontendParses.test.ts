@@ -16,6 +16,11 @@ import html from "../../../connected-frontend/index.html?raw";
  */
 const source: string = html as unknown as string;
 
+// Modules extracted out of index.html into connected-frontend/js/ must parse
+// too: a syntax error there breaks the feature the same way.
+const modules = import.meta.glob("../../../connected-frontend/js/*.js",
+  { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+
 const blocks = [...source.matchAll(
   /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 
@@ -36,6 +41,16 @@ describe("connected-frontend/index.html", () => {
       }
     });
     expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("every extracted js/ module parses and is loaded by index.html", () => {
+    const names = Object.keys(modules);
+    expect(names.length).toBeGreaterThan(0);
+    for (const [path, src] of Object.entries(modules)) {
+      expect(() => new Function(src), path).not.toThrow();
+      const file = path.split("/").pop();
+      expect(source, `${file} is not referenced by index.html`).toContain(`<script src="js/${file}"></script>`);
+    }
   });
 
   it("leaves no function declared with nothing calling it", () => {
