@@ -11,15 +11,19 @@ where the implementation or product decision is absent.
 
 Production uses the scheduled PostgreSQL workflow in
 `.github/workflows/backup-postgresql.yml`, not the old SQLite pilot copy
-procedure. The production dump is checksum-protected, GPG-encrypted, retained
-as a private Actions artifact for 30 days, and has a separate automated restore
+procedure. The production dump is checksum-protected, GPG-encrypted and
+retained as an Actions artifact for 30 days. The repository is public, so the
+encrypted artifact is downloadable by any signed-in GitHub user; see
+`docs/backup_and_restore.md` "Known risks". It has a separate automated restore
 test. Staging uses separate secrets/workflows.
 
 The System Console's `last_backup_at` describes only a backup initiated
 through the application. It is not a global "last scheduled backup" indicator.
 
-Remaining operational evidence gap: automated restore has release evidence;
-the documented literal human manual DR drill is still a separate task.
+Automated restore evidence: scheduled runs failed 2026-09-13 to 2026-09-27
+(verification defects, not bad backups); the first fully verified run is
+37132802899 on 2026-10-03, which also upgraded production's v64 data to head.
+The documented literal human manual DR drill is still a separate task.
 
 ## Service Desk — new-ticket notification
 
