@@ -158,6 +158,11 @@ def lookup(body: LookupIn, request: Request, db: DBSession = Depends(get_db)):
     return {"user_id": user.id, "display_name": user.display_name}
 
 
+# Environments where code-only (scan-all) login is permitted. Never staging or
+# production: see login().
+_CODE_ONLY_LOGIN_ENVS = frozenset({"development", "test"})
+
+
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, db: DBSession = Depends(get_db)):
     key = real_client_ip(request)
@@ -196,7 +201,18 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         else:
             matched = ac
     else:
-        # Legacy scan-all path (used by tests; production always provides user_id via /lookup).
+        # Code-only login verifies the code against EVERY active account (one
+        # slow hash each) and can only check per-account lockout after a match,
+        # so failures never lock anything. It exists for local tooling and the
+        # test suite. Everywhere else -- staging and production, including a
+        # production service mislabelled ENVIRONMENT=staging -- it is refused
+        # before any hash is computed; every real client sends user_id from
+        # /api/auth/lookup. The refusal still counts against the IP.
+        if (settings.ENVIRONMENT or "").strip().lower() not in _CODE_ONLY_LOGIN_ENVS:
+            record_login_failure_db(key, db)
+            raise HTTPException(422, detail={
+                "error": "user_id_required",
+                "message": "Sign in through account lookup (unit and role) first."})
         matched = None
         for ac in db.query(AccessCode).filter(AccessCode.active_status == True).all():  # noqa: E712
             if verify_code(code, ac.code_hash):
@@ -208,9 +224,8 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         _raise_if_locked(matched)
         # R5-L04 (note): the scan-all path cannot increment a per-account counter on
         # failure because no account is identified until the code matches. IP-level
-        # throttle (record_login_failure_db above) is the only defence on this path.
-        # This path is test-only; production always provides user_id via /lookup,
-        # which takes the per-account counter path above.
+        # throttle (record_login_failure_db above) is the only defence on this path,
+        # which is why it is confined to development/test (enforced above).
 
     record_login_success_db(key, db)
     user = db.get(User, matched.user_id)
