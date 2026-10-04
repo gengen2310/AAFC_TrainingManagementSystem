@@ -44,6 +44,24 @@ def is_read_only_role(p: "Principal") -> bool:
     return p.role in READ_ONLY_ROLES
 
 
+def may_view_cadet_records(p: "Principal") -> bool:
+    """Cadet personal and training records (cadet list, risk, class
+    membership and rosters, training-record matrix/export, a cadet's record,
+    sessions needing attention). sqn_general is excluded; every other role
+    still passes its own scope checks afterwards.
+
+    Policy question open with the product owner: whether sqn_general, a
+    read-only Squadron role, is meant to be refused these reads. This is the
+    one place that decides it."""
+    return p.role != "sqn_general"
+
+
+def may_record_session_outcomes(p: "Principal") -> bool:
+    """Deliver / cancel / reschedule a session. sqn_general is excluded; the
+    session write checks that follow apply to everyone else."""
+    return p.role != "sqn_general"
+
+
 @dataclass
 class Principal:
     user_id: str

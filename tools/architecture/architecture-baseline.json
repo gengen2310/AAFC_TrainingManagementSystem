@@ -25,7 +25,7 @@
     "backend/app/routers/setup.py": 1,
     "backend/app/routers/system.py": 0,
     "backend/app/routers/timing.py": 0,
-    "backend/app/routers/training.py": 28,
+    "backend/app/routers/training.py": 16,
     "backend/app/routers/wing_calendar.py": 7
   },
   "router_cross_imports": {}
