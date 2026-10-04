@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import sqlalchemy.exc as _sa_exc
 from fastapi.encoders import ENCODERS_BY_TYPE
 import datetime as _dt
 from datetime import timezone as _tzmod
@@ -416,6 +417,58 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# ── Request concurrency cap (per worker) ────────────────────────────────────
+# Defined after the other @app.middleware functions, so it wraps every
+# DB-using middleware (CORS, added below, stays outermost). Prevents the
+# thread-pool / connection-pool deadlock found at national scale: FastAPI runs
+# a sync dependency (get_principal: holds a DB connection) and the sync
+# endpoint as separate thread-pool jobs, so a request holds its connection
+# while waiting for a thread; under overload the connections were held by
+# requests waiting for threads and the threads by requests waiting for
+# connections, and the worker stayed wedged even after load stopped. With at
+# most REQUEST_CONCURRENCY (default DB_POOL_SIZE; the overflow is left for the
+# few nested sessions) requests in flight, every admitted request can get its
+# connection; the rest wait here asynchronously -- holding neither a thread
+# nor a connection -- and get 503 if the wait exceeds REQUEST_QUEUE_TIMEOUT_SEC.
+_CONCURRENCY_EXEMPT = frozenset({"/api/health", "/healthz"})
+_request_slots = None
+
+
+def reset_request_slots() -> None:
+    """Re-read REQUEST_CONCURRENCY (tests)."""
+    global _request_slots
+    _request_slots = None
+
+
+def _busy() -> JSONResponse:
+    return JSONResponse(status_code=503, headers={"Retry-After": "5"}, content={
+        "error": "server_busy", "message": "The service is busy. Please try again in a few seconds."})
+
+
+@app.middleware("http")
+async def request_concurrency_cap(request: Request, call_next):
+    import asyncio
+    global _request_slots
+    if request.url.path in _CONCURRENCY_EXEMPT:
+        return await call_next(request)
+    if _request_slots is None:
+        _request_slots = asyncio.Semaphore(settings.REQUEST_CONCURRENCY or settings.DB_POOL_SIZE)
+    try:
+        await asyncio.wait_for(_request_slots.acquire(), timeout=settings.REQUEST_QUEUE_TIMEOUT_SEC)
+    except asyncio.TimeoutError:
+        logging.getLogger("capacity").warning('{"event":"request_queue_timeout","path":"%s"}', request.url.path)
+        return _busy()
+    try:
+        return await call_next(request)
+    except _sa_exc.TimeoutError:
+        # Raised in a middleware below the exception handlers (e.g. the DB-backed
+        # rate limiter): still overload, not an internal error.
+        logging.getLogger("capacity").warning('{"event":"db_pool_exhausted","path":"%s"}', request.url.path)
+        return _busy()
+    finally:
+        _request_slots.release()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -432,6 +485,20 @@ for r in (health.router, auth.router, organisations.router, accounts.router,
     app.include_router(r)
 
 app.include_router(custom_phases_router, prefix="/api")
+
+
+@app.exception_handler(_sa_exc.TimeoutError)
+async def db_pool_exhausted(request: Request, exc: Exception):
+    """Every pooled DB connection is busy and the wait (DB_POOL_TIMEOUT) ran out.
+
+    That is overload, not a code defect: answer 503 + Retry-After so clients
+    back off and monitoring points at capacity. National qualification at 250
+    users produced 178 such failures as opaque 500 "internal_error"."""
+    logging.getLogger("capacity").warning(
+        '{"event":"db_pool_exhausted","path":"%s","pool_size":%d,"max_overflow":%d,"timeout_s":%d}',
+        request.url.path, settings.DB_POOL_SIZE, settings.DB_POOL_MAX_OVERFLOW, settings.DB_POOL_TIMEOUT)
+    return JSONResponse(status_code=503, headers={"Retry-After": "5"}, content={
+        "error": "server_busy", "message": "The service is busy. Please try again in a few seconds."})
 
 
 @app.exception_handler(500)
