@@ -21,6 +21,14 @@ const source: string = html as unknown as string;
 const modules = import.meta.glob("../../../connected-frontend/js/*.js",
   { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 
+// The production image's web root (Dockerfile COPY ... /usr/share/nginx/html/)
+// and the local run script must serve the same files. When #69 extracted js/
+// modules, the Dockerfile gained `COPY js/` but RUN_TMS_CONNECTED_FRONTEND_MAC.sh
+// still copied only index.html, so a local run had openModal/promptText
+// undefined and every dialog failed.
+import dockerfile from "../../../connected-frontend/Dockerfile?raw";
+import runScript from "../../../RUN_TMS_CONNECTED_FRONTEND_MAC.sh?raw";
+
 const blocks = [...source.matchAll(
   /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 
@@ -50,6 +58,16 @@ describe("connected-frontend/index.html", () => {
       expect(() => new Function(src), path).not.toThrow();
       const file = path.split("/").pop();
       expect(source, `${file} is not referenced by index.html`).toContain(`<script src="js/${file}"></script>`);
+    }
+  });
+
+  it("the local run script serves everything the production image serves", () => {
+    const served = [...(dockerfile as unknown as string).matchAll(
+      /^COPY\s+(\S+)\s+\/usr\/share\/nginx\/html\//gm)].map(m => m[1].replace(/\/$/, ""));
+    expect(served).toEqual(expect.arrayContaining(["index.html", "js"]));
+    for (const path of served) {
+      expect(runScript as unknown as string, `local run script does not serve ${path}`)
+        .toContain(`"$SRC_DIR/${path}"`);
     }
   });
 
