@@ -122,25 +122,50 @@ def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
 # Response serialiser (never includes code_hash)
 # ─────────────────────────────────────────────
 
-def _account_out(u: User, db: DBSession) -> dict:
-    ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
-                                     AccessCode.active_status == True).first()  # noqa: E712
+def _accounts_context(db: DBSession, users: list) -> dict:
+    """Pre-load what _account_out() needs for MANY accounts in a constant number
+    of queries. Per-account lookups cost ~3 queries per account (measured: 419
+    queries for /api/accounts on the national qualification dataset)."""
+    ids = [u.id for u in users]
+    ctx: dict = {"code": {}, "sqn": {}, "wing": {}, "nat": {}, "flight": {}}
+    if not ids:
+        return ctx
+    for ac in (db.query(AccessCode).filter(AccessCode.user_id.in_(ids), AccessCode.active_status == True)  # noqa: E712
+               .order_by(AccessCode.user_id, AccessCode.created_at).all()):
+        ctx["code"].setdefault(ac.user_id, ac)
+    for key, model, attr in (("sqn", Squadron, "squadron_id"), ("wing", Wing, "wing_id"),
+                             ("nat", NationalEntity, "national_id"), ("flight", Flight, "flight_id")):
+        wanted = {getattr(u, attr) for u in users if getattr(u, attr)}
+        if wanted:
+            ctx[key] = {o.id: o for o in db.query(model).filter(model.id.in_(wanted)).all()}
+    return ctx
+
+
+def _account_out(u: User, db: DBSession, ctx: "dict | None" = None) -> dict:
+    if ctx is not None:
+        ac = ctx["code"].get(u.id)
+    else:
+        ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
+                                         AccessCode.active_status == True).first()  # noqa: E712
+
+    def _get(key, model, oid):
+        return ctx[key].get(oid) if ctx is not None else db.get(model, oid)
     # Resolve unit names
     sqn_code = sqn_name = wing_code = wing_name = nat_name = flight_name = None
     if u.squadron_id:
-        s = db.get(Squadron, u.squadron_id)
+        s = _get("sqn", Squadron, u.squadron_id)
         if s:
             sqn_code, sqn_name = s.code, s.name
     if u.wing_id:
-        w = db.get(Wing, u.wing_id)
+        w = _get("wing", Wing, u.wing_id)
         if w:
             wing_code, wing_name = w.code, w.name
     if u.national_id:
-        n = db.get(NationalEntity, u.national_id)
+        n = _get("nat", NationalEntity, u.national_id)
         if n:
             nat_name = n.short_name
     if u.flight_id:
-        fl = db.get(Flight, u.flight_id)
+        fl = _get("flight", Flight, u.flight_id)
         if fl:
             flight_name = fl.name
 
@@ -313,7 +338,8 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
         q = q.filter(User.active_status == active_status)
 
     users = q.order_by(User.display_name).all()
-    return [_account_out(u, db) for u in users]
+    ctx = _accounts_context(db, users)
+    return [_account_out(u, db, ctx) for u in users]
 
 
 @router.post("/accounts")
