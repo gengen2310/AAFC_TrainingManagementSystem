@@ -159,7 +159,7 @@ number; bulk CEA import and attendance write bursts under load.
 
 A release is structurally mature only when all of these hold:
 
-- [ ] clean clone -> documented local startup works (to be re-walked)
+- [x] clean clone -> documented local startup works (walked 2026-10-04 on a fresh clone; `README.md` written from it, every command run; the June setup guide labelled historical)
 - [x] full automated suites pass (backend 2575/12 skipped; browser 3 engines)
 - [x] migrations upgrade/rollback in rehearsal (SQLite + PostgreSQL 18)
 - [x] backup restore demonstrated (restore run 37132802899, real production data)
