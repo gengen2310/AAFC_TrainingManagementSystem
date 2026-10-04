@@ -5,6 +5,7 @@ from sqlalchemy import or_, and_
 
 from ..database import get_db
 from ..dependencies import get_principal
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import is_national_admin, is_wing_writer  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_role
@@ -157,7 +158,7 @@ def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
     identifiable national, so only system_admin may mutate it -- guessing an
     owner would let one national edit another's reference data."""
     if ph.scope_type == "squadron":
-        if p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
+        if sqn_admin_outside_own_squadron(p, ph.scope_id):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
         if p.role in ("wing_admin", "national_admin"):
             raise HTTPException(403, detail={"error": "insufficient_scope"})

@@ -48,6 +48,7 @@ from ..models.training import (
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                            require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
@@ -6169,7 +6170,7 @@ def classify_cea_activity(
     # their own squadron's manual activity, but must never be able to
     # overwrite a wing-wide CEA activity's classification for every
     # squadron in the wing at once.
-    if act.unit_id != p.squadron_id and p.role == "sqn_admin":
+    if sqn_admin_outside_own_squadron(p, act.unit_id):
         raise HTTPException(403, detail={
             "error": "wing_wide_activity",
             "message": "Only a Wing Admin or higher can classify a wing-wide CEA activity.",

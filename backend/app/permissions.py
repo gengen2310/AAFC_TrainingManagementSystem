@@ -45,6 +45,13 @@ def is_read_only_role(p: "Principal") -> bool:
     return p.role in READ_ONLY_ROLES
 
 
+def sqn_admin_outside_own_squadron(p: "Principal", squadron_id: str | None) -> bool:
+    """True when a Squadron Admin is acting on a target outside their own
+    Squadron (the Squadron counterpart of wing_admin_outside_own_wing). Each
+    caller keeps its own error response."""
+    return p.role == "sqn_admin" and squadron_id != p.squadron_id
+
+
 def has_known_role(p: "Principal") -> bool:
     """Any recognised role. Gates written as "role in <every role>" only refuse
     a principal whose role is unrecognised (corrupt or retired)."""

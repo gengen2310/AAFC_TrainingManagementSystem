@@ -33,6 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import has_known_role, is_national_admin  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
@@ -99,7 +100,7 @@ def _validate_create_scope(p: Principal, target_role: str,
         if wing_admin_outside_own_wing(p, sqn.wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts for SQNs in their Wing."})
-        if p.role == "sqn_admin" and sqn_id != p.squadron_id:
+        if sqn_admin_outside_own_squadron(p, sqn_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "SQN Admin can only create accounts in their own Squadron."})
 
