@@ -54,6 +54,7 @@ from ..permissions import (Principal, resolve_view_squadron_id,
 from ..services import audit
 from ..services import (visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
+from ..services_parade_dates import ParadeDateRuleError, classify_parade_dates
 from ..services_year import (
     PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
     selectable_years, year_display_name, year_state,
@@ -1199,169 +1200,28 @@ def add_parade_date(
     return _night_out_as_date(pn)
 
 
-def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
-    """Return ISO date strings that should become parade dates given the body parameters.
-
-    Supports weekly, fortnightly, monthly (first weekday in month), and daily frequencies.
-    excluded_dates and max_repeats are applied here. Holiday exclusion is optional.
-    """
+def _classify_parade_dates(body: GenerateParadeDatesIn, holidays: list) -> list[dict]:
+    """HTTP adapter over services_parade_dates.classify_parade_dates -- the one
+    recurrence rule shared by preview and generate (see that module)."""
     try:
-        start = date.fromisoformat(body.start_date)
-    except ValueError:
-        raise HTTPException(400, detail={"error": "invalid_date_format"})
+        return classify_parade_dates(
+            weekday=body.weekday, start_date=body.start_date, end_date=body.end_date,
+            frequency=body.frequency, excluded_dates=body.excluded_dates,
+            exclude_holidays=body.exclude_holidays, max_repeats=body.max_repeats,
+            holidays=holidays,
+        )
+    except ParadeDateRuleError as e:
+        raise HTTPException(400, detail={"error": e.code, "message": e.message})
 
-    end: date | None = None
-    if body.end_date:
-        try:
-            end = date.fromisoformat(body.end_date)
-        except ValueError:
-            raise HTTPException(400, detail={"error": "invalid_date_format"})
 
-    if end is None and body.max_repeats is None:
-        raise HTTPException(400, detail={
-            "error": "end_date_or_max_repeats_required",
-            "message": "Provide either end_date or max_repeats.",
-        })
-
-    excluded_set = set(body.excluded_dates or [])
-
-    def in_holiday(d: date) -> bool:
-        ds = d.isoformat()
-        return any(h.start_date <= ds <= h.end_date for h in holidays)
-
-    freq = (body.frequency or "weekly").lower()
-    candidates: list[str] = []
-    d = start
-    last_occurrence: date | None = None
-
-    while True:
-        if end and d > end:
-            break
-        if body.max_repeats is not None and len(candidates) >= body.max_repeats:
-            break
-
-        include = False
-        if freq == "daily":
-            include = True
-        elif freq in ("weekly", "fortnightly"):
-            if d.weekday() == body.weekday:
-                if freq == "weekly":
-                    include = True
-                else:
-                    # fortnightly: every second occurrence
-                    if last_occurrence is None or (d - last_occurrence).days >= 14:
-                        include = True
-        elif freq == "monthly":
-            # First occurrence of weekday in the calendar month
-            if d.weekday() == body.weekday:
-                # Is this the first occurrence of this weekday in the month?
-                if d.day <= 7:
-                    include = True
-        elif freq == "yearly":
-            # Same calendar month/day as the start date, each year.
-            if d.month == start.month and d.day == start.day:
-                include = True
-        else:
-            # Unknown frequency falls back to weekly
-            if d.weekday() == body.weekday:
-                include = True
-
-        if include:
-            ds = d.isoformat()
-            skip = ds in excluded_set
-            if body.exclude_holidays and in_holiday(d):
-                skip = True
-            if not skip:
-                candidates.append(ds)
-                last_occurrence = d
-
-        d += timedelta(days=1)
-
-    return candidates
+def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
+    """The dates generate-parade-dates creates: exactly the preview's will_create rows."""
+    return [r["date"] for r in _classify_parade_dates(body, holidays) if r["status"] == "will_create"]
 
 
 def _compute_candidate_dates_classified(body: GenerateParadeDatesIn, holidays: list) -> list[dict]:
-    """Like _compute_candidate_dates, but returns every date the recurrence
-    pattern touches (not just the ones that would be created), each tagged
-    with why it would or would not be created.
-
-    original_instruction.md Section 9 requires the preview to classify each
-    candidate rather than silently dropping holiday-conflicting and
-    explicitly-skipped dates from the list with no explanation. This is a
-    read-only, additive sibling of _compute_candidate_dates -- the write path
-    (generate_parade_dates) still calls the original function unchanged, so
-    this cannot alter what actually gets created.
-    """
-    try:
-        start = date.fromisoformat(body.start_date)
-    except ValueError:
-        raise HTTPException(400, detail={"error": "invalid_date_format"})
-
-    end: date | None = None
-    if body.end_date:
-        try:
-            end = date.fromisoformat(body.end_date)
-        except ValueError:
-            raise HTTPException(400, detail={"error": "invalid_date_format"})
-
-    if end is None and body.max_repeats is None:
-        raise HTTPException(400, detail={
-            "error": "end_date_or_max_repeats_required",
-            "message": "Provide either end_date or max_repeats.",
-        })
-
-    excluded_set = set(body.excluded_dates or [])
-
-    def in_holiday(d: date) -> bool:
-        ds = d.isoformat()
-        return any(h.start_date <= ds <= h.end_date for h in holidays)
-
-    freq = (body.frequency or "weekly").lower()
-    rows: list[dict] = []
-    included_count = 0
-    d = start
-    last_occurrence: date | None = None
-
-    while True:
-        if end and d > end:
-            break
-        if body.max_repeats is not None and included_count >= body.max_repeats:
-            break
-
-        include = False
-        if freq == "daily":
-            include = True
-        elif freq in ("weekly", "fortnightly"):
-            if d.weekday() == body.weekday:
-                if freq == "weekly":
-                    include = True
-                else:
-                    if last_occurrence is None or (d - last_occurrence).days >= 14:
-                        include = True
-        elif freq == "monthly":
-            if d.weekday() == body.weekday and d.day <= 7:
-                include = True
-        elif freq == "yearly":
-            if d.month == start.month and d.day == start.day:
-                include = True
-        else:
-            if d.weekday() == body.weekday:
-                include = True
-
-        if include:
-            ds = d.isoformat()
-            if ds in excluded_set:
-                rows.append({"date": ds, "status": "explicitly_skipped"})
-            elif body.exclude_holidays and in_holiday(d):
-                rows.append({"date": ds, "status": "holiday_conflict"})
-            else:
-                rows.append({"date": ds, "status": "will_create"})
-                included_count += 1
-                last_occurrence = d
-
-        d += timedelta(days=1)
-
-    return rows
+    """Every date the pattern touches, classified (REM-10 preview)."""
+    return _classify_parade_dates(body, holidays)
 
 
 @router.post("/years/{year_id}/preview-parade-dates")
