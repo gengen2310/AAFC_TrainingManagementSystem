@@ -5,6 +5,7 @@ from sqlalchemy import or_, and_
 
 from ..database import get_db
 from ..dependencies import get_principal
+from ..permissions import is_national_admin, is_wing_writer  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_role
 from ..models.custom_phases import CustomTrainingPhase, CUSTOM_PHASE_SCOPE_TYPES
@@ -104,14 +105,14 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
     if body.scope_type == "squadron":
         scope_id = p.squadron_id
     elif body.scope_type == "wing":
-        if p.role not in ("wing_admin", "system_admin", "national_admin"):
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
         if p.role == "wing_admin":
             scope_id = p.wing_id  # force to own wing; ignore body.scope_id
         else:
             scope_id = body.scope_id or p.wing_id  # national_admin/system_admin may specify
     elif body.scope_type == "national":
-        if p.role not in ("national_admin", "system_admin"):
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
         # scope_id names the national entity. Forcing it to None (the pre-v61
         # behaviour) left _visible_phases nothing to filter on, so every
@@ -123,7 +124,7 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
         if not scope_id:
             raise HTTPException(400, detail={"error": "national_unresolved"})
     elif body.scope_type == "system":
-        if p.role not in ("national_admin", "system_admin"):
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
         # "system" is installation-wide, above any one national, so it is the
         # one scope that deliberately carries no scope_id.

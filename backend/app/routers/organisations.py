@@ -656,7 +656,7 @@ def enter_proxy(squadron_id: str, body: EnterIn, request: Request,
         if s.wing_id != p.wing_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
         mode = "proxy"
-    elif p.role in ("national_admin", "system_admin"):
+    elif is_national_admin(p):
         mode = "delegated_intervention"
     else:
         raise HTTPException(403, detail={"error": "forbidden"})

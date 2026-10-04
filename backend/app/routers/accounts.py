@@ -33,6 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
+from ..permissions import has_known_role, is_national_admin  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
 import re
@@ -55,8 +56,6 @@ router = APIRouter(prefix="/api", tags=["accounts"])
 # Which roles an actor may read/manage. sqn_general reads its own squadron's
 # accounts read-only (2026-09-28 product decision); scope is enforced below
 # (list filter + _can_read_account) and writes stay behind the central write-role policy.
-_READ_ROLES = {"sqn_admin", "sqn_general", "wing_viewer", "wing_admin",
-               "national_viewer", "national_admin", "system_admin", "auditor"}
 
 
 # ─────────────────────────────────────────────
@@ -309,7 +308,7 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
                   flight_id: str | None = None, role: str | None = None,
                   active_status: bool | None = None, include_archived: bool = False,
                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     q = db.query(User)
     if not include_archived:
@@ -468,7 +467,7 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
 
 @router.get("/accounts/{uid}")
 def get_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     u = db.get(User, uid)
     if not u or u.is_archived:
@@ -1088,7 +1087,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
 
 def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
     """Only sqn_admin (own SQN), wing_admin (own Wing), nat_admin, system_admin."""
-    if p.role in ("national_admin", "system_admin"):
+    if is_national_admin(p):
         return
     if p.role == "wing_admin":
         sqn = db.get(Squadron, sqn_id)

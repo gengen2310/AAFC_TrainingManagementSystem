@@ -35,3 +35,11 @@ def test_is_squadron_equals_the_old_squadron_tuple():
     # Replaced 11 inline `p.role in ("sqn_admin", "sqn_general")` scope checks.
     for r in P.ROLES:
         assert _p(r).is_squadron == (r in ("sqn_admin", "sqn_general")), r
+
+
+def test_has_known_role_admits_every_role_and_refuses_an_unknown_one():
+    # Replaced router-local _READ_ROLES sets (accounts, wing_calendar) that
+    # listed every role; the gate only ever refused an unrecognised role.
+    for r in P.ROLES:
+        assert P.has_known_role(_p(r)), r
+    assert not P.has_known_role(_p("retired_role"))

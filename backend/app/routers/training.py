@@ -5039,7 +5039,7 @@ def _can_create_phase(p: Principal, scope_level: str,
             if squadron_id and squadron_id != p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "out_of_scope",
                                                   "message": "Can only create a squadron-scope phase for the squadron currently in Proxy Mode."})
-        elif p.role in ("national_admin", "system_admin"):
+        elif is_national_admin(p):
             if not p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "intervention_required",
                                                   "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope phase."})

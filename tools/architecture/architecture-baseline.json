@@ -10,23 +10,23 @@
   },
   "router_direct_role_checks": {
     "backend/app/routers/__init__.py": 0,
-    "backend/app/routers/accounts.py": 7,
+    "backend/app/routers/accounts.py": 4,
     "backend/app/routers/auth.py": 0,
-    "backend/app/routers/custom_phases.py": 8,
+    "backend/app/routers/custom_phases.py": 5,
     "backend/app/routers/dashboard.py": 0,
     "backend/app/routers/export_import.py": 0,
     "backend/app/routers/health.py": 0,
     "backend/app/routers/jobs.py": 1,
     "backend/app/routers/ops.py": 0,
-    "backend/app/routers/organisations.py": 5,
+    "backend/app/routers/organisations.py": 4,
     "backend/app/routers/planning.py": 7,
     "backend/app/routers/search.py": 4,
     "backend/app/routers/service_desk.py": 8,
     "backend/app/routers/setup.py": 1,
     "backend/app/routers/system.py": 0,
     "backend/app/routers/timing.py": 0,
-    "backend/app/routers/training.py": 12,
-    "backend/app/routers/wing_calendar.py": 4
+    "backend/app/routers/training.py": 11,
+    "backend/app/routers/wing_calendar.py": 1
   },
   "router_cross_imports": {}
 }

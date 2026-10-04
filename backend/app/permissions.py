@@ -45,6 +45,12 @@ def is_read_only_role(p: "Principal") -> bool:
     return p.role in READ_ONLY_ROLES
 
 
+def has_known_role(p: "Principal") -> bool:
+    """Any recognised role. Gates written as "role in <every role>" only refuse
+    a principal whose role is unrecognised (corrupt or retired)."""
+    return p.role in ROLES
+
+
 def wing_admin_outside_own_wing(p: "Principal", wing_id: str | None) -> bool:
     """True when a Wing Admin is acting on a target outside their own Wing.
 
