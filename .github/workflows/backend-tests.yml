@@ -88,6 +88,9 @@ jobs:
       - name: Verify shared design-token sync
         run: python scripts/check_token_sync.py
 
+      - name: Verify staging restore test matches production
+        run: python scripts/check_restore_workflow_sync.py
+
       - name: Self-test the architecture guard
         run: python -m unittest discover -s tools/architecture -p "test_*.py"
 

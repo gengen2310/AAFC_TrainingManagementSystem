@@ -587,7 +587,7 @@ jobs:
         run: |
           echo "Restore test SKIPPED — no backup artifact available."
           echo "Trigger the backup workflow to create one:"
-          echo "  Actions → PostgreSQL Backup — Daily → Run workflow"
+          echo "  Actions → PostgreSQL Backup — Production — Daily → Run workflow"
 
       # ── 10. Clean up ALL plaintext files (always, even on failure) ───────────
       - name: Clean up plaintext files

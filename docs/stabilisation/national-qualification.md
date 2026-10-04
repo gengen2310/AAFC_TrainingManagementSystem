@@ -67,7 +67,8 @@ Saturated throughput rose from 82 to 121 req/s after the report fixes.
 | Event | Result |
 |---|---|
 | Maintenance enabled (20 s drain) | PENDING: writes continue (3 boundary 503s); LOCKED: all 103 writes 503, reads continue; 0 × 500 |
-| Maintenance disabled | 2 writes 503 for up to 10 s on the other worker (per-worker cache TTL, documented) |
+| Maintenance disabled | Before #71: the other worker kept refusing writes until its 10 s cache expired (re-drill on 2 workers: 57 of 192 writes refused, the last 7.8 s after switching off). After #71 (re-read the state before refusing): 0 of 184 refused. |
+| Maintenance enabled with no drain window (`drain_seconds=0`) | A worker whose cache still says OFF can accept writes for up to 10 s (2 of 40 in the drill). This is by design: closing it would cost a database read on every write. The default drain window (PENDING) allows writes anyway. |
 | Worker SIGKILL | 0 failed requests; the supervisor respawned the worker |
 | PostgreSQL stopped 15 s | every request 503 `database_unavailable` (no internals exposed); pool recovered automatically, 0 errors after |
 

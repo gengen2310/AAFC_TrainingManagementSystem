@@ -27,16 +27,13 @@ from ..models.wing_calendar import (
     WING_EVENT_TYPES, PLANNING_IMPORTANCE_LEVELS, WING_EVENT_STATUS, SQN_STATUS_VALUES,
 )
 from ..dependencies import get_principal
+from ..permissions import has_known_role, is_wing_writer, is_writer  # noqa: E402
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, NATIONAL_LEVEL
 from ..services import audit
 
 router = APIRouter(prefix="/api/wing-calendar", tags=["wing-calendar"])
 
-_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
-_READ_ROLES  = frozenset({
-    "sqn_admin", "sqn_general", "wing_admin", "wing_viewer",
-    "national_admin", "national_viewer", "system_admin", "auditor",
-})
 
 
 # ─────────────────────────────────────────────────────────────
@@ -44,17 +41,17 @@ _READ_ROLES  = frozenset({
 # ─────────────────────────────────────────────────────────────
 
 def _require_write(p: Principal, wing_id: str) -> None:
-    if p.role not in _WRITE_ROLES:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
-    if p.role == "wing_admin" and p.wing_id != wing_id:
+    if wing_admin_outside_own_wing(p, wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
 
 
 def _require_read(p: Principal, wing_id: str) -> None:
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     # Scope enforcement for scoped roles
-    if p.role in ("sqn_admin", "sqn_general") and p.wing_id != wing_id:
+    if p.is_squadron and p.wing_id != wing_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if p.is_wing and p.wing_id != wing_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -630,7 +627,7 @@ def update_squadron_status(
     Only sqn_admin (or higher for their scope) can update their squadron's status.
     Status updates for 703SQN are independent from 704SQN.
     """
-    if p.role not in ("sqn_admin", "wing_admin", "national_admin", "system_admin"):
+    if not is_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
 
     e = _get_event_or_404(event_id, db)
@@ -715,7 +712,7 @@ def get_squadron_overlay(
     sqn_id = squadron_id or p.active_squadron_id
     if squadron_id and squadron_id != p.active_squadron_id:
         # Cross-squadron status lookup only allowed for wing/national/system scope
-        if p.role in ("sqn_admin", "sqn_general"):
+        if p.is_squadron:
             raise HTTPException(403, detail={"error": "out_of_scope"})
         if p.is_wing:
             sqn = db.get(Squadron, squadron_id)

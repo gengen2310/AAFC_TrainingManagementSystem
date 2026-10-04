@@ -4,6 +4,7 @@ No secrets are hard-coded. For production, set SECRET_KEY/JWT_SECRET to strong
 random values and DATABASE_URL to the PostgreSQL DSN.
 """
 from functools import lru_cache
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,8 +24,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # SQLite for local demo; PostgreSQL DSN for production.
-    DATABASE_URL: str = "sqlite:///./aafc_tms.db"
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # repr=False on every field that holds or embeds a credential: printing or
+    # logging Settings (or a traceback capturing it) must not reveal secrets.
+    DATABASE_URL: str = Field("sqlite:///./aafc_tms.db", repr=False)
+    REDIS_URL: str = Field("redis://localhost:6379/0", repr=False)
 
     # SQLAlchemy connection pool sizing (Postgres only; ignored for SQLite).
     # As of 2026-08 (GAP-18 fix, see deployment/backup-dr.md), production runs on
@@ -52,8 +55,8 @@ class Settings(BaseSettings):
     # Secrets — MUST be overridden in production via environment.
     # Dev defaults are ≥32 bytes to satisfy HS256 key-length requirements during local testing.
     # These values MUST be replaced with cryptographically random secrets in production.
-    SECRET_KEY: str = "dev-only-change-me-in-production-aafc"
-    JWT_SECRET: str = "dev-only-change-me-jwt-secret-aafc-tms"
+    SECRET_KEY: str = Field("dev-only-change-me-in-production-aafc", repr=False)
+    JWT_SECRET: str = Field("dev-only-change-me-jwt-secret-aafc-tms", repr=False)
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_TTL_MIN: int = 30
     REFRESH_TOKEN_TTL_MIN: int = 60 * 12
@@ -91,7 +94,7 @@ class Settings(BaseSettings):
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
-    SMTP_PASS: str = ""
+    SMTP_PASS: str = Field("", repr=False)
     SMTP_FROM: str = "no-reply@aafc-tms.ca"
 
     # URL for the Planning Workspace frontend (served separately).

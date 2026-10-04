@@ -19,7 +19,8 @@ from ..richtext import sanitize_rich_text
 from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
                                SessionAssistantFacilitator)
 from ..dependencies import get_principal, client_meta
-from ..permissions import is_national_admin, is_wing_writer, is_read_only_role, is_writer  # noqa: E402
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
+from ..permissions import is_national_admin, is_wing_writer, is_read_only_role, is_writer, may_record_session_outcomes, may_view_cadet_records  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
                           require_can_view_wing, require_can_write_activity, require_role, require_write_role, require_system_admin,
@@ -2065,7 +2066,7 @@ def create_cadet(body: CadetCreateIn, db: DBSession = Depends(get_db),
 
 @router.get("/cadets")
 def list_cadets(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = _active_squadron(p)
     rows = db.query(Cadet).filter(Cadet.squadron_id == sq_id, Cadet.is_archived == False).all()  # noqa: E712
@@ -2087,7 +2088,7 @@ def list_cadets(db: DBSession = Depends(get_db), p: Principal = Depends(get_prin
 
 @router.get("/cadets/risk")
 def cadet_risk(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = _active_squadron(p)
     rows = db.query(Cadet).filter(Cadet.squadron_id == sq_id, Cadet.is_archived == False).all()  # noqa: E712
@@ -2153,7 +2154,7 @@ def list_cadet_class_memberships(
     cadet_id: str, include_archived: bool = False,
     db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     _require_cadet_and_squadron(db, p, cadet_id, write=False)
     q = db.query(CadetClassMembership).filter(CadetClassMembership.cadet_id == cadet_id)
@@ -2242,7 +2243,7 @@ def archive_cadet_class_membership(
 def list_training_class_members(
     cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     tc = db.get(TrainingClass, cid)
     if not tc:
@@ -4352,7 +4353,7 @@ def get_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depen
         # (inherited) -- previously required require_can_view_wing, which
         # every squadron role always fails (can_view_wing has no squadron
         # branch at all), for the same reason as the national case above.
-        viewer_wing_id = p.wing_id if p.role in ("sqn_admin", "sqn_general") else None
+        viewer_wing_id = p.wing_id if p.is_squadron else None
         if not (p.can_view_wing(a.wing_id) or (viewer_wing_id and viewer_wing_id == a.wing_id)):
             require_can_view_wing(p, a.wing_id)  # always raises here; reuses its exact error message
         view_scope = "wing"
@@ -4853,7 +4854,7 @@ def _can_create_element(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing elements."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create elements for their own wing."})
     elif scope_level == "squadron":
@@ -5023,7 +5024,7 @@ def _can_create_phase(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing phases."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create phases for their own wing."})
     elif scope_level == "squadron":
@@ -5038,7 +5039,7 @@ def _can_create_phase(p: Principal, scope_level: str,
             if squadron_id and squadron_id != p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "out_of_scope",
                                                   "message": "Can only create a squadron-scope phase for the squadron currently in Proxy Mode."})
-        elif p.role in ("national_admin", "system_admin"):
+        elif is_national_admin(p):
             if not p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "intervention_required",
                                                   "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope phase."})
@@ -6026,7 +6027,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing tags."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create tags for their own wing."})
     else:  # squadron
@@ -7176,7 +7177,7 @@ def sessions_needs_attention(
     p: Principal = Depends(get_principal),
 ):
     """Past Sessions (parade_night.date < today) still in planned/published/cancelled-unresolved state."""
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = resolve_view_squadron_id(p, squadron_id, db)
     today_str = str(_date.today())
@@ -7311,7 +7312,7 @@ def deliver_session(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_record_session_outcomes(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     if not (body.delivery_note or "").strip():
         raise HTTPException(400, detail={"error": "delivery_note_required"})
@@ -7340,7 +7341,7 @@ def cancel_session_outcome(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_record_session_outcomes(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     if not (body.cancellation_reason or "").strip():
         raise HTTPException(400, detail={"error": "cancellation_reason_required"})
@@ -7368,7 +7369,7 @@ def reschedule_session(
     p: Principal = Depends(get_principal),
 ):
     import uuid as _uuid_mod
-    if p.role == "sqn_general":
+    if not may_record_session_outcomes(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     original = _require_session_write(db, p, session_id)
     if original.status not in ("cancelled", "cancelled_late"):
@@ -7524,7 +7525,7 @@ def training_class_roster(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     tc = db.get(TrainingClass, class_id)
     if not tc or tc.is_archived:
@@ -7673,7 +7674,7 @@ def training_records_matrix(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     from ..models.training import CadetSessionOutcome
 
@@ -7793,7 +7794,7 @@ def training_records_export(
     from fastapi.responses import StreamingResponse
     from ..models.training import CadetSessionOutcome
 
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     tc = db.get(TrainingClass, class_id)
     if not tc or tc.is_archived:
@@ -7904,7 +7905,7 @@ def cadet_training_record(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role == "sqn_general":
+    if not may_view_cadet_records(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     from ..models.training import CadetSessionOutcome
 

@@ -12,9 +12,15 @@
 #   3. Verifies SHA-256 integrity before restore.
 #   4. Restores into a DISPOSABLE PostgreSQL service container
 #      — never staging, never production.
-#   5. Verifies required tables, Alembic migration HEAD, and row counts.
-#   6. Reports pass / fail.
+#   5. Checks the restored Alembic revision belongs to this repository's
+#      migration graph, then rehearses `alembic upgrade head` on the copy.
+#   6. Verifies required tables, every ORM model table, row counts, and
+#      authenticated API reads through a temporary backend.
 #   7. Deletes all plaintext files even if a step fails.
+#
+# Everything below the header is generated from test-restore-postgresql.yml
+# (scripts/check_restore_workflow_sync.py; CI fails on drift). Edit the
+# production workflow, then run that script with --write.
 #
 # Prerequisites — GitHub Secrets:
 #   BACKUP_GPG_PRIVATE_KEY  — same key used by the production restore test.
@@ -27,7 +33,7 @@ on:
 
 permissions:
   contents: read
-  actions: read
+  actions: read             # required to list and download artifacts
 
 concurrency:
   group: postgresql-restore-test-staging
@@ -41,8 +47,9 @@ jobs:
 
     services:
       postgres:
-        # Must match the staging source server's major version
-        # (Railway's postgres-ssl:18 image).
+        # Must match the source server's major version (Railway's
+        # postgres-ssl:18 image) — pg_restore of a custom-format dump from a
+        # newer major version into an older server is not supported.
         image: postgres:18-alpine
         env:
           POSTGRES_USER: restore_user
@@ -67,6 +74,9 @@ jobs:
       PGDATABASE: aafc_tms_restore_test
 
     steps:
+      # ── 1. Install tools ────────────────────────────────────────────────────
+      # Match the backup workflow's client version (PGDG postgresql-client-18)
+      # so pg_restore is compatible with a custom-format dump taken by pg_dump 18.
       - name: Install tools
         run: |
           sudo apt-get update -qq
@@ -79,6 +89,7 @@ jobs:
           pg_restore --version
           gpg --version | head -1
 
+      # ── 2. Import GPG private key ────────────────────────────────────────────
       - name: Import GPG private key
         env:
           BACKUP_GPG_PRIVATE_KEY: ${{ secrets.BACKUP_GPG_PRIVATE_KEY }}
@@ -86,8 +97,11 @@ jobs:
         run: |
           if [ -z "$BACKUP_GPG_PRIVATE_KEY" ]; then
             echo "::error::BACKUP_GPG_PRIVATE_KEY secret is not set."
+            echo "::error::See deployment/backup-dr.md for setup."
             exit 1
           fi
+
+          # Import private key (non-interactively with passphrase)
           printf '%s' "$BACKUP_GPG_PRIVATE_KEY" \
             | base64 --decode \
             | gpg --batch \
@@ -95,20 +109,21 @@ jobs:
                   --passphrase-fd 3 \
                   --import \
             3< <(printf '%s' "$BACKUP_GPG_PASSPHRASE")
+
           gpg --list-secret-keys 2>/dev/null | grep -c 'sec' | grep -v '^0$' > /dev/null \
             || { echo '::error::Private key import failed — no secret keys found'; exit 1; }
           echo "GPG private key imported."
 
-      # Dynamic, not hardcoded — fails loudly if the migration chain
-      # branches instead of silently trusting a value that goes stale
-      # after every new migration.
-      - name: Checkout migration files
+      # ── 3. Determine expected Alembic head from the checked-out repo ────────
+      # Dynamic, not hardcoded — fails loudly if the migration chain branches
+      # instead of silently trusting a value that goes stale after every
+      # new migration.
+      - name: Checkout backend
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            backend/alembic/versions
-            backend/scripts/compute_alembic_head.py
-          sparse-checkout-cone-mode: false
+            backend
+          sparse-checkout-cone-mode: true
 
       - name: Compute expected Alembic head
         run: |
@@ -116,6 +131,7 @@ jobs:
           echo "Computed head: ${HEAD}"
           echo "EXPECTED_ALEMBIC_HEAD=${HEAD}" >> "$GITHUB_ENV"
 
+      # ── 4. Find most recent backup artifact ─────────────────────────────────
       - name: Find latest backup artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -145,6 +161,7 @@ jobs:
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "$GITHUB_ENV"
           echo "Found: ${ARTIFACT_NAME} (id=${ARTIFACT_ID}, created=${ARTIFACT_DATE})"
 
+      # ── 4. Download and unpack artifact ─────────────────────────────────────
       - name: Download artifact
         if: env.NO_BACKUP != 'true'
         env:
@@ -158,6 +175,7 @@ jobs:
           echo "Artifact contents:"
           ls -lh /tmp/restore_staging/
 
+          # Locate encrypted files
           ENCRYPTED_DUMP=$(find /tmp/restore_staging -name '*.dump.gpg' | head -1)
           ENCRYPTED_CHECKSUM=$(find /tmp/restore_staging -name '*.sha256.gpg' | head -1)
 
@@ -167,6 +185,7 @@ jobs:
           echo "ENCRYPTED_DUMP=${ENCRYPTED_DUMP}"         >> "$GITHUB_ENV"
           echo "ENCRYPTED_CHECKSUM=${ENCRYPTED_CHECKSUM}" >> "$GITHUB_ENV"
 
+      # ── 5. Decrypt dump and checksum ────────────────────────────────────────
       - name: Decrypt backup
         if: env.NO_BACKUP != 'true'
         env:
@@ -189,6 +208,7 @@ jobs:
           fi
           echo "Decrypted dump size: $(stat -c%s "$DECRYPTED_DUMP") bytes"
 
+          # Decrypt checksum if present
           if [ -n "$ENCRYPTED_CHECKSUM" ] && [ -f "$ENCRYPTED_CHECKSUM" ]; then
             DECRYPTED_CHECKSUM="/tmp/aafc_restore.sha256"
             echo "DECRYPTED_CHECKSUM=${DECRYPTED_CHECKSUM}" >> "$GITHUB_ENV"
@@ -203,9 +223,13 @@ jobs:
               || { echo '::warning::Could not decrypt checksum file — skipping integrity check'; }
           fi
 
+      # ── 6. Verify SHA-256 integrity ──────────────────────────────────────────
       - name: Verify dump integrity
         if: env.NO_BACKUP != 'true' && env.DECRYPTED_CHECKSUM != ''
         run: |
+          # sha256sum -c expects "hash  filename" in the checksum file.
+          # The stored checksum references the original /tmp/aafc_dump_*.dump path.
+          # Re-hash the decrypted file and compare manually.
           STORED_HASH=$(awk '{print $1}' "$DECRYPTED_CHECKSUM")
           ACTUAL_HASH=$(sha256sum "$DECRYPTED_DUMP" | awk '{print $1}')
 
@@ -217,9 +241,16 @@ jobs:
           fi
           echo "SHA-256 integrity check passed: ${ACTUAL_HASH}"
 
+      # ── 7. Restore into service container ───────────────────────────────────
       - name: Restore database
         if: env.NO_BACKUP != 'true'
         run: |
+          # --clean --if-exists: the target database already has a default
+          # `public` schema (every fresh Postgres database does) — without
+          # this, restoring a dump that explicitly includes `CREATE SCHEMA
+          # public;` fails with "schema already exists". --if-exists makes
+          # the preceding DROP statements tolerant of objects that aren't
+          # there yet on a truly empty database.
           pg_restore \
             --host="$PGHOST" \
             --port="$PGPORT" \
@@ -227,11 +258,78 @@ jobs:
             --dbname="$PGDATABASE" \
             --no-owner \
             --no-privileges \
+            --clean \
+            --if-exists \
             --exit-on-error \
             "$DECRYPTED_DUMP" \
             || { echo '::error::pg_restore failed'; exit 1; }
           echo "pg_restore completed."
 
+      # ── 7b. Identify the restored schema and rehearse the production upgrade ──
+      # Production legitimately lags main between releases, so the restored
+      # database is at production's revision, not this repo's head. The old
+      # check required restored == head and therefore failed every week
+      # (production at v64 a4e9507a9c51 vs head), so no restore was ever
+      # verified. Now: the restored revision must be a KNOWN revision of this
+      # repository's migration graph (unknown = foreign/corrupt schema = fail);
+      # the copy is then upgraded to head -- exactly what the next production
+      # deploy will do -- and every check below runs on the upgraded data.
+      # This is a disposable CI database; production is never touched.
+      - name: Set up Python
+        if: env.NO_BACKUP != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install backend dependencies
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        run: |
+          pip install -q -r requirements.txt
+          pip install -q "psycopg2-binary>=2.9"
+
+      - name: Identify restored schema revision
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: restore_user
+          PGDATABASE: aafc_tms_restore_test
+          PGPASSWORD: restore_test_ci_only
+        run: |
+          python3 - << 'PYEOF'
+          import os, subprocess, sys
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          rev = subprocess.run(["psql", "-tAc", "SELECT version_num FROM alembic_version;"],
+                               capture_output=True, text=True, check=True).stdout.strip()
+          sd = ScriptDirectory.from_config(Config("alembic.ini"))
+          head = os.environ["EXPECTED_ALEMBIC_HEAD"]
+          try:
+              sd.get_revision(rev)
+          except Exception:
+              print(f"::error::Restored alembic revision '{rev}' is not part of this repository's migration graph.")
+              sys.exit(1)
+          pending = [r.revision for r in sd.iterate_revisions(head, rev)][:-1]
+          print(f"Restored (staging) revision:    {rev}")
+          print(f"Repository head:                {head}")
+          print(f"Migrations the next deploy will apply: {len(pending)}")
+          for r in reversed(pending):
+              print(f"  - {r}")
+          PYEOF
+
+      - name: Rehearse staging upgrade on restored data (alembic upgrade head)
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: alembic upgrade head
+
+      # ── 8. Verify schema, migrations, and row counts ─────────────────────────
       - name: Verify restored database
         if: env.NO_BACKUP != 'true'
         run: |
@@ -257,9 +355,10 @@ jobs:
 
           failures = []
 
-          # Computed dynamically by the "Compute expected Alembic head" step
-          # earlier in this job — see test-restore-postgresql.yml
-          # for the identical mechanism.
+          # 1. Alembic migration HEAD — computed dynamically by the
+          # "Compute expected Alembic head" step earlier in this job (from
+          # the actual checked-out migration files, not a hardcoded value
+          # that would silently go stale after every new migration).
           EXPECTED_HEAD = os.environ['EXPECTED_ALEMBIC_HEAD']
           try:
               head = psql("SELECT version_num FROM alembic_version;")
@@ -270,10 +369,19 @@ jobs:
           except Exception as e:
               failures.append(f"alembic_version table missing or unreadable: {e}")
 
+          # 2. Required tables present and accessible
+          # Updated 2026-08-13: added tables introduced in v38–v51 migrations
+          # (training_classes, session_audiences, cadet_class_memberships,
+          # ip_api_requests, user_api_requests, facilitators, parade_nights).
           REQUIRED_TABLES = [
               'users', 'wings', 'squadrons', 'audit_logs', 'system_settings',
               'access_codes', 'proxy_sessions', 'phases', 'program_packages',
               'curriculum_items', 'planning_years', 'sessions',
+              # 'session_audience' (singular) is SessionAudience.__tablename__;
+              # 'session_audiences' never existed, so this list failed forever.
+              'training_classes', 'session_audience', 'cadet_class_memberships',
+              'ip_api_requests', 'user_api_requests',
+              'facilitators', 'parade_nights', 'ip_login_attempts',
           ]
           for table in REQUIRED_TABLES:
               try:
@@ -282,6 +390,7 @@ jobs:
               except Exception as e:
                   failures.append(f"Table '{table}' missing or unreadable: {e}")
 
+          # 3. users table must have at least one row (bootstrapped system_admin)
           try:
               user_count = int(psql("SELECT COUNT(*) FROM users;"))
               if user_count < 1:
@@ -291,11 +400,13 @@ jobs:
           except Exception as e:
               failures.append(f"users row count check failed: {e}")
 
+          # 4. No plaintext access code hashes in users (column exists but we don't read values)
           try:
               col_count = psql(
                   "SELECT COUNT(*) FROM information_schema.columns "
                   "WHERE table_name='users' AND column_name='access_code_hash';"
               )
+              # access_code_hash should exist as a column (it's how codes are stored securely)
               if col_count == '1':
                   print("  PASS  users.access_code_hash column present (hashed storage confirmed)")
               else:
@@ -303,6 +414,7 @@ jobs:
           except Exception as e:
               failures.append(f"Schema check failed: {e}")
 
+          # Results
           print()
           if failures:
               print(f"RESTORE VERIFICATION FAILED — {len(failures)} check(s) failed:")
@@ -313,6 +425,163 @@ jobs:
               print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
           PYEOF
 
+      - name: Verify every application model table exists after the upgrade
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          # Derived from the ORM, so it cannot go stale the way a hand-written
+          # table list did ('session_audiences' was never a real table).
+          import sys
+          from sqlalchemy import inspect
+          from app.database import Base, engine
+          import app.models  # noqa: F401  (registers every model)
+          have = set(inspect(engine).get_table_names())
+          want = set(Base.metadata.tables)
+          missing = sorted(want - have)
+          if missing:
+              print("::error::Model tables missing after upgrade: " + ", ".join(missing))
+              sys.exit(1)
+          print(f"PASS  all {len(want)} application model tables present after upgrade")
+          PYEOF
+
+      # ── 8b. Application-level restore proof ──────────────────────────────────
+      # Schema/row verification above only proves PostgreSQL restored — it
+      # doesn't prove the application can actually read the data. Starts a
+      # real backend against the restored (disposable) database, creates a
+      # throwaway test admin directly via the ORM (no real production access
+      # code is ever used or needed), and drives a representative set of
+      # authenticated reads through the real API. Everything here is
+      # destroyed with the rest of the ephemeral runner at the end of the job
+      # — nothing persists, nothing touches staging or production.
+      - name: Create throwaway test admin in the restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          import secrets
+          from app.database import SessionLocal
+          from app.models import User, AccessCode
+          from app.security import hash_code
+
+          code = secrets.token_hex(8).upper()
+          db = SessionLocal()
+          try:
+              admin = User(display_name="Restore-Test Throwaway Admin", role="system_admin", active_status=True)
+              db.add(admin)
+              db.flush()
+              db.add(AccessCode(user_id=admin.id, code_hash=hash_code(code)))
+              db.commit()
+          finally:
+              db.close()
+
+          with open("/tmp/restore_test_admin_code.txt", "w") as f:
+              f.write(code)
+          print("Throwaway test admin created (code never logged).")
+          PYEOF
+
+      - name: Start backend against restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          nohup python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/restore_test_backend.log 2>&1 &
+          echo $! > /tmp/restore_test_backend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/api/health || { echo "::error::Backend did not become ready"; cat /tmp/restore_test_backend.log; exit 1; }
+          echo "Backend is up against the restored database."
+
+      - name: Drive authenticated reads through the real API
+        if: env.NO_BACKUP != 'true'
+        run: |
+          python3 - << 'PYEOF'
+          import json
+          import urllib.request
+          import urllib.error
+
+          BASE = "http://127.0.0.1:8000"
+          with open("/tmp/restore_test_admin_code.txt") as f:
+              code = f.read().strip()
+
+          def call(method, path, token=None, body=None):
+              req = urllib.request.Request(
+                  f"{BASE}{path}",
+                  data=json.dumps(body).encode() if body is not None else None,
+                  method=method,
+                  headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      return resp.status, json.loads(resp.read())
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+
+          failures = []
+
+          status, body = call("POST", "/api/auth/login", body={"code": code})
+          if status != 200 or not body or "token" not in body:
+              print(f"::error::Login failed: status={status}")
+              raise SystemExit(1)
+          token = body["token"]
+          print("  PASS  login as throwaway restore-test admin")
+
+          status, body = call("GET", "/api/health/ready")
+          if status != 200:
+              failures.append(f"/api/health/ready -> {status}")
+          else:
+              print(f"  PASS  /api/health/ready -> squadrons={body.get('squadrons')}")
+
+          checks = [
+              ("GET", "/api/auth/me"),
+              ("GET", "/api/wings"),
+              ("GET", "/api/squadrons"),
+              ("GET", "/api/users"),
+              ("GET", "/api/planning/years"),
+              ("GET", "/api/planning/facilitators"),
+          ]
+          for method, path in checks:
+              status, body = call(method, path, token=token)
+              if status != 200:
+                  failures.append(f"{path} -> {status}")
+              else:
+                  size = len(body) if isinstance(body, list) else "n/a"
+                  print(f"  PASS  {path} -> 200 (items={size})" if size != "n/a" else f"  PASS  {path} -> 200")
+
+          print()
+          if failures:
+              print(f"APPLICATION-LEVEL RESTORE CHECK FAILED — {len(failures)} check(s) failed:")
+              for f in failures:
+                  print(f"  FAIL  {f}")
+              raise SystemExit(1)
+          print(f"APPLICATION-LEVEL RESTORE CHECK PASSED — all {2 + len(checks)} authenticated reads succeeded against restored staging data.")
+          PYEOF
+
+      - name: Stop temporary backend
+        if: always()
+        run: |
+          if [ -f /tmp/restore_test_backend.pid ]; then
+            kill "$(cat /tmp/restore_test_backend.pid)" 2>/dev/null || true
+          fi
+          rm -f /tmp/restore_test_admin_code.txt /tmp/restore_test_backend.pid /tmp/restore_test_backend.log 2>/dev/null || true
+
+      # ── 9. Report skip if no backup existed ─────────────────────────────────
       - name: Report skip
         if: env.NO_BACKUP == 'true'
         run: |
@@ -320,6 +589,7 @@ jobs:
           echo "Trigger the backup workflow to create one:"
           echo "  Actions → PostgreSQL Backup — Staging — Manual → Run workflow"
 
+      # ── 10. Clean up ALL plaintext files (always, even on failure) ───────────
       - name: Clean up plaintext files
         if: always()
         run: |

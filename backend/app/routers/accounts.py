@@ -33,6 +33,9 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
+from ..permissions import has_known_role, is_national_admin  # noqa: E402
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
 import re
 
@@ -54,8 +57,6 @@ router = APIRouter(prefix="/api", tags=["accounts"])
 # Which roles an actor may read/manage. sqn_general reads its own squadron's
 # accounts read-only (2026-09-28 product decision); scope is enforced below
 # (list filter + _can_read_account) and writes stay behind the central write-role policy.
-_READ_ROLES = {"sqn_admin", "sqn_general", "wing_viewer", "wing_admin",
-               "national_viewer", "national_admin", "system_admin", "auditor"}
 
 
 # ─────────────────────────────────────────────
@@ -86,7 +87,7 @@ def _validate_create_scope(p: Principal, target_role: str,
         w = db.get(Wing, wing_id)
         if not w or w.is_archived:
             raise HTTPException(404, detail={"error": "wing_not_found"})
-        if p.role == "wing_admin" and wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts in their own Wing."})
 
@@ -96,10 +97,10 @@ def _validate_create_scope(p: Principal, target_role: str,
         sqn = db.get(Squadron, sqn_id)
         if not sqn or sqn.is_archived:
             raise HTTPException(404, detail={"error": "squadron_not_found"})
-        if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, sqn.wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts for SQNs in their Wing."})
-        if p.role == "sqn_admin" and sqn_id != p.squadron_id:
+        if sqn_admin_outside_own_squadron(p, sqn_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "SQN Admin can only create accounts in their own Squadron."})
 
@@ -113,7 +114,7 @@ def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
         if target.squadron_id:
             sqn = db.get(Squadron, target.squadron_id)
             return sqn is not None and sqn.wing_id == p.wing_id
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         return target.squadron_id == p.squadron_id
     return False
 
@@ -308,7 +309,7 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
                   flight_id: str | None = None, role: str | None = None,
                   active_status: bool | None = None, include_archived: bool = False,
                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     q = db.query(User)
     if not include_archived:
@@ -467,7 +468,7 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
 
 @router.get("/accounts/{uid}")
 def get_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     u = db.get(User, uid)
     if not u or u.is_archived:
@@ -652,7 +653,7 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "squadron_not_found"})
     if body.new_squadron_id == u.squadron_id:
         raise HTTPException(400, detail={"error": "scope_unchanged"})
-    if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, sqn.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
     if p.role == "sqn_admin":
@@ -1087,7 +1088,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
 
 def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
     """Only sqn_admin (own SQN), wing_admin (own Wing), nat_admin, system_admin."""
-    if p.role in ("national_admin", "system_admin"):
+    if is_national_admin(p):
         return
     if p.role == "wing_admin":
         sqn = db.get(Squadron, sqn_id)

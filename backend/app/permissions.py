@@ -15,6 +15,7 @@ ROLES = {
     "system_admin", "auditor",
 }
 WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
+SQUADRON_LEVEL = {"sqn_general", "sqn_admin"}
 WING_LEVEL = {"wing_viewer", "wing_admin"}
 NATIONAL_LEVEL = {"national_viewer", "national_admin", "system_admin", "auditor"}
 # Named role sets used for authorization decisions across routers (previously
@@ -44,6 +45,48 @@ def is_read_only_role(p: "Principal") -> bool:
     return p.role in READ_ONLY_ROLES
 
 
+def sqn_admin_outside_own_squadron(p: "Principal", squadron_id: str | None) -> bool:
+    """True when a Squadron Admin is acting on a target outside their own
+    Squadron (the Squadron counterpart of wing_admin_outside_own_wing). Each
+    caller keeps its own error response."""
+    return p.role == "sqn_admin" and squadron_id != p.squadron_id
+
+
+def has_known_role(p: "Principal") -> bool:
+    """Any recognised role. Gates written as "role in <every role>" only refuse
+    a principal whose role is unrecognised (corrupt or retired)."""
+    return p.role in ROLES
+
+
+def wing_admin_outside_own_wing(p: "Principal", wing_id: str | None) -> bool:
+    """True when a Wing Admin is acting on a target outside their own Wing.
+
+    The rule "a Wing Admin acts only inside their own Wing" was written inline
+    at every Wing-scoped write (accounts, organisations, training reference
+    data, Wing calendar, Service Desk, custom phases). Each caller keeps its own
+    error response; only the condition lives here. Other roles are not
+    constrained by this predicate (their scope is checked elsewhere)."""
+    return p.role == "wing_admin" and wing_id != p.wing_id
+
+
+def may_view_cadet_records(p: "Principal") -> bool:
+    """Cadet personal and training records (cadet list, risk, class
+    membership and rosters, training-record matrix/export, a cadet's record,
+    sessions needing attention). sqn_general is excluded; every other role
+    still passes its own scope checks afterwards.
+
+    Policy question open with the product owner: whether sqn_general, a
+    read-only Squadron role, is meant to be refused these reads. This is the
+    one place that decides it."""
+    return p.role != "sqn_general"
+
+
+def may_record_session_outcomes(p: "Principal") -> bool:
+    """Deliver / cancel / reschedule a session. sqn_general is excluded; the
+    session write checks that follow apply to everyone else."""
+    return p.role != "sqn_general"
+
+
 @dataclass
 class Principal:
     user_id: str
@@ -61,6 +104,10 @@ class Principal:
     @property
     def is_national(self) -> bool:
         return self.role in NATIONAL_LEVEL
+
+    @property
+    def is_squadron(self) -> bool:
+        return self.role in SQUADRON_LEVEL
 
     @property
     def is_wing(self) -> bool:

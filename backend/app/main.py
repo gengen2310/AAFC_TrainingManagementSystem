@@ -33,7 +33,12 @@ _maint_cache: dict = {
     "active": False, "msg": "", "block_reads": False, "block_logins": False,
     "pending_until": None,  # ISO timestamp; None = no drain period / immediate lock
     "expires": 0.0,
+    "fetched_at": 0.0,      # monotonic time of the last successful DB read
 }
+# Before refusing a request, a copy older than this is re-read: turning
+# maintenance off is otherwise seen by the other workers only when their
+# 10 s cache expires, and they keep answering 503 until then.
+REVALIDATE_BEFORE_REFUSAL_SEC = 1.0
 # Only the expired-cache refresher takes this lock. Fresh-cache reads remain
 # lock-free, while expiry boundaries collapse concurrent refreshes to one DB
 # checkout instead of stampeding the connection pool.
@@ -80,6 +85,7 @@ def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
             _maint_cache["block_logins"] = block_logins
             _maint_cache["pending_until"] = pending_until_iso
             _maint_cache["expires"] = now + 10.0
+            _maint_cache["fetched_at"] = now
         except Exception:
             # Keep the last known state and briefly back off. The same lock also
             # prevents an error boundary from turning into repeated pool waits.
@@ -87,6 +93,17 @@ def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
             return cached_result()
         return (active, msg, block_reads, block_logins,
                 _compute_phase(active, pending_until_iso), pending_until_iso)
+
+
+def _confirm_maintenance_before_refusal() -> tuple[bool, str, bool, bool, str, str | None]:
+    """The maintenance state to act on when about to refuse a request.
+
+    A copy younger than REVALIDATE_BEFORE_REFUSAL_SEC is trusted; an older one
+    is re-read through the same single-flight refresh, so concurrent refusals
+    collapse to one read and normal traffic (state off) never reaches here."""
+    if _time.monotonic() - _maint_cache["fetched_at"] > REVALIDATE_BEFORE_REFUSAL_SEC:
+        _maint_cache["expires"] = 0.0
+    return _maintenance_active()
 
 
 def _compute_phase(active: bool, pending_until_iso: str | None) -> str:
@@ -266,12 +283,20 @@ async def maintenance_gate(request: Request, call_next):
     is_login = path == "/api/auth/login"
     is_read = method == "GET"
 
-    needs_gate = (
-        (is_write and not is_login)       # all writes except login (login has its own gate)
-        or (is_login and block_logins)    # login only gated when explicitly requested
-        or (is_read and block_reads)      # reads only gated when explicitly requested
-    )
-    if not needs_gate:
+    def needs_gate(block_reads: bool, block_logins: bool) -> bool:
+        return (
+            (is_write and not is_login)       # all writes except login (login has its own gate)
+            or (is_login and block_logins)    # login only gated when explicitly requested
+            or (is_read and block_reads)      # reads only gated when explicitly requested
+        )
+    if not needs_gate(block_reads, block_logins):
+        return await call_next(request)
+
+    # About to refuse: act on a current state, not a copy up to 10 s old that
+    # another worker may already have turned off (see REVALIDATE_BEFORE_REFUSAL_SEC).
+    active, msg, block_reads, block_logins, phase, _pending_until = await run_in_threadpool(
+        _confirm_maintenance_before_refusal)
+    if not active or phase == "pending" or not needs_gate(block_reads, block_logins):
         return await call_next(request)
 
     from .security import decode_token
