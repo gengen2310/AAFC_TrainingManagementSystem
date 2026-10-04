@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
@@ -48,7 +48,9 @@ from ..models.training import (
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
+from ..permissions import (Principal, resolve_view_squadron_id,
+                           require_role, require_write_role,
+                           require_can_write_squadron, require_can_view_squadron)
 from ..services import audit
 from ..services import (visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
@@ -56,6 +58,9 @@ from ..services_year import (
     PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
     selectable_years, year_display_name, year_state,
 )
+from ..services_timing import effective_template
+from ..services_curriculum_progress import class_curriculum_progress
+from ..services_data_quality import data_freshness
 
 
 def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
@@ -65,7 +70,6 @@ def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
     except PastYearLocked as exc:
         raise HTTPException(403, detail={"error": "past_year_read_only",
                                          "message": str(exc)})
-from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
@@ -103,9 +107,16 @@ def _cadet_group_for_class(db: DBSession, tc: "TrainingClass | None") -> str | N
     if tc.training_stage_id:
         phase = db.get(CurriculumPhase, tc.training_stage_id)
         if phase:
-            name = (phase.display_name or phase.name or "").lower()
+            # Canonical name is the governed semantic key; display_name is UI
+            # copy and may be something generic such as "Stage A". Check both
+            # independently so a non-empty display label never masks a useful
+            # canonical value such as "A. Orientation".
+            phase_names = [
+                (phase.name or "").lower(),
+                (phase.display_name or "").lower(),
+            ]
             for cg in _STAGE_CODE_CADET_GROUP.values():
-                if cg in name:
+                if any(cg in phase_name for phase_name in phase_names):
                     return cg
     return None
 
@@ -337,15 +348,13 @@ def _parse_program_file(content: bytes, is_xlsx: bool) -> list[dict]:
 # RBAC helpers
 # ─────────────────────────────────────────────────────────────
 
-_WRITE_BLOCKED = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
 _NAT_ROLES     = frozenset({"national_admin", "system_admin"})
 _WING_ROLES    = frozenset({"wing_admin", *_NAT_ROLES})
 _ALL_ADMIN     = frozenset({"sqn_admin", "wing_admin", "national_admin", "system_admin"})
 
 
 def _require_plan_write(p: Principal) -> None:
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
 
 
 def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
@@ -356,8 +365,8 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
     rather than at each of the fifteen year-scoped write endpoints so that a new
     endpoint added later inherits the protection instead of forgetting it.
     """
-    if write and p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if write:
+        _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
     if p.role in ("sqn_admin", "sqn_general"):
@@ -490,27 +499,71 @@ def _location_out(loc: TrainingArea) -> dict:
     }
 
 
+def _session_out_context(db: DBSession, sessions: list) -> dict:
+    """Pre-load everything _real_session_out() needs for MANY sessions in a
+    constant number of queries. Serialising one session at a time issued ~5
+    queries per session (measured: term planner 26 queries for 4 sessions, 66
+    for 12), so a full training year cost ~1,200 queries per request. Output
+    is identical with or without the context (pinned by a parity test)."""
+    from ..models.training import SessionAssistantFacilitator as _SAF
+    ids = [s.id for s in sessions]
+    ctx: dict = {"rooms": {}, "facs": {}, "saf": {}, "ci": {}, "aud": {}, "cpa": {}}
+    if not ids:
+        return ctx
+    room_ids = {s.training_area_id for s in sessions if s.training_area_id and not s.training_area_name_at_time}
+    if room_ids:
+        ctx["rooms"] = {r.id: r.name for r in db.query(TrainingArea).filter(TrainingArea.id.in_(room_ids)).all()}
+    saf_rows = db.query(_SAF).filter(_SAF.session_id.in_(ids)).all()
+    for row in saf_rows:
+        ctx["saf"].setdefault(row.session_id, []).append(row)
+    fac_ids = {s.assistant_facilitator_id for s in sessions if s.assistant_facilitator_id} | {r.user_id for r in saf_rows}
+    if fac_ids:
+        ctx["facs"] = {f.id: f for f in db.query(Facilitator).filter(Facilitator.id.in_(fac_ids)).all()}
+    ci_ids = {s.curriculum_item_id for s in sessions if s.curriculum_item_id}
+    if ci_ids:
+        ctx["ci"] = {c.id: c for c in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids)).all()}
+    ctx["aud"] = dict(db.query(SessionAudience.session_id, func.count(SessionAudience.id))
+                      .filter(SessionAudience.session_id.in_(ids))
+                      .group_by(SessionAudience.session_id).all())
+    for sid, cp in (db.query(SessionCustomPhaseAudience.session_id, CustomTrainingPhase)
+                    .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
+                    .filter(SessionCustomPhaseAudience.session_id.in_(ids)).all()):
+        ctx["cpa"].setdefault(sid, []).append(cp)
+    return ctx
+
+
 def _real_session_out(
     s: TrainingSession, db: DBSession,
     ci_tier: "dict[str, dict] | None" = None,
+    ctx: "dict | None" = None,
 ) -> dict:
-    """Serialize a real training Session in the builder grid format."""
+    """Serialize a real training Session in the builder grid format.
+
+    Bulk callers pass ctx from _session_out_context() (constant queries for the
+    whole batch); single-session callers omit it and it queries directly."""
     room_name = s.training_area_name_at_time
     if not room_name and s.training_area_id:
-        ra = db.get(TrainingArea, s.training_area_id)
-        if ra:
-            room_name = ra.name
+        if ctx is not None:
+            room_name = ctx["rooms"].get(s.training_area_id) or room_name
+        else:
+            ra = db.get(TrainingArea, s.training_area_id)
+            if ra:
+                room_name = ra.name
     from ..models.training import SessionAssistantFacilitator as _SAF
+
+    def _fac(fid):
+        return ctx["facs"].get(fid) if ctx is not None else db.get(Facilitator, fid)
+
     asst_name: str | None = None
     if s.assistant_facilitator_id:
-        af = db.get(Facilitator, s.assistant_facilitator_id)
+        af = _fac(s.assistant_facilitator_id)
         if af:
             asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
     # Build assistant_facilitators list from the join table
-    asst_rows = db.query(_SAF).filter_by(session_id=s.id).all()
+    asst_rows = ctx["saf"].get(s.id, []) if ctx is not None else db.query(_SAF).filter_by(session_id=s.id).all()
     assistant_facilitators_list: list[dict] = []
     for row in asst_rows:
-        f = db.get(Facilitator, row.user_id)
+        f = _fac(row.user_id)
         if f:
             disp = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
         else:
@@ -528,7 +581,7 @@ def _real_session_out(
                 core_status = t["core_status"]
                 is_optional = t.get("is_optional", False)
         else:
-            ci_obj = db.get(CurriculumItem, s.curriculum_item_id)
+            ci_obj = ctx["ci"].get(s.curriculum_item_id) if ctx is not None else db.get(CurriculumItem, s.curriculum_item_id)
             if ci_obj:
                 core_status = ci_obj.core_status
                 is_optional = ci_obj.is_optional
@@ -552,13 +605,15 @@ def _real_session_out(
         "location_name": room_name,
         "status": s.status,
         "notes": s.delivery_notes,
-        "is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1,
+        "is_combined": (ctx["aud"].get(s.id, 0) if ctx is not None
+                        else db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count()) > 1,
         "custom_phase_audiences": [
             {"custom_phase_id": cp.id, "name": cp.name}
-            for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
-            .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
-            .filter(SessionCustomPhaseAudience.session_id == s.id)
-            .all()
+            for cp in (ctx["cpa"].get(s.id, []) if ctx is not None else [
+                cp for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
+                .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
+                .filter(SessionCustomPhaseAudience.session_id == s.id)
+                .all()])
         ],
         "override_conflict": False,
         "created_at": iso_z(s.created_at) if s.created_at else None,
@@ -650,7 +705,7 @@ def list_planning_years(
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         q = q.filter(PlanningYear.wing_id == p.wing_id)
     if unit_id:
         q = q.filter(PlanningYear.unit_id == unit_id)
@@ -968,6 +1023,16 @@ def delete_planning_year(
                 ).filter(ParadeNight.planning_year_id == year_id)
             ),
         ).count(),
+        # Cadet outcomes are operational training history, not disposable planning
+        # children. Any recorded outcome blocks permanent deletion even when the
+        # parade night is archived or the legacy session has no class audience.
+        "cadet_session_outcomes": db.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.session_id.in_(
+                db.query(TrainingSession.id).join(
+                    ParadeNight, TrainingSession.parade_night_id == ParadeNight.id
+                ).filter(ParadeNight.planning_year_id == year_id)
+            )
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
         "parade_night_prep_plans": db.query(AnchorPrepPlan).join(
@@ -1010,7 +1075,6 @@ def delete_planning_year(
                 SessionStatusHistory,
                 SessionAudience,
                 SessionCustomPhaseAudience,
-                CadetSessionOutcome,
             ):
                 db.query(child_model).filter(
                     child_model.session_id.in_(session_ids)
@@ -2006,8 +2070,9 @@ def get_term_planner(
         ts_by_night: dict[str, list] = {}
         for s in ts_rows:
             ts_by_night.setdefault(s.parade_night_id, []).append(s)
+        ctx = _session_out_context(db, ts_rows)   # one batch for the whole year
         for pn in all_dates:
-            sessions_by_date[pn.id] = [_real_session_out(s, db) for s in ts_by_night.get(pn.id, [])]
+            sessions_by_date[pn.id] = [_real_session_out(s, db, ctx=ctx) for s in ts_by_night.get(pn.id, [])]
     else:
         for pn in all_dates:
             sessions_by_date[pn.id] = []
@@ -2055,7 +2120,7 @@ def get_builder(
     if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2082,7 +2147,8 @@ def get_builder(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == False,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    real_sessions = [_real_session_out(s, db) for s in ts]
+    ctx = _session_out_context(db, ts)
+    real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
     conflicts = db.query(PlanningConflict).filter(
         PlanningConflict.parade_night_id == date_id,
@@ -2215,8 +2281,8 @@ def create_session(
     # canonical schedule/print endpoint can place the session on its real row.
     placement_template_id = pn.timing_template_id
     if not placement_template_id:
-        effective_template = _effective_template(db, pn.squadron_id, pn.date)
-        placement_template_id = effective_template.id if effective_template else None
+        effective_tmpl = effective_template(db, pn.squadron_id, pn.date)
+        placement_template_id = effective_tmpl.id if effective_tmpl else None
     if placement_template_id:
         period_block = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == placement_template_id,
@@ -2558,7 +2624,8 @@ def list_archived_sessions(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == True,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    return {"sessions": [_real_session_out(s, db) for s in ts]}
+    ctx = _session_out_context(db, ts)
+    return {"sessions": [_real_session_out(s, db, ctx=ctx) for s in ts]}
 
 
 @router.get("/parade-dates/{date_id}/weekly-program")
@@ -2580,7 +2647,8 @@ def get_weekly_program(
             TrainingSession.parade_night_id == pn.id,
             TrainingSession.is_archived == False,  # noqa: E712
         ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-        real_sessions = [_real_session_out(s, db) for s in ts]
+        ctx = _session_out_context(db, ts)
+        real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
         # CLASS-06: which Training Class(es) each session targets, additive
         # to _real_session_out()'s own output. Attached here rather than
@@ -2612,7 +2680,7 @@ def get_weekly_program(
     if pn and pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2738,24 +2806,32 @@ def get_long_range(
             ParadeNightTimingSnapshot.display_order,
         ).all():
             snaps_by_pn_lr.setdefault(snap.parade_night_id, []).append(snap)
+
+        # Conflicts are another parade-night child collection. Load them once
+        # for the whole range rather than issuing one SELECT per night.
+        conflicts_by_pn_lr: dict[str, list] = {}
+        for conflict in db.query(PlanningConflict).filter(
+            PlanningConflict.parade_night_id.in_(pn_ids_lr),
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        ).all():
+            conflicts_by_pn_lr.setdefault(conflict.parade_night_id, []).append(conflict)
     else:
         ts_by_night_lr = {}
         classes_by_session_lr = {}
         snaps_by_pn_lr = {}
+        conflicts_by_pn_lr = {}
 
+    ctx_lr = _session_out_context(db, [s for v in ts_by_night_lr.values() for s in v])  # whole range, once
     rows = []
     for pn_obj in parade_dates:
         real_sessions: list[dict] = []
         ts = sorted(ts_by_night_lr.get(pn_obj.id, []),
                     key=lambda s: (s.period_number, s.cadet_group or ""))
-        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
+        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr, ctx=ctx_lr) for s in ts]
         for sess_out, s in zip(real_sessions, ts):
             sess_out["training_classes"] = classes_by_session_lr.get(s.id, [])
 
-        conflicts = db.query(PlanningConflict).filter(
-            PlanningConflict.parade_night_id == pn_obj.id,
-            PlanningConflict.is_resolved == False,  # noqa: E712
-        ).all()
+        conflicts = conflicts_by_pn_lr.get(pn_obj.id, [])
 
         pn_snaps_lr = snaps_by_pn_lr.get(pn_obj.id, [])
         instructional_periods = [
@@ -2840,7 +2916,7 @@ def list_locations(
     )
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(TrainingArea.squadron_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         sqn_ids = [s.id for s in db.query(Squadron).filter(
             Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
         ).all()]
@@ -2939,15 +3015,14 @@ def list_planning_facilitators(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    # Aligned to the same _view_squadron_id() resolution every other resource
+    # Aligned to the same resolve_view_squadron_id() resolution every other resource
     # endpoint in training.py already standardizes on (GET /api/facilitators,
     # /api/training-areas, /api/equipment, /api/activities) -- this endpoint
     # previously had its own bespoke role filter with no national_admin/
     # system_admin branch at all (silently unfiltered = every facilitator in
     # the system) and no proxy/acting-squadron awareness, so it could disagree
     # with what a squadron's own facilitator list actually shows.
-    from .training import _view_squadron_id
-    sq_id = _view_squadron_id(p, unit_id, db)
+    sq_id = resolve_view_squadron_id(p, unit_id, db)
     q = db.query(Facilitator).filter(
         Facilitator.active_status == True,  # noqa: E712
         Facilitator.squadron_id == sq_id,
@@ -3346,7 +3421,6 @@ def get_command_centre(
     p: Principal = Depends(get_principal),
 ):
     from sqlalchemy import or_, func
-    from .dashboard import _data_freshness
 
     today = date.today().isoformat()
 
@@ -3360,7 +3434,7 @@ def get_command_centre(
         q = db.query(PlanningYear)
         if p.role in ("sqn_admin", "sqn_general"):
             q = q.filter(PlanningYear.unit_id == p.squadron_id)
-        elif p.role in ("wing_admin", "wing_viewer"):
+        elif p.is_wing:
             q = q.filter(PlanningYear.wing_id == p.wing_id)
         py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
         if py is None:
@@ -3597,7 +3671,7 @@ def get_command_centre(
         "training_classes": training_classes_out,
         "recent_imports": [],
         "nights_missing_facilitator": nights_missing_fac,
-        "data_freshness": _data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
+        "data_freshness": data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
     }
 
 
@@ -3626,7 +3700,6 @@ def get_class_forecasts(
     """
     from sqlalchemy import func, select as sa_select
     import math
-    from .training import _class_curriculum_progress
 
     py = db.get(PlanningYear, year_id)
     if not py:
@@ -3687,7 +3760,7 @@ def get_class_forecasts(
 
     forecasts = []
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         requirements = prog.get("requirements", [])
         remaining = [r for r in requirements if r["status"] not in _DELIVERED_STATUSES]
         planned = [r for r in remaining if r["status"] == _PLANNED_STATUS]
@@ -3701,7 +3774,7 @@ def get_class_forecasts(
         if c.training_stage_id is None:
             # The five classes auto-created with a planning year carry a
             # stage_code (ORI/INI/...) but no training_stage_id, and
-            # _class_curriculum_progress keys off the stage, so they have zero
+            # class_curriculum_progress keys off the stage, so they have zero
             # requirements for a reason that has nothing to do with progress.
             # Reporting "All requirements delivered." there is a green light
             # for work nobody has scoped yet -- say what is actually true.
@@ -3809,7 +3882,7 @@ def _curriculum_scope_query(db: DBSession, p: Principal):
             CurriculumItem.wing_id == wing_id,
             CurriculumItem.squadron_id == p.squadron_id,
         ))
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         q = q.filter(or_(
             CurriculumItem.owning_level == "national",
             CurriculumItem.wing_id == p.wing_id,
@@ -3878,7 +3951,7 @@ def list_missions(
     # CLASS-05: per-class breakdown, additive to the existing item-level
     # backlog_status/is_scheduled/etc fields below (none of which change).
     # A Training Class's Stage is matched to a CurriculumItem's phase the
-    # same way _class_curriculum_progress (training.py) does -- by
+    # same way class_curriculum_progress (services_curriculum_progress.py) does -- by
     # CurriculumPhase.name == CurriculumItem.phase -- so this reuses that
     # resolution rather than inventing a second one (addendum §44). Classes
     # are not filtered by training_year_id: the Session<->Class assignment

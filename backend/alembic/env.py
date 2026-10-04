@@ -7,6 +7,7 @@ import os, sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+from alembic.operations import ops
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.config import normalize_database_url, settings  # noqa: E402
@@ -153,8 +154,6 @@ def include_object(object_, name, type_, reflected, compare_to):
         return False
     if type_ == "index" and name in (_COMPATIBILITY_INDEXES | _MODEL_INDEXES_WITHOUT_FORWARD_MIGRATION):
         return False
-    if type_ == "column" and (table_name, name) in _LEGACY_NULLABILITY_COLUMNS:
-        return False
     if type_ in {"unique_constraint", "primary_key_constraint"} and name in _COMPATIBILITY_CONSTRAINTS:
         return False
     if type_ == "foreign_key_constraint":
@@ -164,6 +163,42 @@ def include_object(object_, name, type_, reflected, compare_to):
         if constrained and (table_name, constrained[0], referred) in _LEGACY_FOREIGN_KEYS:
             return False
     return True
+
+
+def _strip_known_nullability_ops(container) -> None:
+    """Remove only known nullable-only drift from an autogenerate op tree.
+
+    The old include_object filter hid the *entire column*, which also hid a
+    missing column or future type/default changes. Keeping the column in the
+    comparison and deleting only modify_nullable preserves all other drift.
+    """
+    kept = []
+    for operation in container.ops:
+        if isinstance(operation, ops.ModifyTableOps):
+            _strip_known_nullability_ops(operation)
+            if operation.ops:
+                kept.append(operation)
+            continue
+        if isinstance(operation, ops.AlterColumnOp):
+            key = (operation.table_name, operation.column_name)
+            if key in _LEGACY_NULLABILITY_COLUMNS and operation.modify_nullable is not None:
+                operation.modify_nullable = None
+                if operation.has_changes():
+                    kept.append(operation)
+                continue
+        kept.append(operation)
+    container.ops[:] = kept
+
+
+def process_revision_directives(context_, revision, directives):
+    """Autogenerate hook: suppress only allow-listed nullability alterations."""
+    if not directives:
+        return
+    script = directives[0]
+    for upgrade_ops in script.upgrade_ops_list:
+        _strip_known_nullability_ops(upgrade_ops)
+    for downgrade_ops in script.downgrade_ops_list:
+        _strip_known_nullability_ops(downgrade_ops)
 
 
 def compare_type(context_, inspected_column, metadata_column, inspected_type, metadata_type):
@@ -176,7 +211,8 @@ def compare_type(context_, inspected_column, metadata_column, inspected_type, me
 
 def run_migrations_offline():
     context.configure(url=database_url, target_metadata=target_metadata, literal_binds=True,
-                      include_object=include_object, compare_type=compare_type)
+                      include_object=include_object, compare_type=compare_type,
+                      process_revision_directives=process_revision_directives)
     with context.begin_transaction():
         context.run_migrations()
 
@@ -187,7 +223,8 @@ def run_migrations_online():
     connectable = engine_from_config(cfg, prefix="sqlalchemy.", poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata,
-                          include_object=include_object, compare_type=compare_type)
+                          include_object=include_object, compare_type=compare_type,
+                          process_revision_directives=process_revision_directives)
         with context.begin_transaction():
             context.run_migrations()
 

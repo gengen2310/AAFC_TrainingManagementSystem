@@ -294,6 +294,66 @@ def test_import_csv_oversized_file_rejected_before_parsing(client):
     assert r.json()["detail"]["error"] == "file_too_large"
 
 
+
+def _xlsm_import_file(code: str = "IMP-XLSM-PREV-01", title: str = "XLSM Preview Test"):
+    import io
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "zz - Program backend"
+    ws.append([])
+    ws.append([])
+    ws.append([])
+    ws.append([
+        "Program", "Module_Code", "Module_Title", "Identifier", "Part",
+        "Duration_Min", "Suggested_#_Parts", "Elements",
+        "Instructor_Suitability", "URL",
+    ])
+    ws.append([
+        "B. Initial", code, title, f"{code}(1)", 1,
+        60, 1, "Test element", "Any", "https://example.test/learning",
+    ])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return {
+        "file": (
+            "curriculum.xlsm",
+            buf.getvalue(),
+            "application/vnd.ms-excel.sheet.macroEnabled.12",
+        )
+    }
+
+
+def test_import_xlsm_preview_writes_nothing_then_commit_creates(client):
+    """XLSM must use the same preview-then-commit contract as JSON and CSV."""
+    hdr = _sysadmin(client)
+    code = "IMP-XLSM-PREV-01"
+    files = _xlsm_import_file(code)
+
+    preview = client.post(
+        "/api/curriculum/import-xlsm?preview=true", headers=hdr, files=files
+    )
+    assert preview.status_code == 200, preview.text
+    dp = preview.json()
+    assert dp["preview"] is True
+    assert dp["created"] == 1
+
+    listed_before = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert not any(i.get("code") == code for i in listed_before)
+
+    commit = client.post(
+        "/api/curriculum/import-xlsm", headers=hdr, files=_xlsm_import_file(code)
+    )
+    assert commit.status_code == 200, commit.text
+    dc = commit.json()
+    assert dc["preview"] is False
+    assert dc["created"] == 1
+
+    listed_after = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert any(i.get("code") == code for i in listed_after)
+
+
 def test_import_xlsm_oversized_file_rejected_before_parsing(client):
     """Same size-limit protection for the .xlsm import endpoint -- this one hands the raw
     bytes straight to openpyxl.load_workbook(), which has significant memory overhead of

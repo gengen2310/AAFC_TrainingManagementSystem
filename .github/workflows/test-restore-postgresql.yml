@@ -265,6 +265,70 @@ jobs:
             || { echo '::error::pg_restore failed'; exit 1; }
           echo "pg_restore completed."
 
+      # ── 7b. Identify the restored schema and rehearse the production upgrade ──
+      # Production legitimately lags main between releases, so the restored
+      # database is at production's revision, not this repo's head. The old
+      # check required restored == head and therefore failed every week
+      # (production at v64 a4e9507a9c51 vs head), so no restore was ever
+      # verified. Now: the restored revision must be a KNOWN revision of this
+      # repository's migration graph (unknown = foreign/corrupt schema = fail);
+      # the copy is then upgraded to head -- exactly what the next production
+      # deploy will do -- and every check below runs on the upgraded data.
+      # This is a disposable CI database; production is never touched.
+      - name: Set up Python
+        if: env.NO_BACKUP != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install backend dependencies
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        run: |
+          pip install -q -r requirements.txt
+          pip install -q "psycopg2-binary>=2.9"
+
+      - name: Identify restored schema revision
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: restore_user
+          PGDATABASE: aafc_tms_restore_test
+          PGPASSWORD: restore_test_ci_only
+        run: |
+          python3 - << 'PYEOF'
+          import os, subprocess, sys
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+          rev = subprocess.run(["psql", "-tAc", "SELECT version_num FROM alembic_version;"],
+                               capture_output=True, text=True, check=True).stdout.strip()
+          sd = ScriptDirectory.from_config(Config("alembic.ini"))
+          head = os.environ["EXPECTED_ALEMBIC_HEAD"]
+          try:
+              sd.get_revision(rev)
+          except Exception:
+              print(f"::error::Restored alembic revision '{rev}' is not part of this repository's migration graph.")
+              sys.exit(1)
+          pending = [r.revision for r in sd.iterate_revisions(head, rev)][:-1]
+          print(f"Restored (production) revision: {rev}")
+          print(f"Repository head:                {head}")
+          print(f"Migrations the next deploy will apply: {len(pending)}")
+          for r in reversed(pending):
+              print(f"  - {r}")
+          PYEOF
+
+      - name: Rehearse production upgrade on restored data (alembic upgrade head)
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: alembic upgrade head
+
       # ── 8. Verify schema, migrations, and row counts ─────────────────────────
       - name: Verify restored database
         if: env.NO_BACKUP != 'true'
@@ -313,7 +377,9 @@ jobs:
               'users', 'wings', 'squadrons', 'audit_logs', 'system_settings',
               'access_codes', 'proxy_sessions', 'phases', 'program_packages',
               'curriculum_items', 'planning_years', 'sessions',
-              'training_classes', 'session_audiences', 'cadet_class_memberships',
+              # 'session_audience' (singular) is SessionAudience.__tablename__;
+              # 'session_audiences' never existed, so this list failed forever.
+              'training_classes', 'session_audience', 'cadet_class_memberships',
               'ip_api_requests', 'user_api_requests',
               'facilitators', 'parade_nights', 'ip_login_attempts',
           ]
@@ -359,6 +425,31 @@ jobs:
               print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
           PYEOF
 
+      - name: Verify every application model table exists after the upgrade
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          # Derived from the ORM, so it cannot go stale the way a hand-written
+          # table list did ('session_audiences' was never a real table).
+          import sys
+          from sqlalchemy import inspect
+          from app.database import Base, engine
+          import app.models  # noqa: F401  (registers every model)
+          have = set(inspect(engine).get_table_names())
+          want = set(Base.metadata.tables)
+          missing = sorted(want - have)
+          if missing:
+              print("::error::Model tables missing after upgrade: " + ", ".join(missing))
+              sys.exit(1)
+          print(f"PASS  all {len(want)} application model tables present after upgrade")
+          PYEOF
+
       # ── 8b. Application-level restore proof ──────────────────────────────────
       # Schema/row verification above only proves PostgreSQL restored — it
       # doesn't prove the application can actually read the data. Starts a
@@ -368,19 +459,6 @@ jobs:
       # authenticated reads through the real API. Everything here is
       # destroyed with the rest of the ephemeral runner at the end of the job
       # — nothing persists, nothing touches staging or production.
-      - name: Set up Python for application-level check
-        if: env.NO_BACKUP != 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install backend dependencies
-        if: env.NO_BACKUP != 'true'
-        working-directory: backend
-        run: |
-          pip install -q -r requirements.txt
-          pip install -q "psycopg2-binary>=2.9"
-
       - name: Create throwaway test admin in the restored database
         if: env.NO_BACKUP != 'true'
         working-directory: backend

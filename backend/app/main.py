@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import sqlalchemy.exc as _sa_exc
 from fastapi.encoders import ENCODERS_BY_TYPE
 import datetime as _dt
 from datetime import timezone as _tzmod
@@ -33,55 +34,59 @@ _maint_cache: dict = {
     "pending_until": None,  # ISO timestamp; None = no drain period / immediate lock
     "expires": 0.0,
 }
+# Only the expired-cache refresher takes this lock. Fresh-cache reads remain
+# lock-free, while expiry boundaries collapse concurrent refreshes to one DB
+# checkout instead of stampeding the connection pool.
+_maint_refresh_lock = threading.Lock()
 
 def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
     """Returns (is_active, message, block_reads, block_logins, phase, pending_until).
 
-    phase is one of:
-      "normal"  — maintenance not active
-      "pending" — maintenance enabled but still within the drain window; writes NOT yet blocked
-      "locked"  — maintenance active and drain window has passed; writes blocked
+    Fresh-cache reads are lock-free. Once expired, a double-checked single-flight
+    lock allows exactly one thread per worker to refresh from the database.
     """
-    import datetime as _dt
-    now = _time.monotonic()
-    if now < _maint_cache["expires"]:
-        active = _maint_cache["active"]
-        pending_until_iso = _maint_cache["pending_until"]
-        phase = _compute_phase(active, pending_until_iso)
-        return (active, _maint_cache["msg"], _maint_cache["block_reads"],
-                _maint_cache["block_logins"], phase, pending_until_iso)
-    try:
-        from .models.operations import SystemSetting
-        with SessionLocal() as db:
-            row = db.get(SystemSetting, "maintenance_mode")
-            msg_row = db.get(SystemSetting, "maintenance_message")
-            br_row = db.get(SystemSetting, "maintenance_block_reads")
-            bl_row = db.get(SystemSetting, "maintenance_block_logins")
-            pu_row = db.get(SystemSetting, "maintenance_pending_until")
-            active = (row.value == "on") if row else False
-            msg = msg_row.value if msg_row else "System under maintenance. Please try again later."
-            block_reads = (br_row.value == "true") if br_row else False
-            block_logins = (bl_row.value == "true") if bl_row else False
-            pending_until_iso = pu_row.value if pu_row else None
-        _maint_cache["active"] = active
-        _maint_cache["msg"] = msg
-        _maint_cache["block_reads"] = block_reads
-        _maint_cache["block_logins"] = block_logins
-        _maint_cache["pending_until"] = pending_until_iso
-        _maint_cache["expires"] = now + 10.0
-    except Exception:
-        # Pool exhaustion / DB blip: keep the last known state and back off
-        # briefly. Retrying on every request (the old behaviour) re-waited
-        # DB_POOL_TIMEOUT each time, and returning "not active" failed open
-        # during a real maintenance window.
-        _maint_cache["expires"] = now + 2.0
+    def cached_result():
         active = _maint_cache["active"]
         pending_until_iso = _maint_cache["pending_until"]
         return (active, _maint_cache["msg"], _maint_cache["block_reads"],
                 _maint_cache["block_logins"], _compute_phase(active, pending_until_iso),
                 pending_until_iso)
-    phase = _compute_phase(active, pending_until_iso)
-    return active, msg, block_reads, block_logins, phase, pending_until_iso
+
+    now = _time.monotonic()
+    if now < _maint_cache["expires"]:
+        return cached_result()
+
+    with _maint_refresh_lock:
+        # Another request may have refreshed while this thread waited.
+        now = _time.monotonic()
+        if now < _maint_cache["expires"]:
+            return cached_result()
+        try:
+            from .models.operations import SystemSetting
+            with SessionLocal() as db:
+                row = db.get(SystemSetting, "maintenance_mode")
+                msg_row = db.get(SystemSetting, "maintenance_message")
+                br_row = db.get(SystemSetting, "maintenance_block_reads")
+                bl_row = db.get(SystemSetting, "maintenance_block_logins")
+                pu_row = db.get(SystemSetting, "maintenance_pending_until")
+                active = (row.value == "on") if row else False
+                msg = msg_row.value if msg_row else "System under maintenance. Please try again later."
+                block_reads = (br_row.value == "true") if br_row else False
+                block_logins = (bl_row.value == "true") if bl_row else False
+                pending_until_iso = pu_row.value if pu_row else None
+            _maint_cache["active"] = active
+            _maint_cache["msg"] = msg
+            _maint_cache["block_reads"] = block_reads
+            _maint_cache["block_logins"] = block_logins
+            _maint_cache["pending_until"] = pending_until_iso
+            _maint_cache["expires"] = now + 10.0
+        except Exception:
+            # Keep the last known state and briefly back off. The same lock also
+            # prevents an error boundary from turning into repeated pool waits.
+            _maint_cache["expires"] = now + 2.0
+            return cached_result()
+        return (active, msg, block_reads, block_logins,
+                _compute_phase(active, pending_until_iso), pending_until_iso)
 
 
 def _compute_phase(active: bool, pending_until_iso: str | None) -> str:
@@ -204,6 +209,12 @@ _MAINTENANCE_ALWAYS_EXEMPT = frozenset({
     # Login is exempt here; the handler applies block_logins after role is known
     # so system_admin can always log back in even when block_logins=True (MAINT-03).
     "/api/auth/login",
+    # Sign-in is lookup (unit+role -> user_id) THEN login. lookup is a POST, so
+    # the gate treated it as a write and 503'd every fresh sign-in -- system_admin
+    # included -- in any locked window, defeating the login exemption above. It
+    # changes nothing but the same failed-attempt record login itself writes;
+    # block_logins is still enforced by the login handler.
+    "/api/auth/lookup",
     "/api/system/maintenance",
     "/api/system/maintenance/enable",
     "/api/system/maintenance/disable",
@@ -406,6 +417,62 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+# ── Request concurrency cap (per worker) ────────────────────────────────────
+# Defined after the other @app.middleware functions, so it wraps every
+# DB-using middleware (CORS, added below, stays outermost). Prevents the
+# thread-pool / connection-pool deadlock found at national scale: FastAPI runs
+# a sync dependency (get_principal: holds a DB connection) and the sync
+# endpoint as separate thread-pool jobs, so a request holds its connection
+# while waiting for a thread; under overload the connections were held by
+# requests waiting for threads and the threads by requests waiting for
+# connections, and the worker stayed wedged even after load stopped. With at
+# most REQUEST_CONCURRENCY (default DB_POOL_SIZE; the overflow is left for the
+# few nested sessions) requests in flight, every admitted request can get its
+# connection; the rest wait here asynchronously -- holding neither a thread
+# nor a connection -- and get 503 if the wait exceeds REQUEST_QUEUE_TIMEOUT_SEC.
+_CONCURRENCY_EXEMPT = frozenset({"/api/health", "/healthz"})
+_request_slots = None
+
+
+def reset_request_slots() -> None:
+    """Re-read REQUEST_CONCURRENCY (tests)."""
+    global _request_slots
+    _request_slots = None
+
+
+def _busy() -> JSONResponse:
+    return JSONResponse(status_code=503, headers={"Retry-After": "5"}, content={
+        "error": "server_busy", "message": "The service is busy. Please try again in a few seconds."})
+
+
+@app.middleware("http")
+async def request_concurrency_cap(request: Request, call_next):
+    import asyncio
+    global _request_slots
+    if request.url.path in _CONCURRENCY_EXEMPT:
+        return await call_next(request)
+    if _request_slots is None:
+        _request_slots = asyncio.Semaphore(settings.REQUEST_CONCURRENCY or settings.DB_POOL_SIZE)
+    try:
+        await asyncio.wait_for(_request_slots.acquire(), timeout=settings.REQUEST_QUEUE_TIMEOUT_SEC)
+    except asyncio.TimeoutError:
+        logging.getLogger("capacity").warning('{"event":"request_queue_timeout","path":"%s"}', request.url.path)
+        return _busy()
+    try:
+        return await call_next(request)
+    except _sa_exc.TimeoutError:
+        # Raised in a middleware below the exception handlers (e.g. the DB-backed
+        # rate limiter): still overload, not an internal error.
+        logging.getLogger("capacity").warning('{"event":"db_pool_exhausted","path":"%s"}', request.url.path)
+        return _busy()
+    except (_sa_exc.OperationalError, _sa_exc.DisconnectionError) as exc:
+        logging.getLogger("capacity").error('{"event":"database_unavailable","path":"%s","error":"%s"}',
+                                            request.url.path, type(exc).__name__)
+        return _db_unavailable()
+    finally:
+        _request_slots.release()
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -422,6 +489,38 @@ for r in (health.router, auth.router, organisations.router, accounts.router,
     app.include_router(r)
 
 app.include_router(custom_phases_router, prefix="/api")
+
+
+@app.exception_handler(_sa_exc.TimeoutError)
+async def db_pool_exhausted(request: Request, exc: Exception):
+    """Every pooled DB connection is busy and the wait (DB_POOL_TIMEOUT) ran out.
+
+    That is overload, not a code defect: answer 503 + Retry-After so clients
+    back off and monitoring points at capacity. National qualification at 250
+    users produced 178 such failures as opaque 500 "internal_error"."""
+    logging.getLogger("capacity").warning(
+        '{"event":"db_pool_exhausted","path":"%s","pool_size":%d,"max_overflow":%d,"timeout_s":%d}',
+        request.url.path, settings.DB_POOL_SIZE, settings.DB_POOL_MAX_OVERFLOW, settings.DB_POOL_TIMEOUT)
+    return JSONResponse(status_code=503, headers={"Retry-After": "5"}, content={
+        "error": "server_busy", "message": "The service is busy. Please try again in a few seconds."})
+
+
+def _db_unavailable() -> JSONResponse:
+    return JSONResponse(status_code=503, headers={"Retry-After": "10"}, content={
+        "error": "database_unavailable",
+        "message": "The service is temporarily unavailable. Please try again shortly."})
+
+
+@app.exception_handler(_sa_exc.OperationalError)
+@app.exception_handler(_sa_exc.DisconnectionError)
+async def db_unreachable(request: Request, exc: Exception):
+    """The database refused or dropped the connection (outage, failover,
+    restart). Unavailability, not a code defect: 503 + Retry-After, with no
+    connection details in the response. The pool recovers by itself when the
+    database returns (verified by the failure drill)."""
+    logging.getLogger("capacity").error('{"event":"database_unavailable","path":"%s","error":"%s"}',
+                                        request.url.path, type(exc).__name__)
+    return _db_unavailable()
 
 
 @app.exception_handler(500)

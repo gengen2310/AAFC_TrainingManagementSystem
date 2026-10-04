@@ -8,7 +8,7 @@ from ..database import get_db
 from ..config import settings
 from ..models import ExportLog, SourceFile
 from ..dependencies import get_principal
-from ..permissions import Principal
+from ..permissions import Principal, require_write_role
 from ..services import audit, visible_curriculum_items
 
 router = APIRouter(prefix="/api", tags=["export-import"])
@@ -120,8 +120,7 @@ def program_import_preview(body: ProgramImportPreviewIn, db: DBSession = Depends
 
     Does not commit anything. Treats all cell content as data (no formula execution).
     """
-    if p.role not in ("sqn_admin", "wing_admin", "national_admin", "system_admin"):
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     try:
         raw = base64.b64decode(body.file_b64)
     except Exception:

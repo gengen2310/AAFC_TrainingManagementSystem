@@ -45,7 +45,7 @@ test.describe("Year rollover", () => {
 
   test("sqn_admin can rollover a planning year with parade dates", async ({ page }) => {
     const hdr = await authHeader(page, "ADMIN703");
-    const srcYear = await allocateYear(page, hdr, 2000 + (RUN_ID % 1800));
+    const srcYear = await allocateYear(page, hdr, 3000 + (RUN_ID % 1800));
     let yearId = "";
     let newYearId = "";
 

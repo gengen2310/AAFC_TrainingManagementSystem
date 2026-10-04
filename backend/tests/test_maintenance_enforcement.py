@@ -288,24 +288,32 @@ def test_create_and_archive_squadron(client):
 
 
 def test_archive_squadron_forbidden_wing_other(client):
-    """wing_admin cannot archive a squadron in a different wing."""
+    """wing_admin cannot archive a squadron in a different wing.
+
+    Previously skipped whenever the test DB held one Wing -- which is always --
+    so this cross-Wing check never ran. It now creates its own second Wing and
+    Squadron, and also proves the same wing_admin CAN archive in its own Wing
+    (so the 403 is the scope rule, not a blanket denial).
+    """
+    import uuid
     wing_hdr = _wing_admin(client)
-    nat_hdr = _nat_admin(client)
-    # Find a squadron not in 7WG
-    r = client.get("/api/wings", headers=nat_hdr)
-    other_wing_id = None
-    for w in r.json():
-        if "7WG" not in (w.get("code") or ""):
-            other_wing_id = w["wing_id"]
-            break
-    if not other_wing_id:
-        pytest.skip("Only one wing in test DB")
-    r2 = client.get("/api/squadrons", headers=nat_hdr)
-    other_sqn = next((s for s in r2.json() if s["wing_id"] == other_wing_id), None)
-    if not other_sqn:
-        pytest.skip("No squadrons in other wing")
-    r3 = client.post(f"/api/squadrons/{other_sqn['squadron_id']}/archive", headers=wing_hdr)
-    assert r3.status_code == 403
+    sysadmin_hdr = _sysadmin(client)
+    tag = uuid.uuid4().hex[:5].upper()
+    w = client.post("/api/wings", json={"code": f"X{tag}", "name": f"Other Wing {tag}",
+                                        "timezone": "Australia/Perth"}, headers=sysadmin_hdr)
+    assert w.status_code in (200, 201), w.text
+    other = client.post("/api/squadrons", json={"wing_id": w.json()["wing_id"], "code": f"9{tag}",
+                                                "name": f"Other Sqn {tag}"}, headers=sysadmin_hdr)
+    assert other.status_code == 200, other.text
+    r = client.post(f"/api/squadrons/{other.json()['squadron_id']}/archive", headers=wing_hdr)
+    assert r.status_code == 403, r.text
+
+    me = client.get("/api/auth/me", headers=wing_hdr).json()["session"]
+    own = client.post("/api/squadrons", json={"wing_id": me["wing_id"], "code": f"8{tag}",
+                                              "name": f"Own Sqn {tag}"}, headers=sysadmin_hdr)
+    assert own.status_code == 200, own.text
+    r = client.post(f"/api/squadrons/{own.json()['squadron_id']}/archive", headers=wing_hdr)
+    assert r.status_code == 200, r.text
 
 
 def test_archive_squadron_forbidden_sqn_general(client):
@@ -463,3 +471,65 @@ def test_disable_maintenance_clears_block_flags(client):
     assert d["enabled"] is False
     assert d["block_reads"] is False
     assert d["block_logins"] is False
+
+
+def test_expired_maintenance_cache_refresh_is_single_flight(monkeypatch):
+    """Concurrent requests at one cache boundary must cause one DB checkout.
+
+    This is the regression guard for the pool-stampede failure mode: fresh
+    reads stay lock-free, while every waiter after expiry observes the first
+    thread's refreshed cache instead of opening another SessionLocal.
+    """
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    import app.main as main_module
+
+    snapshot = dict(main_module._maint_cache)
+    session_opens = 0
+    count_lock = threading.Lock()
+    worker_count = 16
+    barrier = threading.Barrier(worker_count)
+
+    class FakeSession:
+        def __enter__(self):
+            # Keep the elected refresher busy briefly so the other workers all
+            # reach the refresh boundary while it owns the single-flight lock.
+            time.sleep(0.05)
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, model, key):
+            return None
+
+    def fake_session_local():
+        nonlocal session_opens
+        with count_lock:
+            session_opens += 1
+        return FakeSession()
+
+    monkeypatch.setattr(main_module, "SessionLocal", fake_session_local)
+    main_module._maint_cache.update({
+        "active": False,
+        "msg": "",
+        "block_reads": False,
+        "block_logins": False,
+        "pending_until": None,
+        "expires": 0.0,
+    })
+
+    def read_at_boundary():
+        barrier.wait(timeout=5)
+        return main_module._maintenance_active()
+
+    try:
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
+            results = list(pool.map(lambda _: read_at_boundary(), range(worker_count)))
+        assert session_opens == 1
+        assert all(result[0] is False for result in results)
+        assert all(result[4] == "normal" for result in results)
+    finally:
+        main_module._maint_cache.clear()
+        main_module._maint_cache.update(snapshot)

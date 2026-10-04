@@ -11,13 +11,17 @@ from ..models import (
 )
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
-from ..permissions import Principal, require_role, require_can_view_squadron, require_can_write_squadron, require_system_or_nat_admin
+from ..permissions import is_wing_writer  # noqa: E402
+from ..permissions import is_national_admin  # noqa: E402
+from ..permissions import (
+    Principal, require_role, require_can_view_squadron, require_can_write_squadron,
+    require_system_or_nat_admin, require_audit_access,
+)
 from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
 router = APIRouter(prefix="/api", tags=["organisations"])
 
-_NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
 
 
 # ── Organisations ──
@@ -58,7 +62,7 @@ class WingCreateIn(BaseModel):
 @router.post("/wings")
 def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
                 p: Principal = Depends(get_principal)):
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only NAT HQ admin can create Wings."})
     code = (body.code or "").strip().upper()
@@ -305,7 +309,7 @@ def create_squadron(body: SquadronCreateIn, db: DBSession = Depends(get_db),
     Wing admin: own Wing only.
     Other roles: 403.
     """
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only Wing or NAT HQ admin can create Squadrons / Specialist Units."})
     # Wing admin scope check
@@ -350,7 +354,7 @@ def squadron_archive_impact(squadron_id: str, db: DBSession = Depends(get_db),
     blocks on (archiving never cascades into or destroys these), so they
     are informational only for the wizard to surface and require
     acknowledgement of, per the plan's explicit design."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -429,7 +433,7 @@ def archive_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     system_admin and national_admin: any unit.
     wing_admin: only units in their own Wing.
     """
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -459,7 +463,7 @@ def restore_squadron(squadron_id: str, db: DBSession = Depends(get_db),
                      p: Principal = Depends(get_principal)):
     """Restore a previously archived Squadron/Specialist Unit.
     system_admin and national_admin: any unit. wing_admin: only units in their own Wing."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -492,7 +496,7 @@ def delete_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Princi
     is a denormalized column, not a DB-enforced foreign key. Additive to the
     existing archive path; archive remains the default whenever any
     dependent exists."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -690,16 +694,11 @@ def current_proxy(p: Principal = Depends(get_principal)):
     return {"active": True, "mode": p.proxy_mode, "acting_squadron_id": p.acting_squadron_id}
 
 
-# sqn_general reads its own squadron's audit rows read-only (2026-09-28 product
-# decision); the query below scopes non-national, non-wing actors to squadron_id.
-_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "sqn_general", "wing_admin", "national_admin", "national_viewer", "system_admin"})
-
-# ── Audit (read-only; auditor + wing/national admins) ──
+# ── Audit (read-only; centrally authorized, scoped below) ──
 @router.get("/audit")
 def get_audit(object_type: str | None = None, object_id: str | None = None, batch_id: str | None = None,
               limit: int = 300, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _AUDIT_READ_ROLES:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_audit_access(p)
     q = db.query(AuditLog)
     if not p.is_national:
         if p.is_wing:

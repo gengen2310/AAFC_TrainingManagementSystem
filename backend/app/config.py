@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 5
     DB_POOL_MAX_OVERFLOW: int = 2
     DB_POOL_TIMEOUT: int = 30
+    # In-flight requests admitted per worker (0 = DB_POOL_SIZE). Keeping this at
+    # or below the pool size means an admitted request can always get its DB
+    # connection; see main.request_concurrency_cap.
+    REQUEST_CONCURRENCY: int = 0
+    REQUEST_QUEUE_TIMEOUT_SEC: float = 10
 
     # Secrets — MUST be overridden in production via environment.
     # Dev defaults are ≥32 bytes to satisfy HS256 key-length requirements during local testing.

@@ -18,8 +18,7 @@ from ..models import (
 )
 from ..services_year import current_year, find_year_context
 from ..dependencies import get_principal
-from ..permissions import Principal
-from .training import _view_squadron_id, _NAT_ADMIN_ROLES
+from ..permissions import Principal, resolve_view_squadron_id
 
 router = APIRouter(prefix="/api", tags=["setup"])
 
@@ -36,7 +35,7 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         national = {"wings_created": wings_created, "squadrons_created": squadrons_created}
 
     squadron = None
-    sq_id = _view_squadron_id(p, squadron_id, db)
+    sq_id = resolve_view_squadron_id(p, squadron_id, db)
     if sq_id:
         s = db.get(Squadron, sq_id)
         if s:

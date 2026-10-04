@@ -26,7 +26,11 @@ from ..models import (TimingTemplate, TimingBlock, ParadeNightTimingOverride,
 from ..models.training import SessionAudience, TrainingClass
 from ..models.training import BLOCK_TYPES
 from ..dependencies import get_principal, client_meta
-from ..permissions import Principal, require_can_view_squadron, require_can_write_squadron
+from ..permissions import (
+    Principal, require_write_role,
+    require_can_view_squadron, require_can_write_squadron,
+)
+from ..services_timing import effective_template
 from ..services import audit
 
 
@@ -40,7 +44,6 @@ def _check_version(obj, client_version: int | None) -> None:
 
 router = APIRouter(prefix="/api", tags=["timing"])
 
-_WRITE_BLOCKED = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
 _TIME_RE = re.compile(r'^([01]\d|2[0-3]):([0-5]\d)$')
 
 
@@ -101,30 +104,6 @@ def _template_dict(t: TimingTemplate, include_blocks: bool = True) -> dict:
     return d
 
 
-def _effective_template(db: DBSession, squadron_id: str, date: str) -> TimingTemplate | None:
-    """Return the timing template effective on the given ISO date for a squadron.
-
-    Picks the most recent template whose effective_from <= date and whose
-    effective_to is None or >= date. Past parade nights that were created with
-    a different template are unaffected — this only controls new lookups.
-    """
-    candidates = (
-        db.query(TimingTemplate)
-        .filter(
-            TimingTemplate.squadron_id == squadron_id,
-            TimingTemplate.is_archived == False,    # noqa: E712
-            TimingTemplate.active_status == True,   # noqa: E712
-            TimingTemplate.effective_from <= date,
-        )
-        .order_by(TimingTemplate.effective_from.desc())
-        .all()
-    )
-    for t in candidates:
-        if t.effective_to is None or t.effective_to >= date:
-            return t
-    return None
-
-
 def _active_squadron(p: Principal):
     """The squadron a write should target: proxy/intervention target, else home.
 
@@ -174,7 +153,15 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
     leaves the template's current blocks untouched rather than being torn
     down partway through a failed save.
     """
-    ip_counter = 0
+    # Missing period numbers must be allocated *after* all explicit numbers.
+    # Otherwise editing a saved template with periods 1..N and adding one new
+    # Training Period (period_number=None) incorrectly reuses 1 and fails as a
+    # duplicate. Preserve explicit numbering and extend from its current max.
+    explicit_period_numbers = [
+        bd.period_number for bd in block_data
+        if bd.block_type == "training_period" and bd.period_number is not None
+    ]
+    ip_counter = max(explicit_period_numbers, default=0)
     resolved: list[tuple[int, "BlockIn", bool, int | None]] = []
     seen_period_numbers: set[int] = set()
     for i, bd in enumerate(block_data):
@@ -315,8 +302,7 @@ def create_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     sq_id = _active_squadron(p)
     if not sq_id:
         raise HTTPException(400, detail={"error": "no_squadron_scope",
@@ -361,7 +347,7 @@ def create_timing_template(
 # ── GET /api/timing-templates/effective ── (must come before {tid} route)
 
 @router.get("/timing-templates/effective")
-def get_effective_template(
+def geteffective_template(
     date: str,
     squadron_id: str | None = None,
     db: DBSession = Depends(get_db),
@@ -379,7 +365,7 @@ def get_effective_template(
     if s:
         require_can_view_squadron(p, s.id, s.wing_id)
 
-    t = _effective_template(db, sq_id, date)
+    t = effective_template(db, sq_id, date)
     if not t:
         return {"template": None, "instructional_period_count": None,
                 "message": "No timing template is set for this date."}
@@ -414,8 +400,7 @@ def update_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -461,8 +446,7 @@ def archive_timing_template(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -497,8 +481,7 @@ def apply_from_date(
     that would overlap. Past parade nights are NOT changed — only new creation will
     use the new template.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     t = db.get(TimingTemplate, tid)
     if not t or t.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -575,7 +558,7 @@ def get_parade_timing(
                 "template": _template_dict(t),
             }
 
-    effective = _effective_template(db, pn.squadron_id, pn.date)
+    effective = effective_template(db, pn.squadron_id, pn.date)
     if effective:
         return {"source": "default", "template": _template_dict(effective)}
 
@@ -598,8 +581,7 @@ def set_timing_override(
 
     Does not change the squadron's default future template.
     """
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     pn = db.get(ParadeNight, pnid)
     if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -653,8 +635,7 @@ def remove_timing_override(
     p: Principal = Depends(get_principal),
 ):
     """Remove a one-night timing override. The parade night reverts to the default template."""
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
     pn = db.get(ParadeNight, pnid)
     if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
@@ -774,7 +755,7 @@ def get_parade_night_schedule(
 
     template_id = pn.timing_template_id
     if not template_id:
-        effective = _effective_template(db, pn.squadron_id, pn.date)
+        effective = effective_template(db, pn.squadron_id, pn.date)
         template_id = effective.id if effective else None
     blocks = _resolved_template_blocks(db, template_id)
     sessions = (

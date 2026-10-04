@@ -17,6 +17,31 @@ ROLES = {
 WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
 WING_LEVEL = {"wing_viewer", "wing_admin"}
 NATIONAL_LEVEL = {"national_viewer", "national_admin", "system_admin", "auditor"}
+# Named role sets used for authorization decisions across routers (previously
+# re-declared or spelled out inline in each router).
+NATIONAL_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
+WING_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
+READ_ONLY_ROLES = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
+
+
+def is_national_admin(p: "Principal") -> bool:
+    """national_admin or system_admin (e.g. may edit national curriculum)."""
+    return p.role in NATIONAL_ADMIN_ROLES
+
+
+def is_wing_writer(p: "Principal") -> bool:
+    """May write Wing-owned data: wing_admin, national_admin, system_admin."""
+    return p.role in WING_WRITE_ROLES
+
+
+def is_writer(p: "Principal") -> bool:
+    """Any write-capable role (WRITE_ROLES)."""
+    return p.role in WRITE_ROLES
+
+
+def is_read_only_role(p: "Principal") -> bool:
+    """Roles with no write authority anywhere."""
+    return p.role in READ_ONLY_ROLES
 
 
 @dataclass
@@ -179,6 +204,35 @@ def require_role(p: Principal, *roles: str):
         })
 
 
+def require_write_role(p: Principal, message: str | None = None):
+    """Require one of the system's write-capable roles."""
+    if p.role not in WRITE_ROLES:
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": message or "This action requires write-capable administrator access.",
+        })
+
+
+def resolve_view_squadron_id(p: Principal, squadron_id: str | None, db) -> str | None:
+    """Resolve the Squadron an unqualified READ means.
+
+    An explicit Squadron is validated through the same central view-policy used
+    everywhere else. With no explicit target, a Squadron account reads its
+    home Squadron and a higher-scope account reads its current proxy/
+    intervention target (or None when no Squadron has been selected).
+
+    This helper intentionally performs no write authorization.
+    """
+    if squadron_id:
+        from .models import Squadron
+        squadron = db.get(Squadron, squadron_id)
+        if not squadron:
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        require_can_view_squadron(p, squadron.id, squadron.wing_id)
+        return squadron.id
+    return p.active_squadron_id
+
+
 def require_system_admin(p: Principal):
     if not p.is_system_admin:
         raise HTTPException(403, detail={
@@ -195,10 +249,25 @@ def require_system_or_nat_admin(p: Principal):
         })
 
 
+AUDIT_READ_ROLES = frozenset({
+    "auditor",
+    "sqn_admin",
+    "sqn_general",
+    "wing_admin",
+    "national_admin",
+    "national_viewer",
+    "system_admin",
+})
+
+
 def require_audit_access(p: Principal):
-    """Roles permitted to read audit logs."""
-    if p.role not in ("system_admin", "national_admin", "auditor"):
+    """Central policy for read-only audit-log access.
+
+    Scope filtering remains the caller's responsibility; this helper answers
+    only whether the role may read audit records at all.
+    """
+    if p.role not in AUDIT_READ_ROLES:
         raise HTTPException(403, detail={
             "error": "forbidden",
-            "message": "Audit log access is restricted to System Administrator, National Administrator, or Auditor roles.",
+            "message": "This role does not have audit-log read access.",
         })

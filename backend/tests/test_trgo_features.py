@@ -566,10 +566,10 @@ def test_facilitator_import_handles_1000_row_file(client):
 # ─────────────────────────────────────────────────────────────
 
 def test_facilitator_create_retried_with_same_idempotency_key_does_not_duplicate(client):
-    from app.security import reset_idempotency_cache
-    reset_idempotency_cache()
+    import uuid
+    run = uuid.uuid4().hex[:8]  # unique keys: the dedup store is shared, not per-process
     hdr = dict(_sqn_admin_hdr(client))
-    hdr["Idempotency-Key"] = "test-idem-key-001"
+    hdr["Idempotency-Key"] = f"test-idem-key-001-{run}"
     body = {"first_name": "Idem", "last_name": "Retry", "confirm_duplicate": True}
 
     r1 = client.post("/api/facilitators", json=body, headers=hdr)
@@ -584,15 +584,15 @@ def test_facilitator_create_retried_with_same_idempotency_key_does_not_duplicate
 
 
 def test_facilitator_create_different_idempotency_keys_both_apply(client):
-    from app.security import reset_idempotency_cache
-    reset_idempotency_cache()
+    import uuid
+    run = uuid.uuid4().hex[:8]  # unique keys: the dedup store is shared, not per-process
     hdr = dict(_sqn_admin_hdr(client))
 
-    hdr["Idempotency-Key"] = "test-idem-key-002a"
+    hdr["Idempotency-Key"] = f"test-idem-key-002a-{run}"
     r1 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "First"}, headers=hdr)
     assert r1.status_code == 200, r1.text
 
-    hdr["Idempotency-Key"] = "test-idem-key-002b"
+    hdr["Idempotency-Key"] = f"test-idem-key-002b-{run}"
     r2 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "Second"}, headers=hdr)
     assert r2.status_code == 200, r2.text
     assert r1.json()["facilitator_id"] != r2.json()["facilitator_id"]

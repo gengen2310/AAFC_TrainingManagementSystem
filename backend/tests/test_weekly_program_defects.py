@@ -269,26 +269,26 @@ def test_replacing_a_templates_blocks_with_duplicate_period_numbers_is_rejected_
     assert len(blocks) == 1 and blocks[0]["block_name"] == "Period 1"
 
 
-def test_duplicate_period_number_via_auto_assignment_collision_is_also_rejected(client):
-    """One block explicitly claims period_number=2; a later block with no
-    explicit period_number auto-increments into the same value. This is just
-    as ambiguous as an explicit duplicate and must be rejected the same way."""
+def test_missing_period_numbers_continue_after_highest_explicit_number(client):
+    """A new training-period block added beside existing explicit periods gets
+    the next free number instead of colliding with an already-saved period."""
     hdr = _sqn_admin_hdr(client)
     year = next_test_year()
     r = client.post("/api/timing-templates", json={
-        "name": f"Auto Collision Template {year}",
+        "name": f"Auto Allocation Template {year}",
         "effective_from": f"{year}-01-01",
         "blocks": [
             {"display_order": 0, "block_name": "Explicit Period 2", "block_type": "training_period",
              "period_number": 2, "start_time": "19:00", "end_time": "19:45"},
-            {"display_order": 1, "block_name": "Auto Period 1", "block_type": "training_period",
+            {"display_order": 1, "block_name": "Auto Period 3", "block_type": "training_period",
              "start_time": "19:50", "end_time": "20:35"},
-            {"display_order": 2, "block_name": "Auto Period 2 Collision", "block_type": "training_period",
+            {"display_order": 2, "block_name": "Auto Period 4", "block_type": "training_period",
              "start_time": "20:40", "end_time": "21:25"},
         ],
     }, headers=hdr)
-    assert r.status_code == 400, r.text
-    assert r.json()["detail"]["error"] == "duplicate_period_number"
+    assert r.status_code == 200, r.text
+    periods = [b["period_number"] for b in r.json()["blocks"] if b["is_instructional_period"]]
+    assert periods == [2, 3, 4]
 
 
 def test_distinct_period_numbers_still_save_normally(client):

@@ -90,14 +90,14 @@ class TestChangeCodeTargetsActiveRow:
         uid = _get_sqn_admin_id(client)
         hdr = login(client, "ADMIN703")
         r = client.post("/api/auth/change-code",
-                        json={"user_id": uid, "new_code": "CHANGECODE1"},
+                        json={"user_id": uid, "new_code": "CHANGECODE1", "current_code": "ADMIN703"},
                         headers=hdr)
         assert r.status_code == 200
         new_hdr = login(client, "CHANGECODE1")
         assert new_hdr is not None
         # Restore
         r2 = client.post("/api/auth/change-code",
-                         json={"user_id": uid, "new_code": "ADMIN703"},
+                         json={"user_id": uid, "new_code": "ADMIN703", "current_code": "CHANGECODE1"},
                          headers=new_hdr)
         assert r2.status_code == 200
 
@@ -114,7 +114,7 @@ class TestChangeCodeTargetsActiveRow:
         try:
             hdr = login(client, "ADMIN703")
             r = client.post("/api/auth/change-code",
-                            json={"user_id": uid, "new_code": "NEWACTIVE99"},
+                            json={"user_id": uid, "new_code": "NEWACTIVE99", "current_code": "ADMIN703"},
                             headers=hdr)
             assert r.status_code == 200
 
@@ -129,7 +129,7 @@ class TestChangeCodeTargetsActiveRow:
             # Restore
             restore_hdr = login(client, "NEWACTIVE99")
             client.post("/api/auth/change-code",
-                        json={"user_id": uid, "new_code": "ADMIN703"},
+                        json={"user_id": uid, "new_code": "ADMIN703", "current_code": "NEWACTIVE99"},
                         headers=restore_hdr)
         finally:
             _cleanup_stale_codes(uid)
@@ -170,7 +170,7 @@ class TestChangeCodeTargetsActiveRow:
         uid = _get_sqn_admin_id(client)
         old_hdr = login(client, "ADMIN703")
         r = client.post("/api/auth/change-code",
-                        json={"user_id": uid, "new_code": "CHANGETEST2"},
+                        json={"user_id": uid, "new_code": "CHANGETEST2", "current_code": "ADMIN703"},
                         headers=old_hdr)
         assert r.status_code == 200
         r_old = client.post("/api/auth/login", json={"code": "ADMIN703"})
@@ -178,7 +178,7 @@ class TestChangeCodeTargetsActiveRow:
         # Restore
         new_hdr = login(client, "CHANGETEST2")
         client.post("/api/auth/change-code",
-                    json={"user_id": uid, "new_code": "ADMIN703"},
+                    json={"user_id": uid, "new_code": "ADMIN703", "current_code": "CHANGETEST2"},
                     headers=new_hdr)
 
 
@@ -570,3 +570,29 @@ class TestSiblingLoginFallbackLockout:
                 f"primary failed_attempts grew more than the 3 genuine failures "
                 f"(before={before}, after={after})"
             )
+
+
+class TestSelfChangeCodeReauthentication:
+    """A stolen authenticated session must not be enough to rotate its own credential."""
+
+    def test_self_change_without_current_code_is_rejected(self, client):
+        uid = _get_sqn_admin_id(client)
+        hdr = login(client, "ADMIN703")
+        r = client.post(
+            "/api/auth/change-code",
+            json={"user_id": uid, "new_code": "ATTEMPT99"},
+            headers=hdr,
+        )
+        assert r.status_code == 403, r.text
+        assert r.json()["detail"]["error"] == "reauth_required"
+
+    def test_self_change_with_wrong_current_code_is_rejected(self, client):
+        uid = _get_sqn_admin_id(client)
+        hdr = login(client, "ADMIN703")
+        r = client.post(
+            "/api/auth/change-code",
+            json={"user_id": uid, "new_code": "ATTEMPT99", "current_code": "WRONG-CODE"},
+            headers=hdr,
+        )
+        assert r.status_code == 403, r.text
+        assert r.json()["detail"]["error"] == "reauth_required"

@@ -2,6 +2,15 @@
 
 ## Project overview
 
+## Current engineering phase — stabilisation
+
+As of 2026-10-03 the product owner has moved the system into a **predictability and sustainability** phase. Read `docs/stabilisation/README.md` before structural work.
+
+- Do not start major net-new feature programmes while stabilisation is active unless the product owner explicitly overrides the freeze.
+- Security, data-integrity, release-blocking and already-authorised workflow fixes remain in scope.
+- Run `python tools/architecture/guard.py` before committing structural work. The guard is a ratchet: the connected-frontend monolith and router-local role-policy debt may shrink but must not silently grow.
+- Prefer behaviour-preserving extraction over rewrites. Refactor and behaviour redesign belong in separate commits/PRs whenever practical.
+
 AAFC Training Management System (TMS) — national connected pilot, v17.1.
 FastAPI backend, PostgreSQL (Supabase-hosted) in deployed environments, SQLite for local dev/tests.
 Two deployed frontends, both intentionally kept separate (see Frontend below).
@@ -22,7 +31,7 @@ convention for this package. Work directly in the git checkout.
 - `backend/app/seeds/seed_all.py` — full demo/synthetic dataset (16 squadrons, Wing, National, curriculum). Calls `reset_db()` (drop+recreate via SQLAlchemy metadata, bypassing Alembic) — after running it against any Alembic-managed DB, run `alembic stamp head` or the `alembic_version` table will be gone.
 - `backend/app/seeds/staging_seed.py` — minimal bootstrap: creates one `system_admin` from `STAGING_BOOTSTRAP_SYSADMIN_CODE` env var, idempotent, no full org data.
 - `backend/docker-entrypoint-staging.sh` — container entrypoint: runs `alembic upgrade head`, then bootstrap seed if no system_admin exists, then gunicorn.
-- `connected-frontend/` — legacy single-file SPA (`index.html`, ~400KB), served by its own Dockerfile/nginx. This is the TMS root frontend — **never replace it with the React app** (see below).
+- `connected-frontend/` — legacy single-file SPA (`index.html`, ~1.25MB at the 2026-10-03 stabilisation baseline), served by its own Dockerfile/nginx. This is the TMS root frontend — **never replace it with the React app** (see below).
 - `frontend/` — React + Vite + TypeScript "Planning Workspace". Also has a `--mode single` build (`npm run build:single`) that inlines everything into one file via `vite-plugin-singlefile`, used by `make connected` to regenerate `connected-frontend/index.html` from the React source — that mode's `outDir` is `dist-single`, the default `build` script's is `dist`. Don't conflate the two when touching build config.
 
 ## Frontend architecture — do not "simplify" this into one app
