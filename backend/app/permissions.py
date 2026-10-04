@@ -15,6 +15,7 @@ ROLES = {
     "system_admin", "auditor",
 }
 WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
+SQUADRON_LEVEL = {"sqn_general", "sqn_admin"}
 WING_LEVEL = {"wing_viewer", "wing_admin"}
 NATIONAL_LEVEL = {"national_viewer", "national_admin", "system_admin", "auditor"}
 # Named role sets used for authorization decisions across routers (previously
@@ -90,6 +91,10 @@ class Principal:
     @property
     def is_national(self) -> bool:
         return self.role in NATIONAL_LEVEL
+
+    @property
+    def is_squadron(self) -> bool:
+        return self.role in SQUADRON_LEVEL
 
     @property
     def is_wing(self) -> bool:

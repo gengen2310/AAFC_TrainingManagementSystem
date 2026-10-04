@@ -55,7 +55,7 @@ def _require_read(p: Principal, wing_id: str) -> None:
     if p.role not in _READ_ROLES:
         raise HTTPException(403, detail={"error": "forbidden"})
     # Scope enforcement for scoped roles
-    if p.role in ("sqn_admin", "sqn_general") and p.wing_id != wing_id:
+    if p.is_squadron and p.wing_id != wing_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if p.is_wing and p.wing_id != wing_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -716,7 +716,7 @@ def get_squadron_overlay(
     sqn_id = squadron_id or p.active_squadron_id
     if squadron_id and squadron_id != p.active_squadron_id:
         # Cross-squadron status lookup only allowed for wing/national/system scope
-        if p.role in ("sqn_admin", "sqn_general"):
+        if p.is_squadron:
             raise HTTPException(403, detail={"error": "out_of_scope"})
         if p.is_wing:
             sqn = db.get(Squadron, squadron_id)

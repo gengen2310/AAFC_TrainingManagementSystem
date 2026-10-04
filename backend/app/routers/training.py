@@ -4353,7 +4353,7 @@ def get_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depen
         # (inherited) -- previously required require_can_view_wing, which
         # every squadron role always fails (can_view_wing has no squadron
         # branch at all), for the same reason as the national case above.
-        viewer_wing_id = p.wing_id if p.role in ("sqn_admin", "sqn_general") else None
+        viewer_wing_id = p.wing_id if p.is_squadron else None
         if not (p.can_view_wing(a.wing_id) or (viewer_wing_id and viewer_wing_id == a.wing_id)):
             require_can_view_wing(p, a.wing_id)  # always raises here; reuses its exact error message
         view_scope = "wing"

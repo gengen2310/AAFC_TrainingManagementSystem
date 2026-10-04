@@ -114,7 +114,7 @@ def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
         if target.squadron_id:
             sqn = db.get(Squadron, target.squadron_id)
             return sqn is not None and sqn.wing_id == p.wing_id
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         return target.squadron_id == p.squadron_id
     return False
 

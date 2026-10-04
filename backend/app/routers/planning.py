@@ -370,7 +370,7 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
         _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         if py.unit_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
     elif p.role == "wing_admin":
@@ -704,7 +704,7 @@ def list_planning_years(
     this list, so returning them by default would break every one of them.
     """
     q = db.query(PlanningYear)
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
     elif p.is_wing:
         q = q.filter(PlanningYear.wing_id == p.wing_id)
@@ -730,7 +730,7 @@ def list_planning_years(
             wing_code=wg.code if wg else None,
         ))
 
-    sqn_id = p.squadron_id if p.role in ("sqn_admin", "sqn_general") else unit_id
+    sqn_id = p.squadron_id if p.is_squadron else unit_id
 
     # Years the user may select that have no row yet. Listing one does NOT
     # create it -- materialisation happens on write, in ensure_year_context.
@@ -2774,7 +2774,7 @@ def list_locations(
         TrainingArea.active_status == True,  # noqa: E712
         TrainingArea.is_archived == False,  # noqa: E712
     )
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         q = q.filter(TrainingArea.squadron_id == p.squadron_id)
     elif p.is_wing:
         sqn_ids = [s.id for s in db.query(Squadron).filter(
@@ -3292,7 +3292,7 @@ def get_command_centre(
             _require_year_access(p, py)
     else:
         q = db.query(PlanningYear)
-        if p.role in ("sqn_admin", "sqn_general"):
+        if p.is_squadron:
             q = q.filter(PlanningYear.unit_id == p.squadron_id)
         elif p.is_wing:
             q = q.filter(PlanningYear.wing_id == p.wing_id)
@@ -3516,7 +3516,7 @@ def get_command_centre(
     nights_missing_fac = len(nights_missing_fac_ids)
 
     # Determine scope for data freshness (command-centre is squadron or wing scoped)
-    _cc_scope = "squadron" if p.role in ("sqn_admin", "sqn_general") else "wing"
+    _cc_scope = "squadron" if p.is_squadron else "wing"
     _cc_sq_id = py.unit_id if _cc_scope == "squadron" else None
     _cc_wing_id = (py.wing_id or p.wing_id) if _cc_scope == "wing" else None
 
@@ -3734,7 +3734,7 @@ def _curriculum_scope_query(db: DBSession, p: Principal):
         CurriculumItem.is_archived == False,  # noqa: E712
         CurriculumItem.active_status == True,  # noqa: E712
     )
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         sqn = db.get(Squadron, p.squadron_id) if p.squadron_id else None
         wing_id = sqn.wing_id if sqn else None
         q = q.filter(or_(

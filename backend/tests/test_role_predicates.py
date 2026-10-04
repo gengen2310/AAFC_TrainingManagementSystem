@@ -29,3 +29,9 @@ def test_national_admin_wing_writer_writer_and_read_only_sets():
         assert P.is_wing_writer(p) == (r in {"wing_admin", "national_admin", "system_admin"}), r
         assert P.is_writer(p) == (r in {"sqn_admin", "wing_admin", "national_admin", "system_admin"}), r
         assert P.is_read_only_role(p) == (r in ("sqn_general", "wing_viewer", "national_viewer", "auditor")), r
+
+
+def test_is_squadron_equals_the_old_squadron_tuple():
+    # Replaced 11 inline `p.role in ("sqn_admin", "sqn_general")` scope checks.
+    for r in P.ROLES:
+        assert _p(r).is_squadron == (r in ("sqn_admin", "sqn_general")), r
