@@ -17,6 +17,31 @@ ROLES = {
 WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
 WING_LEVEL = {"wing_viewer", "wing_admin"}
 NATIONAL_LEVEL = {"national_viewer", "national_admin", "system_admin", "auditor"}
+# Named role sets used for authorization decisions across routers (previously
+# re-declared or spelled out inline in each router).
+NATIONAL_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
+WING_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
+READ_ONLY_ROLES = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
+
+
+def is_national_admin(p: "Principal") -> bool:
+    """national_admin or system_admin (e.g. may edit national curriculum)."""
+    return p.role in NATIONAL_ADMIN_ROLES
+
+
+def is_wing_writer(p: "Principal") -> bool:
+    """May write Wing-owned data: wing_admin, national_admin, system_admin."""
+    return p.role in WING_WRITE_ROLES
+
+
+def is_writer(p: "Principal") -> bool:
+    """Any write-capable role (WRITE_ROLES)."""
+    return p.role in WRITE_ROLES
+
+
+def is_read_only_role(p: "Principal") -> bool:
+    """Roles with no write authority anywhere."""
+    return p.role in READ_ONLY_ROLES
 
 
 @dataclass

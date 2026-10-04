@@ -294,7 +294,7 @@ def list_tickets(
 
     q = db.query(ServiceTicket)
 
-    if p.role in ("wing_admin", "wing_viewer"):
+    if p.is_wing:
         # New rows carry ServiceTicket.wing_id directly; the outer join keeps
         # legacy squadron-only rows visible during/after migration.
         q = (

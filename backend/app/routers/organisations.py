@@ -11,6 +11,8 @@ from ..models import (
 )
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
+from ..permissions import is_wing_writer  # noqa: E402
+from ..permissions import is_national_admin  # noqa: E402
 from ..permissions import (
     Principal, require_role, require_can_view_squadron, require_can_write_squadron,
     require_system_or_nat_admin, require_audit_access,
@@ -20,7 +22,6 @@ from ..services import audit, fk_dependents
 
 router = APIRouter(prefix="/api", tags=["organisations"])
 
-_NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
 
 
 # ── Organisations ──
@@ -61,7 +62,7 @@ class WingCreateIn(BaseModel):
 @router.post("/wings")
 def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
                 p: Principal = Depends(get_principal)):
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only NAT HQ admin can create Wings."})
     code = (body.code or "").strip().upper()
@@ -308,7 +309,7 @@ def create_squadron(body: SquadronCreateIn, db: DBSession = Depends(get_db),
     Wing admin: own Wing only.
     Other roles: 403.
     """
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only Wing or NAT HQ admin can create Squadrons / Specialist Units."})
     # Wing admin scope check
@@ -353,7 +354,7 @@ def squadron_archive_impact(squadron_id: str, db: DBSession = Depends(get_db),
     blocks on (archiving never cascades into or destroys these), so they
     are informational only for the wizard to surface and require
     acknowledgement of, per the plan's explicit design."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -432,7 +433,7 @@ def archive_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     system_admin and national_admin: any unit.
     wing_admin: only units in their own Wing.
     """
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -462,7 +463,7 @@ def restore_squadron(squadron_id: str, db: DBSession = Depends(get_db),
                      p: Principal = Depends(get_principal)):
     """Restore a previously archived Squadron/Specialist Unit.
     system_admin and national_admin: any unit. wing_admin: only units in their own Wing."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:
@@ -495,7 +496,7 @@ def delete_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Princi
     is a denormalized column, not a DB-enforced foreign key. Additive to the
     existing archive path; archive remains the default whenever any
     dependent exists."""
-    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     s = db.get(Squadron, squadron_id)
     if not s:

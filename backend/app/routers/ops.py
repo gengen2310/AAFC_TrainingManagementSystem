@@ -9,6 +9,7 @@ from ..database import get_db, utcnow, iso_z
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
                       Squadron, Wing, ImportLog, AuditLog, Cadet, CadetMemberImportBatch)
 from ..dependencies import get_principal
+from ..permissions import is_read_only_role  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id, require_role,
                            require_can_view_squadron, require_can_view_wing, require_can_write_squadron)
 from ..services import audit, score_parade
@@ -935,7 +936,7 @@ def cea_member_commit(
     sq_id = _active_squadron(p)
     s = db.get(Squadron, sq_id)
     require_can_write_squadron(p, s.id, s.wing_id)
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+    if is_read_only_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
 
     _, rows, errors = _parse_cea_csv(body.csv_text)

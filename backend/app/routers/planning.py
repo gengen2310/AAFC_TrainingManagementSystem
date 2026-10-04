@@ -705,7 +705,7 @@ def list_planning_years(
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         q = q.filter(PlanningYear.wing_id == p.wing_id)
     if unit_id:
         q = q.filter(PlanningYear.unit_id == unit_id)
@@ -2916,7 +2916,7 @@ def list_locations(
     )
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(TrainingArea.squadron_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         sqn_ids = [s.id for s in db.query(Squadron).filter(
             Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
         ).all()]
@@ -3434,7 +3434,7 @@ def get_command_centre(
         q = db.query(PlanningYear)
         if p.role in ("sqn_admin", "sqn_general"):
             q = q.filter(PlanningYear.unit_id == p.squadron_id)
-        elif p.role in ("wing_admin", "wing_viewer"):
+        elif p.is_wing:
             q = q.filter(PlanningYear.wing_id == p.wing_id)
         py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
         if py is None:
@@ -3882,7 +3882,7 @@ def _curriculum_scope_query(db: DBSession, p: Principal):
             CurriculumItem.wing_id == wing_id,
             CurriculumItem.squadron_id == p.squadron_id,
         ))
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         q = q.filter(or_(
             CurriculumItem.owning_level == "national",
             CurriculumItem.wing_id == p.wing_id,

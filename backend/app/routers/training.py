@@ -19,6 +19,7 @@ from ..richtext import sanitize_rich_text
 from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
                                SessionAssistantFacilitator)
 from ..dependencies import get_principal, client_meta
+from ..permissions import is_national_admin, is_wing_writer, is_read_only_role, is_writer  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
                           require_can_view_wing, require_can_write_activity, require_role, require_write_role, require_system_admin,
@@ -107,7 +108,7 @@ def list_curriculum(squadron_id: str | None = None, include_archived: bool = Fal
     if wing_id:
         conditions.append(
             (CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         # National admin with no proxy/wing scope sees all wing curriculum across all wings
         conditions.append(CurriculumItem.owning_level == "wing")
     if sq_id:
@@ -219,7 +220,7 @@ def export_curriculum_xlsx(db: DBSession = Depends(get_db), p: Principal = Depen
     conditions = [CurriculumItem.owning_level == "national"]
     if wing_id:
         conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(CurriculumItem.owning_level == "wing")
     if sq_id:
         conditions.append(CurriculumItem.squadron_id == sq_id)
@@ -426,7 +427,7 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
                   p: Principal = Depends(get_principal)):
     sq_id = _active_squadron(p)
     # Roles that can never write squadron data get a clean 403 first.
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+    if is_read_only_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     if not sq_id:
         # Wing/National admins must enter Proxy / Delegated Intervention to gain a squadron scope.
@@ -4844,11 +4845,11 @@ def _can_create_element(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only system_admin can create system-scope elements."})
     elif scope_level == "national":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only national_admin or system_admin can create national elements."})
     elif scope_level == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing elements."})
         effective_wing = wing_id or p.wing_id
@@ -4856,7 +4857,7 @@ def _can_create_element(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create elements for their own wing."})
     elif scope_level == "squadron":
-        if p.role not in {*_WING_WRITE_ROLES, "sqn_admin"}:
+        if not is_writer(p):
             raise HTTPException(403, detail={"error": "forbidden"})
         if p.role == "sqn_admin" and squadron_id and squadron_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope",
@@ -4875,14 +4876,14 @@ def _visible_elements(db: DBSession, p: Principal) -> list[CurriculumElement]:
     if wing_id:
         conditions.append(
             (CurriculumElement.scope_level == "wing") & (CurriculumElement.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(CurriculumElement.scope_level == "wing")
     if sq_id:
         conditions.append(
             (CurriculumElement.scope_level == "squadron") & (CurriculumElement.squadron_id == sq_id))
     elif p.role == "wing_admin":
         pass  # wing admin: no sqn-scope elements unless proxied
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(CurriculumElement.scope_level == "squadron")
     return db.query(CurriculumElement).filter(
         CurriculumElement.is_archived == False,  # noqa: E712
@@ -5014,11 +5015,11 @@ def _can_create_phase(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only system_admin can create system-scope phases."})
     elif scope_level == "national":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only national_admin or system_admin can create national phases."})
     elif scope_level == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing phases."})
         effective_wing = wing_id or p.wing_id
@@ -5064,14 +5065,14 @@ def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
     if wing_id:
         conditions.append(
             (CurriculumPhase.scope_level == "wing") & (CurriculumPhase.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(CurriculumPhase.scope_level == "wing")
     if sq_id:
         conditions.append(
             (CurriculumPhase.scope_level == "squadron") & (CurriculumPhase.squadron_id == sq_id))
     elif p.role == "wing_admin":
         pass  # wing admin: no sqn-scope phases unless proxied
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(CurriculumPhase.scope_level == "squadron")
     return db.query(CurriculumPhase).filter(
         CurriculumPhase.is_archived == False,  # noqa: E712
@@ -5218,8 +5219,6 @@ class CurriculumImportIn(BaseModel):
     preview: bool = False
 
 
-_NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
-_WING_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
 
 
 def _find_existing_curriculum(db: DBSession, body: CurriculumIn,
@@ -5287,7 +5286,7 @@ def create_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
 def create_wing_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
                            p: Principal = Depends(get_principal)):
     """Create a Wing-owned curriculum item visible to all squadrons under that Wing."""
-    if p.role not in _WING_WRITE_ROLES:
+    if not is_wing_writer(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only Wing or NAT HQ admin can create Wing curriculum."})
     wing_id = body.wing_id or p.acting_wing_id or p.wing_id
@@ -5328,7 +5327,7 @@ def create_national_curriculum(body: CurriculumIn, db: DBSession = Depends(get_d
     Multiple parts of the same module share the same code but have distinct
     identifiers / part_numbers — they are NOT duplicates.
     """
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only NAT HQ admin can create National curriculum."})
     exists = _find_existing_curriculum(db, body, "national")
@@ -5360,13 +5359,13 @@ def update_curriculum(cid: str, body: CurriculumUpdateIn, db: DBSession = Depend
         raise HTTPException(404, detail={"error": "not_found"})
     # Ownership check by level
     if ci.owning_level == "national":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "cannot_edit_national_curriculum"})
     elif ci.owning_level == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "cannot_edit_wing_curriculum"})
         # NAT admins may edit any wing's curriculum; wing admins are scoped to their own wing
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             actor_wing = p.acting_wing_id or p.wing_id
             if ci.wing_id != actor_wing:
                 raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -5399,12 +5398,12 @@ def delete_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal = 
     if not ci:
         raise HTTPException(404, detail={"error": "not_found"})
     if ci.owning_level == "national":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "cannot_delete_national_curriculum"})
     elif ci.owning_level == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "cannot_delete_wing_curriculum"})
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             actor_wing = p.acting_wing_id or p.wing_id
             if ci.wing_id != actor_wing:
                 raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -5428,12 +5427,12 @@ def restore_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal =
     if not ci:
         raise HTTPException(404, detail={"error": "not_found"})
     if ci.owning_level == "national":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "cannot_edit_national_curriculum"})
     elif ci.owning_level == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "cannot_edit_wing_curriculum"})
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             actor_wing = p.acting_wing_id or p.wing_id
             if ci.wing_id != actor_wing:
                 raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -5499,7 +5498,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     the endpoint attempts to link the curriculum item to the corresponding
     parade-night session for that squadron.
     """
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={
             "error": "forbidden",
             "message": "Only national_admin or system_admin can bulk-import curriculum.",
@@ -5718,7 +5717,7 @@ async def import_curriculum_xlsm(
     preview=true executes the same downstream classification as commit and
     rolls the transaction back, matching the JSON and CSV import contracts.
     """
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={"error": "forbidden",
                                          "message": "Only national_admin or system_admin can import curriculum."})
 
@@ -5895,7 +5894,7 @@ async def import_curriculum_csv(
     caller can review before resubmitting with preview=false to commit.
     """
     import csv, io
-    if p.role not in _NAT_ADMIN_ROLES:
+    if not is_national_admin(p):
         raise HTTPException(403, detail={
             "error": "forbidden",
             "message": "Only national_admin or system_admin can import curriculum.",
@@ -6019,11 +6018,11 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": "scope must be one of: global, wing, squadron"})
     if scope == "global":
-        if p.role not in _NAT_ADMIN_ROLES:
+        if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only national_admin or system_admin can create global tags."})
     elif scope == "wing":
-        if p.role not in _WING_WRITE_ROLES:
+        if not is_wing_writer(p):
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing tags."})
         effective_wing = wing_id or p.wing_id
@@ -6042,7 +6041,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
             if squadron_id and squadron_id != p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "out_of_scope",
                                                   "message": "Can only create a squadron-scope tag for the squadron currently in Proxy Mode."})
-        elif p.role in _NAT_ADMIN_ROLES:
+        elif is_national_admin(p):
             if not p.acting_squadron_id:
                 raise HTTPException(403, detail={"error": "intervention_required",
                                                   "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope tag."})
@@ -6138,11 +6137,11 @@ def list_subject_area_tags(
     conditions = [_tag_global_visible(SubjectAreaTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((SubjectAreaTag.scope == "wing") & (SubjectAreaTag.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(SubjectAreaTag.scope == "wing")
     if sq_id:
         conditions.append((SubjectAreaTag.scope == "squadron") & (SubjectAreaTag.squadron_id == sq_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(SubjectAreaTag.scope == "squadron")
     from sqlalchemy import or_ as _or_tags
     q = db.query(SubjectAreaTag).filter(_or_tags(*conditions))
@@ -6283,11 +6282,11 @@ def list_facilitator_type_tags(
     conditions = [_tag_global_visible(FacilitatorTypeTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((FacilitatorTypeTag.scope == "wing") & (FacilitatorTypeTag.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(FacilitatorTypeTag.scope == "wing")
     if sq_id:
         conditions.append((FacilitatorTypeTag.scope == "squadron") & (FacilitatorTypeTag.squadron_id == sq_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(FacilitatorTypeTag.scope == "squadron")
     from sqlalchemy import or_ as _or_factype
     q = db.query(FacilitatorTypeTag).filter(_or_factype(*conditions))
@@ -6429,11 +6428,11 @@ def list_session_status_reason_tags(
     conditions = [_tag_global_visible(SessionStatusReasonTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((SessionStatusReasonTag.scope == "wing") & (SessionStatusReasonTag.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(SessionStatusReasonTag.scope == "wing")
     if sq_id:
         conditions.append((SessionStatusReasonTag.scope == "squadron") & (SessionStatusReasonTag.squadron_id == sq_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(SessionStatusReasonTag.scope == "squadron")
     from sqlalchemy import or_ as _or_reason
     q = db.query(SessionStatusReasonTag).filter(_or_reason(*conditions))
@@ -6572,11 +6571,11 @@ def list_activity_type_tags(
     conditions = [_tag_global_visible(ActivityTypeTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((ActivityTypeTag.scope == "wing") & (ActivityTypeTag.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(ActivityTypeTag.scope == "wing")
     if sq_id:
         conditions.append((ActivityTypeTag.scope == "squadron") & (ActivityTypeTag.squadron_id == sq_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(ActivityTypeTag.scope == "squadron")
     from sqlalchemy import or_ as _or_acttype
     q = db.query(ActivityTypeTag).filter(_or_acttype(*conditions))
@@ -6704,11 +6703,11 @@ def list_training_area_capability_tags(
     conditions = [_tag_global_visible(TrainingAreaCapabilityTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((TrainingAreaCapabilityTag.scope == "wing") & (TrainingAreaCapabilityTag.wing_id == wing_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(TrainingAreaCapabilityTag.scope == "wing")
     if sq_id:
         conditions.append((TrainingAreaCapabilityTag.scope == "squadron") & (TrainingAreaCapabilityTag.squadron_id == sq_id))
-    elif p.role in _NAT_ADMIN_ROLES:
+    elif is_national_admin(p):
         conditions.append(TrainingAreaCapabilityTag.scope == "squadron")
     from sqlalchemy import or_ as _or_cap
     q = db.query(TrainingAreaCapabilityTag).filter(_or_cap(*conditions))
@@ -7571,7 +7570,7 @@ def bulk_class_membership(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+    if is_read_only_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     tc = db.get(TrainingClass, class_id)
     if not tc or tc.is_archived:
@@ -8047,7 +8046,7 @@ def override_cadet_session_outcome(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+    if is_read_only_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     from ..models.training import CadetSessionOutcome
 

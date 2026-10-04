@@ -105,9 +105,9 @@ def _validate_create_scope(p: Principal, target_role: str,
 
 
 def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+    if p.is_national:
         return True
-    if p.role in ("wing_admin", "wing_viewer"):
+    if p.is_wing:
         if target.wing_id == p.wing_id:
             return True
         if target.squadron_id:
@@ -315,14 +315,14 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
         q = q.filter(User.is_archived == False)  # noqa: E712
 
     # Scope filtering based on actor role
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+    if p.is_national:
         if wing_id:
             # Filter by wing: both direct wing users and sqn users in that wing
             sqns_in_wing = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == wing_id)]
             q = q.filter((User.wing_id == wing_id) | (User.squadron_id.in_(sqns_in_wing)))
         if squadron_id:
             q = q.filter(User.squadron_id == squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         sqns_in_wing = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
         q = q.filter((User.wing_id == p.wing_id) | (User.squadron_id.in_(sqns_in_wing)))
         if squadron_id:
@@ -1108,10 +1108,10 @@ def list_flights(squadron_id: str | None = None, include_archived: bool = False,
     q = db.query(Flight)
     if not include_archived:
         q = q.filter(Flight.is_archived == False)  # noqa: E712
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+    if p.is_national:
         if squadron_id:
             q = q.filter(Flight.squadron_id == squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         sqn_ids = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
         q = q.filter(Flight.squadron_id.in_(sqn_ids))
         if squadron_id:
