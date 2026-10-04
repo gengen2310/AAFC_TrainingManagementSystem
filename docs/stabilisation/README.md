@@ -2,6 +2,7 @@
 
 **Authorised:** 2026-10-03
 **Working integration base:** PR #68 tip `9f24d42b61e1a8d775d5c4f0a24465d145fe0e85`
+**Release candidate:** PR #69 (supersedes #67/#68). Status below last verified 2026-10-04 at `f8a5dca`.
 **Canonical repository:** `gengen2310/AAFC_TrainingManagementSystem`
 
 ## Objective
@@ -39,32 +40,133 @@ At PR #68 tip:
 
 These numbers are debt baselines, not targets. The guard allows them to decrease but blocks silent increases.
 
+Current ratchet (`tools/architecture/architecture-baseline.json`, at `f8a5dca`):
+
+| Metric | Baseline (#68) | Now |
+|---|---|---|
+| Main TMS bytes / lines / named functions | 1,255,839 / 20,273 / 800 | 1,248,133 / 20,123 / 788 |
+| Direct router `p.role` checks | 185 | 94 |
+| Router-to-router import edges | not detected (guard defect) | 0, enforced (ast-based, self-tested) |
+
 ## Work sequence
 
-### 0. Canonicalise and freeze — ACTIVE
-Use this repository and the current integration chain as the only release source. Do not revive the older `gengen2310/aafc-tms` repository. New work is short-lived branches/PRs.
+Each phase states its status, the evidence for it, and its exit criterion.
+"Done" means the exit criterion holds, not that work was started.
 
-### 1. Architecture ratchets — IMPLEMENTED HERE
-CI blocks growth of the Main TMS monolith and router-local role-policy branching. Deliberate exceptions require an explicit baseline change and review.
+### Phase 0 — Canonicalise and freeze — DONE (pending merge)
 
-### 2. Centralise permission/scope policy — STARTED HERE
-Migrate pure allow/deny gates first, then repeated visible Wing/Squadron scope derivation. Preserve status/error contracts unless a separately approved defect requires a change. Reduce the ratchet after each migration.
+- `gengen2310/AAFC_TrainingManagementSystem` is canonical; `main` is the
+  integration branch. Do not revive `gengen2310/aafc-tms` as a release source.
+- #67 and #68 are closed as superseded; Git containment is recorded on #69.
+  The old `stabilise/predictable-architecture-20261003` branch's content is in
+  #69 (four commits by patch identity, the other seven redone in stronger form).
+- Preserve the deployment fingerprint, migration, backup and rollback gates.
 
-### 3. Extract backend domain services — NEXT
-Priority: `training.py`, `planning.py`, `dashboard.py`. Start with pure computation/query seams such as conflict detection, coverage/readiness, aggregation and import validation. Do not move HTTP schemas and business logic simultaneously.
+Exit: one release-candidate PR; CI guards run on every PR to `main`. Holds
+once #69 is merged.
 
-### 4. Modularise connected frontend — NEXT
-Do not replace the Main TMS with the Planning Workspace. Introduce maintainable modular source incrementally while preserving the deployed behaviour. If a generated single-file artifact remains a deployment requirement, generation must be deterministic and CI-verified. Extraction order: shell/navigation; API/error helpers; auth/session/scope; shared UI; Training Program; Planning; Cadets; Accounts; Service Desk; Administration; reports/imports/audit.
+### Phase 1 — Architecture ratchets — DONE
 
-### 5. Data/query scalability — PLANNED
-Profile N+1 loops, unpaginated high-cardinality endpoints, hierarchy/year/status indexes, connection-pool pressure, large import/report transactions and repeated reference-data queries.
+CI blocks growth of the Main TMS monolith, router-local role checks and
+router-to-router imports. The import check was found never to match anything
+(doubled backslashes in a raw-string regex); it is now ast-based with unit
+self-tests that CI runs. A deliberate baseline increase needs explicit review
+in the same PR.
 
-### 6. National qualification — PLANNED
-Use multi-Wing datasets with 10k+ cadets and 50/100/250 concurrent staff. Exercise simultaneous Squadron writes, Wing/National aggregation, bulk imports, Service Desk/admin workflows, maintenance mode, worker restart, backup and verified restore. Record p50/p95/p99, errors, pool usage, slow queries and recovery.
+### Phase 2 — Centralise permission/scope policy — IN PROGRESS
 
-### 7. Sustainability gate — PLANNED
-A release is structurally mature only when a clean clone starts from documentation, automated suites and migrations pass, backup restore is demonstrated, authorization has one authoritative backend path, architecture ratchets do not regress, and another developer can modify/deploy a subsystem without product-owner-only tribal knowledge.
+Done: named predicates in `permissions.py` (`is_national_admin`,
+`is_wing_writer`, `is_writer`, `is_read_only_role`, `require_write_role`,
+`resolve_view_squadron_id`); router-local role constants removed; 185 -> 94
+direct checks. Pinned by `test_role_predicates.py` and `test_role_matrix.py`.
+
+Remaining: the 94 checks, classified before moving (pure gate / scope
+selection / response shaping / legitimate role-specific behaviour). Only pure
+gates and genuinely common scope derivations move.
+
+For every migrated rule: permission-unit tests; endpoint status/error
+contracts unchanged unless a defect is separately approved; role/scope matrix
+across sqn_general, sqn_admin, wing_viewer, wing_admin, national_viewer,
+national_admin, auditor and system_admin; lower the baseline.
+
+Exit: routers orchestrate requests; they do not invent authorization policy.
+
+### Phase 3 — Extract backend domain services — STARTED
+
+Done: router-to-router coupling removed through `services_timing`,
+`services_curriculum_progress`, `services_data_quality`, `services_accounts`;
+shared multi-worker state in `services_idempotency` and `services_rate_limit`.
+
+Not done: the large routers are essentially unchanged in size (`training.py`
+8,178 -> 8,128 lines, `planning.py` 6,372 -> 6,429, `dashboard.py`
+3,051 -> 2,966). Next: pure computation and query seams in
+`training.py`, `planning.py`, `dashboard.py` (conflict detection,
+coverage/readiness, scope filters, aggregation, import validation). Do not
+move HTTP models and business logic at the same time. Organise by domain, not a
+`services.py` dumping ground.
+
+Exit: large routers are substantially thinner and domain logic is
+unit-testable without an HTTP request.
+
+### Phase 4 — Modularise the connected frontend — STARTED (path proven)
+
+Do **not** replace the Main TMS with the Planning Workspace.
+
+Done: `connected-frontend/js/modal.js` (dialog core) and
+`connected-frontend/js/curriculum-csv-import.js` extracted verbatim. Pattern:
+classic `<script src>` (CSP `script-src 'self'` unchanged), copied by the
+Dockerfile, every `js/*.js` must parse and be referenced
+(`connectedFrontendParses.test.ts`), deploy scripts verify each served module's
+sha256 against source. No generated artifact, so no second source of truth.
+
+Extraction order for what remains: API/error helpers; auth/session/scope
+presentation; shell/navigation; shared table/form utilities; Training
+Program; Planning/Parade Nights/Weekly Program; Cadets; Accounts; Service
+Desk; Administration/System Console; reports/imports/audit. Each extraction is
+parity-only, with tests before and after, and must lower the baseline.
+
+Exit: feature work no longer requires editing a 20k-line entry point.
+
+### Phase 5 — Data/query scalability — LARGELY DONE
+
+Done, each pinned by query-count tests: facilitator leave, Wing/National
+freshness, long-range conflicts, session serialisation (term planner 28->72
+became 11->11 queries as sessions grew), accounts (419 -> 21), Wing overview
+(325 -> 23), National overview (149 -> 38). Overload deadlock between the
+thread pool and connection pool fixed (per-worker request cap; 503 not 500).
+Endpoint inventory: `bounded-responses.md`.
+
+Remaining: Service Desk ticket list and the national accounts list are
+unbounded (need UI paging); no index added without an observed query.
+
+### Phase 6 — National qualification — DONE LOCALLY
+
+`national-qualification.md`: 10,200 cadets / 60 Squadrons / 6 Wings; 50, 100,
+250 realistic users p95 46/53/89 ms with 0 errors; saturated 121 req/s with 0
+errors; maintenance, worker kill and database-outage drills. Earlier September
+evidence (250 users / 30 min after the maintenance-gate event-loop fix) is
+reproduced or improved.
+
+Remaining: repeat on staging hardware before quoting a production capacity
+number; bulk CEA import and attendance write bursts under load.
+
+### Phase 7 — Sustainability gate — NOT YET MET
+
+A release is structurally mature only when all of these hold:
+
+- [ ] clean clone -> documented local startup works (to be re-walked)
+- [x] full automated suites pass (backend 2575/12 skipped; browser 3 engines)
+- [x] migrations upgrade/rollback in rehearsal (SQLite + PostgreSQL 18)
+- [x] backup restore demonstrated (restore run 37132802899, real production data)
+- [ ] another developer can trace a representative request end-to-end
+- [ ] permission policy has one authoritative backend path (Phase 2)
+- [x] bug fixes carry regression tests
+- [x] architecture ratchets at or below the prior release
+- [ ] no critical subsystem needs undocumented product-owner knowledge
 
 ## Refactor PR contract
 
-Each structural PR states: behaviour preserved, seam extracted, tests proving parity, ratchet before/after, migration impact, and rollback method. Do not mix redesign with extraction unless they cannot safely be separated.
+Each structural PR states: behaviour preserved; seam extracted or centralised;
+tests proving parity; architecture-baseline numbers before/after; migration
+impact (normally none); rollback method. Split a PR that mixes redesign with
+extraction unless the two cannot safely be separated.
