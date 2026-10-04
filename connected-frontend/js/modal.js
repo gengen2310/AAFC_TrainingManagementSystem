@@ -12,19 +12,29 @@
 // ═══════════════════════════════════════════════════════════
 let _modalReturnFocus=null;
 const _modalReturnFocusById=new Map();
+let _modalOpenSeq=0;
 function openModal(id){
   const bg=document.getElementById(id);
   if(!bg)return;
   const returnTarget=document.activeElement;
   _modalReturnFocus=returnTarget;
   _modalReturnFocusById.set(id,returnTarget);
+  const seq=++_modalOpenSeq;
+  bg.dataset.modalSeq=String(seq);
   bg.classList.add('active');
   const first=bg.querySelector('input:not([type="hidden"]):not(:disabled),select:not(:disabled),textarea:not(:disabled)')||bg.querySelector('button:not(:disabled),[tabindex]:not([tabindex="-1"]),[href]');
   // Deferred, but never steal focus: if focus is already inside this dialog
   // when the timer fires (the user started typing, or autofill), leave it.
   // An unconditional focus() redirected keystrokes mid-word into the first
   // field (CI REM-111: "Regression" landed in Rank, Family Name stayed empty).
-  if(first)setTimeout(()=>{ if(bg.classList.contains('active')&&!bg.contains(document.activeElement))first.focus(); },200);
+  // Same for a dialog opened on top of this one (the "New reason" prompt over
+  // the outcome-reason dialog): its field keeps focus, or typing lands here.
+  if(first)setTimeout(()=>{
+    if(!bg.classList.contains('active'))return;
+    const host=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.modal-bg.active');
+    if(host&&(host===bg||Number(host.dataset.modalSeq)>seq))return;
+    first.focus();
+  },200);
 }
 function closeModal(id){
   const bg=document.getElementById(id);

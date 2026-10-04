@@ -49,3 +49,28 @@ test("a dialog nobody has focused into still gets its first field focused", asyn
   await page.clock.runFor(1000);
   await expect(page.locator("#fac-rank")).toBeFocused();
 });
+
+// Second root cause, same timer (CI WebKit, session-status-reason-tags): the
+// outcome-reason dialog's deferred auto-focus fired while the "New reason"
+// prompt was already stacked on top of it. Focus was inside a dialog -- just
+// not *this* one -- so the timer pulled it back to #or-reason; Playwright's
+// fill typed into the select, #ti-input stayed empty and Create answered
+// "This field is required." Captured CI snapshot: prompt open, input empty,
+// that error shown.
+test("a dialog stacked on top keeps focus when the dialog beneath it auto-focuses", async ({ page }) => {
+  await login(page);
+  await page.clock.install();
+  // Freeze time: only runFor() advances it, so the timer window is exact.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await page.evaluate(() => { (window as any).collectOutcomeReason("cancelled"); });   // opens #m-outcome-reason at t=0
+  await page.clock.runFor(100);                            // its 30 ms #or-reason focus has run
+  await page.locator("#or-reason").selectOption("__add_new__");                         // stacks the "New reason" prompt at t=100
+  await expect(page.locator("#m-text-input")).toBeVisible();
+  await page.locator("#ti-input").focus();
+  // t=250: past the outcome dialog's 200 ms timer, before the prompt's own
+  // (t=300) would hand focus back -- the window the user is typing in.
+  await page.clock.runFor(150);
+  await expect(page.locator("#ti-input")).toBeFocused();
+  await page.keyboard.type("Weather balloon");
+  await expect(page.locator("#ti-input")).toHaveValue("Weather balloon");
+});
