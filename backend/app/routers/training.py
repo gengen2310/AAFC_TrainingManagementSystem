@@ -19,6 +19,7 @@ from ..richtext import sanitize_rich_text
 from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES,
                                SessionAssistantFacilitator)
 from ..dependencies import get_principal, client_meta
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import is_national_admin, is_wing_writer, is_read_only_role, is_writer, may_record_session_outcomes, may_view_cadet_records  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
@@ -4853,7 +4854,7 @@ def _can_create_element(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing elements."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create elements for their own wing."})
     elif scope_level == "squadron":
@@ -5023,7 +5024,7 @@ def _can_create_phase(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing phases."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create phases for their own wing."})
     elif scope_level == "squadron":
@@ -6026,7 +6027,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only wing_admin or above can create wing tags."})
         effective_wing = wing_id or p.wing_id
-        if p.role == "wing_admin" and effective_wing != p.wing_id:
+        if wing_admin_outside_own_wing(p, effective_wing):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create tags for their own wing."})
     else:  # squadron

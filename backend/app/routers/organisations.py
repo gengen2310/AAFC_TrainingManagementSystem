@@ -11,6 +11,7 @@ from ..models import (
 )
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import is_wing_writer  # noqa: E402
 from ..permissions import is_national_admin  # noqa: E402
 from ..permissions import (
@@ -313,7 +314,7 @@ def create_squadron(body: SquadronCreateIn, db: DBSession = Depends(get_db),
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only Wing or NAT HQ admin can create Squadrons / Specialist Units."})
     # Wing admin scope check
-    if p.role == "wing_admin" and body.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, body.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only create units under their own Wing."})
     w = db.get(Wing, body.wing_id)
@@ -359,7 +360,7 @@ def squadron_archive_impact(squadron_id: str, db: DBSession = Depends(get_db),
     s = db.get(Squadron, squadron_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
-    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, s.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
 
     active_accounts = db.query(User).filter(
@@ -438,7 +439,7 @@ def archive_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     s = db.get(Squadron, squadron_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
-    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, s.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if s.is_archived:
         raise HTTPException(409, detail={"error": "already_archived"})
@@ -468,7 +469,7 @@ def restore_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     s = db.get(Squadron, squadron_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
-    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, s.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if not s.is_archived:
         raise HTTPException(409, detail={"error": "not_archived"})
@@ -501,7 +502,7 @@ def delete_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Princi
     s = db.get(Squadron, squadron_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
-    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, s.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if not s.is_archived:
         raise HTTPException(409, detail={"error": "not_archived",

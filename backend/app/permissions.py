@@ -44,6 +44,17 @@ def is_read_only_role(p: "Principal") -> bool:
     return p.role in READ_ONLY_ROLES
 
 
+def wing_admin_outside_own_wing(p: "Principal", wing_id: str | None) -> bool:
+    """True when a Wing Admin is acting on a target outside their own Wing.
+
+    The rule "a Wing Admin acts only inside their own Wing" was written inline
+    at every Wing-scoped write (accounts, organisations, training reference
+    data, Wing calendar, Service Desk, custom phases). Each caller keeps its own
+    error response; only the condition lives here. Other roles are not
+    constrained by this predicate (their scope is checked elsewhere)."""
+    return p.role == "wing_admin" and wing_id != p.wing_id
+
+
 def may_view_cadet_records(p: "Principal") -> bool:
     """Cadet personal and training records (cadet list, risk, class
     membership and rosters, training-record matrix/export, a cadet's record,

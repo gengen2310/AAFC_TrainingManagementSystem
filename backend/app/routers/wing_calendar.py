@@ -27,6 +27,7 @@ from ..models.wing_calendar import (
     WING_EVENT_TYPES, PLANNING_IMPORTANCE_LEVELS, WING_EVENT_STATUS, SQN_STATUS_VALUES,
 )
 from ..dependencies import get_principal
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, NATIONAL_LEVEL
 from ..services import audit
 
@@ -46,7 +47,7 @@ _READ_ROLES  = frozenset({
 def _require_write(p: Principal, wing_id: str) -> None:
     if p.role not in _WRITE_ROLES:
         raise HTTPException(403, detail={"error": "forbidden"})
-    if p.role == "wing_admin" and p.wing_id != wing_id:
+    if wing_admin_outside_own_wing(p, wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
 
 

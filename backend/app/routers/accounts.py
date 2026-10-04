@@ -33,6 +33,7 @@ from sqlalchemy.exc import IntegrityError
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
 import re
 
@@ -86,7 +87,7 @@ def _validate_create_scope(p: Principal, target_role: str,
         w = db.get(Wing, wing_id)
         if not w or w.is_archived:
             raise HTTPException(404, detail={"error": "wing_not_found"})
-        if p.role == "wing_admin" and wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts in their own Wing."})
 
@@ -96,7 +97,7 @@ def _validate_create_scope(p: Principal, target_role: str,
         sqn = db.get(Squadron, sqn_id)
         if not sqn or sqn.is_archived:
             raise HTTPException(404, detail={"error": "squadron_not_found"})
-        if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, sqn.wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts for SQNs in their Wing."})
         if p.role == "sqn_admin" and sqn_id != p.squadron_id:
@@ -652,7 +653,7 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "squadron_not_found"})
     if body.new_squadron_id == u.squadron_id:
         raise HTTPException(400, detail={"error": "scope_unchanged"})
-    if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, sqn.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
     if p.role == "sqn_admin":

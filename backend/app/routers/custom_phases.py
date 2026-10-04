@@ -5,6 +5,7 @@ from sqlalchemy import or_, and_
 
 from ..database import get_db
 from ..dependencies import get_principal
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_role
 from ..models.custom_phases import CustomTrainingPhase, CUSTOM_PHASE_SCOPE_TYPES
 from .. import services
@@ -159,7 +160,7 @@ def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
             raise HTTPException(403, detail={"error": "insufficient_scope"})
         if p.role in ("wing_admin", "national_admin"):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
-    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
+    if ph.scope_type == "wing" and wing_admin_outside_own_wing(p, ph.scope_id):
         raise HTTPException(403, detail={"error": "insufficient_scope"})
     if ph.scope_type == "national" and p.role == "national_admin":
         if ph.scope_id is None or ph.scope_id != resolve_national_id(db, p):

@@ -7,6 +7,7 @@ from ..database import get_db, utcnow
 from ..models import Squadron, Wing, User, ServiceTicket, ServiceDeskEmailConfig
 from ..models.service_desk_email_config import ServiceDeskEmailConfig as _EmailCfg
 from ..dependencies import get_principal
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_role
 from ..services import audit
 from ..email_service import send_ticket_notification, send_ticket_update_notification
@@ -347,7 +348,7 @@ def update_ticket(
     if not ticket_wing_id and ticket.squadron_id:
         sqn = db.get(Squadron, ticket.squadron_id)
         ticket_wing_id = sqn.wing_id if sqn else None
-    if p.role == "wing_admin" and ticket_wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, ticket_wing_id):
         raise HTTPException(403, detail={"error": "forbidden"})
 
     old_snapshot = {
