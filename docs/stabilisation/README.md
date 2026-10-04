@@ -45,7 +45,7 @@ Current ratchet (`tools/architecture/architecture-baseline.json`, at `f8a5dca`):
 | Metric | Baseline (#68) | Now |
 |---|---|---|
 | Main TMS bytes / lines / named functions | 1,255,839 / 20,273 / 800 | 1,248,133 / 20,123 / 788 |
-| Direct router `p.role` checks | 185 | 94 |
+| Direct router `p.role` checks | 185 | 43 (#71; classified in `role-check-classification.md`) |
 | Router-to-router import edges | not detected (guard defect) | 0, enforced (ast-based, self-tested) |
 
 ## Work sequence
@@ -78,11 +78,16 @@ in the same PR.
 Done: named predicates in `permissions.py` (`is_national_admin`,
 `is_wing_writer`, `is_writer`, `is_read_only_role`, `require_write_role`,
 `resolve_view_squadron_id`); router-local role constants removed; 185 -> 94
-direct checks. Pinned by `test_role_predicates.py` and `test_role_matrix.py`.
+direct checks; #71 continues to 43 (`may_view_cadet_records`,
+`may_record_session_outcomes`, `wing_admin_outside_own_wing`,
+`sqn_admin_outside_own_squadron`, `Principal.is_squadron`, `has_known_role`).
+Pinned by `test_role_predicates.py`, `test_role_matrix.py`,
+`test_sqn_general_record_policies.py`, `test_wing_admin_scope_predicate.py`
+and `test_cross_wing_write_isolation.py`.
 
-Remaining: the 94 checks, classified before moving (pure gate / scope
-selection / response shaping / legitimate role-specific behaviour). Only pure
-gates and genuinely common scope derivations move.
+Remaining: 43 checks, each classified with its reason in
+`role-check-classification.md`. Most are scope selection or role-specific
+product rules that stay where they are.
 
 For every migrated rule: permission-unit tests; endpoint status/error
 contracts unchanged unless a defect is separately approved; role/scope matrix
