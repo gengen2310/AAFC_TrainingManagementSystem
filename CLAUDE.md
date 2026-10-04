@@ -32,7 +32,7 @@ convention for this package. Work directly in the git checkout.
 - `backend/app/seeds/staging_seed.py` — minimal bootstrap: creates one `system_admin` from `STAGING_BOOTSTRAP_SYSADMIN_CODE` env var, idempotent, no full org data.
 - `backend/docker-entrypoint-staging.sh` — container entrypoint: runs `alembic upgrade head`, then bootstrap seed if no system_admin exists, then gunicorn.
 - `connected-frontend/` — legacy single-file SPA (`index.html`, ~1.25MB at the 2026-10-03 stabilisation baseline), served by its own Dockerfile/nginx. This is the TMS root frontend — **never replace it with the React app** (see below).
-- `frontend/` — React + Vite + TypeScript "Planning Workspace". Also has a `--mode single` build (`npm run build:single`) that inlines everything into one file via `vite-plugin-singlefile`, used by `make connected` to regenerate `connected-frontend/index.html` from the React source — that mode's `outDir` is `dist-single`, the default `build` script's is `dist`. Don't conflate the two when touching build config.
+- `frontend/` — React + Vite + TypeScript "Planning Workspace". It also has a `--mode single` build (`npm run build:single`, output `dist-single/`) that inlines the Planning Workspace into one file; the default `build` writes `dist/`. Neither produces the Main TMS: `connected-frontend/index.html` is hand-maintained (there is no `make connected`; never overwrite it with a `frontend/` build). Don't conflate the two build outputs when touching build config.
 
 ## Frontend architecture — do not "simplify" this into one app
 

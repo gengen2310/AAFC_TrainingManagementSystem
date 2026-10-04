@@ -1,5 +1,8 @@
 # AAFC TMS — Setup, Run, and Rollout Guide
 
+> **HISTORICAL DOCUMENT (June 2026). Do not follow it for current setup.** It describes an earlier repository layout (`aafc-tms-national/`, with a Makefile, docker-compose files and a root `.env.example`, none of which exist here), treats the React app as the main dashboard (the Main TMS is `connected-frontend/`), and documents `/docs` (API docs are disabled since v25). Use `README.md`, which is verified against a fresh clone. Kept as a record of the earlier design.
+
+
 **AAFC Training Management System — National Deployable Edition**
 
 This guide explains how to set up, run, test, and roll out the AAFC Training Management System (we will call it "AAFC TMS" or "the system" from here on).
