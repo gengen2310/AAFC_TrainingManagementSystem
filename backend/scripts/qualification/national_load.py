@@ -230,6 +230,7 @@ def main():
     ap.add_argument("--duration", type=int, default=120)
     ap.add_argument("--ramp", type=int, default=20)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--raw", help="also write every request (t, endpoint, status, ms) as JSON lines here")
     ap.add_argument("--think", default="0.5,2.0",
                     help="min,max seconds between a user's actions (aggressive default; real staff ~8,20)")
     a = ap.parse_args()
@@ -254,6 +255,10 @@ def main():
     time.sleep(3)
     res = summarise(rec, samples, a.users, a.duration)
     res["think_s"] = list(THINK)
+    if a.raw:
+        with open(a.raw, "w") as fh:
+            for t, ep, st, ms, _ in rec.rows:
+                fh.write(json.dumps({"t": round(t, 3), "ep": ep, "status": st, "ms": round(ms)}) + "\n")
     json.dump(res, open(a.out, "w"), indent=2)
     print(json.dumps({k: v for k, v in res.items() if k != "endpoints"}, indent=1))
 

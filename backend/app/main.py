@@ -465,6 +465,10 @@ async def request_concurrency_cap(request: Request, call_next):
         # rate limiter): still overload, not an internal error.
         logging.getLogger("capacity").warning('{"event":"db_pool_exhausted","path":"%s"}', request.url.path)
         return _busy()
+    except (_sa_exc.OperationalError, _sa_exc.DisconnectionError) as exc:
+        logging.getLogger("capacity").error('{"event":"database_unavailable","path":"%s","error":"%s"}',
+                                            request.url.path, type(exc).__name__)
+        return _db_unavailable()
     finally:
         _request_slots.release()
 
@@ -499,6 +503,24 @@ async def db_pool_exhausted(request: Request, exc: Exception):
         request.url.path, settings.DB_POOL_SIZE, settings.DB_POOL_MAX_OVERFLOW, settings.DB_POOL_TIMEOUT)
     return JSONResponse(status_code=503, headers={"Retry-After": "5"}, content={
         "error": "server_busy", "message": "The service is busy. Please try again in a few seconds."})
+
+
+def _db_unavailable() -> JSONResponse:
+    return JSONResponse(status_code=503, headers={"Retry-After": "10"}, content={
+        "error": "database_unavailable",
+        "message": "The service is temporarily unavailable. Please try again shortly."})
+
+
+@app.exception_handler(_sa_exc.OperationalError)
+@app.exception_handler(_sa_exc.DisconnectionError)
+async def db_unreachable(request: Request, exc: Exception):
+    """The database refused or dropped the connection (outage, failover,
+    restart). Unavailability, not a code defect: 503 + Retry-After, with no
+    connection details in the response. The pool recovers by itself when the
+    database returns (verified by the failure drill)."""
+    logging.getLogger("capacity").error('{"event":"database_unavailable","path":"%s","error":"%s"}',
+                                        request.url.path, type(exc).__name__)
+    return _db_unavailable()
 
 
 @app.exception_handler(500)

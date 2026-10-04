@@ -24,3 +24,23 @@ def test_pool_timeout_returns_503_with_retry_after(client):
         assert int(r.headers["Retry-After"]) > 0
     finally:
         app.router.routes = [rt for rt in app.router.routes if getattr(rt, "path", "") != "/api/__test_pool_timeout"]
+
+
+def _db_down():
+    raise sqlalchemy.exc.OperationalError(
+        "SELECT 1", {}, Exception('connection to server at "127.0.0.1", port 5432 failed: Connection refused'))
+
+
+def test_database_unreachable_returns_503_not_500(client):
+    """Failure drill: stopping PostgreSQL for 15 s under load returned 466 x 500
+    internal_error. An unreachable database is unavailability -- 503 + Retry-After
+    -- and the pool recovered by itself once PostgreSQL returned."""
+    app.add_api_route("/api/__test_db_down", _db_down, methods=["GET"])
+    try:
+        r = client.get("/api/__test_db_down")
+        assert r.status_code == 503, r.text
+        assert r.json()["error"] == "database_unavailable"
+        assert int(r.headers["Retry-After"]) > 0
+        assert "127.0.0.1" not in r.text and "Connection refused" not in r.text, "no internals in the response"
+    finally:
+        app.router.routes = [rt for rt in app.router.routes if getattr(rt, "path", "") != "/api/__test_db_down"]
