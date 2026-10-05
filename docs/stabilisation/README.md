@@ -96,15 +96,19 @@ national_admin, auditor and system_admin; lower the baseline.
 
 Exit: routers orchestrate requests; they do not invent authorization policy.
 
-### Phase 3 — Extract backend domain services — STARTED
+### Phase 3 — Extract backend domain services — IN PROGRESS
 
 Done: router-to-router coupling removed through `services_timing`,
 `services_curriculum_progress`, `services_data_quality`, `services_accounts`;
 shared multi-worker state in `services_idempotency` and `services_rate_limit`.
 
-Not done: the large routers are essentially unchanged in size (`training.py`
-8,178 -> 8,128 lines, `planning.py` 6,372 -> 6,429, `dashboard.py`
-3,051 -> 2,966). Next: pure computation and query seams in
+Since then: `dashboard.py` 3,051 -> **824** lines (53 metric helpers moved
+verbatim into `services_dashboard_{common,readiness,delivery,curriculum,
+facilitators,adoption}.py`; all 75 dashboard responses byte-identical before
+and after; boundary test keeps HTTP/authorization out of them).
+`planning.py` 6,429 -> 6,289 (parade-date rule -> `services_parade_dates.py`).
+
+Not done: `training.py` (8,128 lines) is essentially unchanged. Next: pure computation and query seams in
 `training.py`, `planning.py`, `dashboard.py` (conflict detection,
 coverage/readiness, scope filters, aggregation, import validation). Do not
 move HTTP models and business logic at the same time. Organise by domain, not a
