@@ -70,16 +70,21 @@ def classify_parade_dates(
         horizon = start + timedelta(days=SCAN_HORIZON_DAYS)
     except OverflowError:
         horizon = date.max
-    if end is not None and end > horizon:
+    # With max_repeats the count bounds the walk, so a far end date is allowed;
+    # the scan itself still never passes the horizon.
+    if end is not None and end > horizon and max_repeats is None:
         raise ParadeDateRuleError(
             "date_range_too_long",
             f"The end date must be within {SCAN_HORIZON_DAYS // 366} years of the start date.")
-    limit = end if end is not None else horizon
+    limit = min(end, horizon) if end is not None else horizon
 
     excluded = set(excluded_dates or [])
     holiday_ranges = [(h.start_date, h.end_date) for h in holidays] if exclude_holidays else []
     freq = (frequency or "weekly").lower()
-    fortnight_anchor = start + timedelta(days=(weekday - start.weekday()) % 7)
+    try:
+        fortnight_anchor = start + timedelta(days=(weekday - start.weekday()) % 7)
+    except OverflowError:
+        fortnight_anchor = None     # that weekday never occurs before the calendar ends
 
     rows: list[dict] = []
     created = 0
@@ -90,7 +95,8 @@ def classify_parade_dates(
         if freq == "daily":
             include = True
         elif freq == "fortnightly":
-            include = d.weekday() == weekday and (d - fortnight_anchor).days % 14 == 0
+            include = (fortnight_anchor is not None and d.weekday() == weekday
+                       and (d - fortnight_anchor).days % 14 == 0)
         elif freq == "monthly":
             include = d.weekday() == weekday and d.day <= 7
         elif freq == "yearly":
@@ -114,4 +120,11 @@ def classify_parade_dates(
         if d == date.max:
             break
         d += timedelta(days=1)
+    # The walk stopped at the horizon (not at the caller's end date) before the
+    # requested count: refuse rather than silently create fewer nights.
+    if max_repeats is not None and created < max_repeats and (end is None or end > horizon):
+        raise ParadeDateRuleError(
+            "max_repeats_beyond_horizon",
+            f"{max_repeats} parade nights do not fit within {SCAN_HORIZON_DAYS // 366} years of "
+            "the start date. Lower the number of repeats or set an end date.")
     return rows

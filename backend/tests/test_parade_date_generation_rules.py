@@ -175,3 +175,44 @@ def test_api_rejects_unbounded_requests_with_400_and_creates_nothing(client, pat
         assert r.json()["detail"]["error"] == code
         assert r.json()["detail"].get("message"), "the UI shows detail.message to the user"
     assert client.get(f"/api/planning/years/{yid}/parade-dates", headers=hdr).json() == []
+
+
+# Codex review on #71 (services_parade_dates.py:76-82), pinned 2026-10-09.
+
+def test_max_repeats_bounds_the_scan_even_when_the_end_date_is_far():
+    # The generator modal sends both bounds; whichever comes first wins, so a
+    # far end date must not be rejected when the count stops the walk early.
+    rows = _rows(weekday=2, start_date="2027-01-01", end_date="2099-12-31",
+                 frequency="daily", max_repeats=3)
+    assert [d for d, _ in rows] == ["2027-01-01", "2027-01-02", "2027-01-03"]
+
+
+def test_max_repeats_the_horizon_cannot_reach_is_rejected_not_truncated():
+    # yearly x200 from 2027 needs 200 years; returning the ~30 the horizon
+    # allows would silently create fewer nights than asked for.
+    with pytest.raises(ParadeDateRuleError) as e:
+        _rows(weekday=0, start_date="2027-03-01", frequency="yearly", max_repeats=200)
+    assert e.value.code == "max_repeats_beyond_horizon"
+
+
+def test_both_bounds_unreachable_count_within_horizon_is_rejected():
+    with pytest.raises(ParadeDateRuleError) as e:
+        _rows(weekday=0, start_date="2027-03-01", end_date="2199-01-01",
+              frequency="yearly", max_repeats=200)
+    assert e.value.code == "max_repeats_beyond_horizon"
+
+
+def test_end_date_reached_before_max_repeats_is_still_a_normal_stop():
+    rows = _rows(weekday=3, start_date="2027-02-01", end_date="2027-02-28", max_repeats=50)
+    assert len(rows) == 4                                   # four Thursdays in Feb 2027
+
+
+@pytest.mark.parametrize("frequency", ["daily", "weekly", "fortnightly", "monthly", "yearly"])
+def test_a_start_on_the_last_calendar_day_never_overflows(frequency):
+    # 9999-12-31 is a Friday (4). Any frequency, any weekday: a result or a
+    # rule error, never OverflowError (HTTP 500).
+    for weekday in range(7):
+        try:
+            _rows(weekday=weekday, start_date="9999-12-31", frequency=frequency, max_repeats=1)
+        except ParadeDateRuleError:
+            pass
