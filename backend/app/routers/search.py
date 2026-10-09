@@ -10,14 +10,13 @@ from ..models import (
 )
 from ..models import Session as TrainingSession
 from ..dependencies import get_principal
-from ..permissions import Principal
+from ..permissions import (
+    Principal, is_writer, level_scope_clause, squadron_scope_clause, wing_scope_clause,
+)
 
 router = APIRouter(prefix="/api", tags=["search"])
 
 _LIMIT = 5
-_NATIONAL_ROLES = {"national_admin", "national_viewer", "system_admin"}
-_WING_ROLES = {"wing_admin", "wing_viewer"}
-_ACCOUNT_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
 
 
 @router.get("/search")
@@ -33,9 +32,12 @@ def search_entities(
     pat = f"%{q}%"
     results: list[dict] = []
 
-    is_national = p.role in _NATIONAL_ROLES
-    is_wing = p.role in _WING_ROLES
-    is_auditor = p.role == "auditor"
+    # The auditor sees national-scope Wings and Squadrons only; every other
+    # result type is skipped for it below.
+    is_auditor = p.is_auditor
+
+    def scoped(q, clause):
+        return q if clause is None else q.filter(clause)
 
     # ── Wings ─────────────────────────────────────────────────────────────
     wq = (
@@ -43,8 +45,7 @@ def search_entities(
         .filter(Wing.is_archived == False, Wing.active_status == True)  # noqa: E712
         .filter(or_(Wing.name.ilike(pat), Wing.code.ilike(pat), Wing.short_name.ilike(pat)))
     )
-    if not is_national and not is_auditor:
-        wq = wq.filter(Wing.id == p.wing_id)
+    wq = scoped(wq, wing_scope_clause(p, Wing.id))
     for w in wq.limit(_LIMIT).all():
         results.append({
             "type": "wing", "id": w.id, "label": w.name,
@@ -57,12 +58,7 @@ def search_entities(
         .filter(Squadron.is_archived == False, Squadron.active_status == True)  # noqa: E712
         .filter(or_(Squadron.name.ilike(pat), Squadron.short_name.ilike(pat), Squadron.code.ilike(pat)))
     )
-    if is_national or is_auditor:
-        pass
-    elif is_wing:
-        sq = sq.filter(Squadron.wing_id == p.wing_id)
-    else:
-        sq = sq.filter(Squadron.id == p.squadron_id)
+    sq = scoped(sq, level_scope_clause(p, wing_column=Squadron.wing_id, squadron_column=Squadron.id))
     for s in sq.limit(_LIMIT).all():
         w_row = db.query(Wing).filter(Wing.id == s.wing_id).first()
         results.append({
@@ -78,12 +74,8 @@ def search_entities(
             .filter(Facilitator.is_archived == False)  # noqa: E712
             .filter(or_(Facilitator.first_name.ilike(pat), Facilitator.last_name.ilike(pat)))
         )
-        if is_national:
-            pass
-        elif is_wing:
-            fq = fq.filter(Facilitator.wing_id == p.wing_id)
-        else:
-            fq = fq.filter(Facilitator.squadron_id == p.squadron_id)
+        fq = scoped(fq, level_scope_clause(
+            p, wing_column=Facilitator.wing_id, squadron_column=Facilitator.squadron_id))
         for f in fq.limit(_LIMIT).all():
             name = f"{f.first_name or ''} {f.last_name}".strip()
             sqn_row = (
@@ -110,15 +102,13 @@ def search_entities(
                 Activity.location.ilike(pat),
             ))
         )
-        if is_national:
-            pass
-        elif is_wing:
-            aq = aq.filter(Activity.wing_id == p.wing_id)
-        else:
-            aq = aq.filter(or_(
-                Activity.squadron_id == p.squadron_id,
-                and_(Activity.owning_level == "wing", Activity.wing_id == p.wing_id),
-            ))
+        activity_scope = level_scope_clause(
+            p, wing_column=Activity.wing_id, squadron_column=Activity.squadron_id)
+        if activity_scope is not None and not p.is_wing:
+            # A Squadron account also sees its own Wing's Wing-owned activities.
+            activity_scope = or_(activity_scope, and_(
+                Activity.owning_level == "wing", wing_scope_clause(p, Activity.wing_id)))
+        aq = scoped(aq, activity_scope)
         for a in aq.limit(_LIMIT).all():
             owning = (a.owning_level or "squadron").capitalize() + " Activity"
             results.append({
@@ -127,18 +117,14 @@ def search_entities(
             })
 
         # ── Accounts ──────────────────────────────────────────────────────
-        if p.role in _ACCOUNT_ROLES:
+        if is_writer(p):
             uq = (
                 db.query(User)
                 .filter(User.is_archived == False, User.active_status == True)  # noqa: E712
                 .filter(or_(User.display_name.ilike(pat), User.role.ilike(pat)))
             )
-            if is_national:
-                pass
-            elif is_wing:
-                uq = uq.filter(User.wing_id == p.wing_id)
-            else:
-                uq = uq.filter(User.squadron_id == p.squadron_id)
+            # By the user's own wing_id (narrower than /api/accounts' Wing scope).
+            uq = scoped(uq, level_scope_clause(p, wing_column=User.wing_id, squadron_column=User.squadron_id))
             for u in uq.limit(_LIMIT).all():
                 sqn_row = (
                     db.query(Squadron).filter(Squadron.id == u.squadron_id).first()
@@ -165,19 +151,8 @@ def search_entities(
                 TrainingSession.custom_title.ilike(pat),
             ))
         )
-        if is_national:
-            pass
-        elif is_wing:
-            wing_sqn_ids = [
-                s.id for s in
-                db.query(Squadron).filter(
-                    Squadron.wing_id == p.wing_id,
-                    Squadron.is_archived == False,  # noqa: E712
-                ).all()
-            ]
-            sess_q = sess_q.filter(TrainingSession.squadron_id.in_(wing_sqn_ids))
-        else:
-            sess_q = sess_q.filter(TrainingSession.squadron_id == p.squadron_id)
+        sess_q = scoped(sess_q, squadron_scope_clause(
+            p, db, TrainingSession.squadron_id, include_archived=False))
         for sess, pn in sess_q.limit(_LIMIT).all():
             label = (
                 sess.curriculum_title_at_time

@@ -34,9 +34,13 @@ from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
 from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
-from ..permissions import has_known_role, is_national_admin  # noqa: E402
+from ..permissions import has_known_role  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
+from ..permissions import (  # noqa: E402
+    may_move_account_to_another_squadron, may_view_account, require_can_write_flight,
+    squadron_scope_clause, wing_or_squadron_scope_clause,
+)
 import re
 
 from ..security import hash_code, generate_code, verify_code
@@ -106,17 +110,7 @@ def _validate_create_scope(p: Principal, target_role: str,
 
 
 def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
-    if p.is_national:
-        return True
-    if p.is_wing:
-        if target.wing_id == p.wing_id:
-            return True
-        if target.squadron_id:
-            sqn = db.get(Squadron, target.squadron_id)
-            return sqn is not None and sqn.wing_id == p.wing_id
-    if p.is_squadron:
-        return target.squadron_id == p.squadron_id
-    return False
+    return may_view_account(p, target, db)
 
 
 # ─────────────────────────────────────────────
@@ -323,13 +317,13 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
             q = q.filter((User.wing_id == wing_id) | (User.squadron_id.in_(sqns_in_wing)))
         if squadron_id:
             q = q.filter(User.squadron_id == squadron_id)
-    elif p.is_wing:
-        sqns_in_wing = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
-        q = q.filter((User.wing_id == p.wing_id) | (User.squadron_id.in_(sqns_in_wing)))
-        if squadron_id:
+    else:
+        # Wing: own-Wing accounts plus accounts in the Wing's Squadrons;
+        # Squadron: own Squadron (permissions.wing_or_squadron_scope_clause).
+        q = q.filter(wing_or_squadron_scope_clause(
+            p, db, wing_column=User.wing_id, squadron_column=User.squadron_id))
+        if p.is_wing and squadron_id:
             q = q.filter(User.squadron_id == squadron_id)
-    else:  # sqn_admin / sqn_general
-        q = q.filter(User.squadron_id == p.squadron_id)
 
     if flight_id:
         q = q.filter(User.flight_id == flight_id)
@@ -656,7 +650,7 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
     if wing_admin_outside_own_wing(p, sqn.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
-    if p.role == "sqn_admin":
+    if not may_move_account_to_another_squadron(p):
         # sqn_admin's manage-authority already restricts them to accounts in
         # their own Squadron, and they can never have a valid *different*
         # destination Squadron -- reject explicitly rather than falling
@@ -1088,18 +1082,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
 
 def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
     """Only sqn_admin (own SQN), wing_admin (own Wing), nat_admin, system_admin."""
-    if is_national_admin(p):
-        return
-    if p.role == "wing_admin":
-        sqn = db.get(Squadron, sqn_id)
-        if not sqn or sqn.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    if p.role == "sqn_admin":
-        if sqn_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    raise HTTPException(403, detail={"error": "forbidden"})
+    require_can_write_flight(p, sqn_id, db)
 
 
 @router.get("/flights")
@@ -1109,18 +1092,13 @@ def list_flights(squadron_id: str | None = None, include_archived: bool = False,
     q = db.query(Flight)
     if not include_archived:
         q = q.filter(Flight.is_archived == False)  # noqa: E712
-    if p.is_national:
-        if squadron_id:
-            q = q.filter(Flight.squadron_id == squadron_id)
-    elif p.is_wing:
-        sqn_ids = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
-        q = q.filter(Flight.squadron_id.in_(sqn_ids))
-        if squadron_id:
-            q = q.filter(Flight.squadron_id == squadron_id)
-    else:
-        q = q.filter(Flight.squadron_id == p.squadron_id)
-        if squadron_id and squadron_id != p.squadron_id:
-            return []
+    scope = squadron_scope_clause(p, db, Flight.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
+    if squadron_id:
+        # A Squadron account naming another Squadron gets [] (the two filters
+        # cannot both hold), as it always did.
+        q = q.filter(Flight.squadron_id == squadron_id)
     return [_flight_out(f, db) for f in q.order_by(Flight.name).all()]
 
 

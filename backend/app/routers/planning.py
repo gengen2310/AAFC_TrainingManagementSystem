@@ -49,6 +49,8 @@ from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
+from ..permissions import level_scope_clause, squadron_scope_clause  # noqa: E402
+from ..permissions import planning_year_outside_scope, wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                            require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
@@ -371,16 +373,10 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
         _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
-    if p.is_squadron:
-        if py.unit_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role == "wing_admin":
-        if py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role in ("wing_viewer", "national_viewer", "auditor"):
-        if p.role == "wing_viewer" and py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    # national_admin, system_admin: unrestricted
+    # Squadron accounts: own Squadron's years; Wing accounts: own Wing's;
+    # national roles: unrestricted.
+    if planning_year_outside_scope(p, py.unit_id, py.wing_id):
+        raise HTTPException(403, detail={"error": "out_of_scope"})
 
 
 def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
@@ -705,10 +701,9 @@ def list_planning_years(
     this list, so returning them by default would break every one of them.
     """
     q = db.query(PlanningYear)
-    if p.is_squadron:
-        q = q.filter(PlanningYear.unit_id == p.squadron_id)
-    elif p.is_wing:
-        q = q.filter(PlanningYear.wing_id == p.wing_id)
+    scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(PlanningYear.unit_id == unit_id)
     if wing_id:
@@ -872,7 +867,7 @@ def create_planning_year(
         wing_id = p.wing_id
         if unit_id and unit_id != p.squadron_id:
             sqn = db.get(Squadron, unit_id)
-            if not sqn or sqn.wing_id != p.wing_id:
+            if not sqn or wing_admin_outside_own_wing(p, sqn.wing_id):
                 raise HTTPException(403, detail={"error": "out_of_scope"})
     # A squadron-scoped plan is a delegated write on that squadron's data --
     # require the same Proxy/Delegated Intervention state every other
@@ -2775,13 +2770,9 @@ def list_locations(
         TrainingArea.active_status == True,  # noqa: E712
         TrainingArea.is_archived == False,  # noqa: E712
     )
-    if p.is_squadron:
-        q = q.filter(TrainingArea.squadron_id == p.squadron_id)
-    elif p.is_wing:
-        sqn_ids = [s.id for s in db.query(Squadron).filter(
-            Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
-        ).all()]
-        q = q.filter(TrainingArea.squadron_id.in_(sqn_ids))
+    scope = squadron_scope_clause(p, db, TrainingArea.squadron_id, include_archived=False)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(TrainingArea.squadron_id == unit_id)
     return [_location_out(loc) for loc in q.order_by(TrainingArea.name).all()]
@@ -3293,10 +3284,9 @@ def get_command_centre(
             _require_year_access(p, py)
     else:
         q = db.query(PlanningYear)
-        if p.is_squadron:
-            q = q.filter(PlanningYear.unit_id == p.squadron_id)
-        elif p.is_wing:
-            q = q.filter(PlanningYear.wing_id == p.wing_id)
+        scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+        if scope is not None:
+            q = q.filter(scope)
         py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
         if py is None:
             py = q.order_by(PlanningYear.year.desc()).first()

@@ -87,6 +87,125 @@ def may_record_session_outcomes(p: "Principal") -> bool:
     return p.role != "sqn_general"
 
 
+# ── Allow/deny gates moved out of routers (2026-10-09) ─────────────────────
+# Each was an inline role check in one router (or the same check repeated in
+# two). Each caller keeps its own error response unless the helper raises.
+
+OVERSIGHT_ROLES = frozenset({"wing_admin", "wing_viewer", "national_admin", "national_viewer",
+                             "system_admin", "auditor"})
+
+
+def is_oversight_role(p: "Principal") -> bool:
+    """May read another account's background job (jobs.get_job): every role
+    except the two Squadron roles; an unrecognised role is refused."""
+    return p.role in OVERSIGHT_ROLES
+
+
+def may_move_account_to_another_squadron(p: "Principal") -> bool:
+    """accounts.change_scope: a Squadron Admin can never move an account to a
+    different Squadron (its manage authority is its own Squadron)."""
+    return p.role != "sqn_admin"
+
+
+def may_change_unit_type(p: "Principal") -> bool:
+    """organisations.update_squadron: the unit type is locked for Squadron
+    Admins; Wing and national admins (through Proxy/Intervention) may change it."""
+    return p.role != "sqn_admin"
+
+
+def may_list_service_tickets(p: "Principal") -> bool:
+    """service_desk.list_tickets: refused to auditor and sqn_general."""
+    return p.role not in ("auditor", "sqn_general")
+
+
+def assignee_outside_wing_admin_authority(p: "Principal", assignee) -> bool:
+    """service_desk.update_ticket: a Wing Admin may assign a ticket only to a
+    Wing Admin of their own Wing. Other callers are not constrained here."""
+    return p.role == "wing_admin" and (
+        assignee.role != "wing_admin" or assignee.wing_id != p.wing_id)
+
+
+def may_write_email_config(p: "Principal", scope: str, wing_id: str | None) -> bool:
+    """service_desk.upsert_email_config: which notification-address scope a
+    caller may write. Wing Admin: their own Wing's; National Admin: the
+    national address (never the system one); System Admin: any."""
+    if p.role == "wing_admin":
+        return scope == "wing" and wing_id == p.wing_id
+    if p.role == "national_admin":
+        return scope == "national"
+    return p.role == "system_admin"
+
+
+def planning_year_outside_scope(p: "Principal", unit_id: str | None, wing_id: str | None) -> bool:
+    """planning._require_year_access: a Squadron account may reach only its
+    own Squadron's years, a Wing account only its own Wing's. National-level
+    roles are not constrained here."""
+    if p.is_squadron:
+        return unit_id != p.squadron_id
+    if p.is_wing:
+        return wing_id != p.wing_id
+    return False
+
+
+def proxy_mode_for(p: "Principal", squadron_wing_id: str | None) -> str:
+    """organisations.enter_proxy: the intervention mode this caller enters on
+    a Squadron, or 403. Wing Admin -> "proxy", only inside their own Wing;
+    National/System Admin -> "delegated_intervention"; everyone else refused."""
+    if p.role == "wing_admin":
+        if squadron_wing_id != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return "proxy"
+    if is_national_admin(p):
+        return "delegated_intervention"
+    raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def require_can_write_flight(p: "Principal", squadron_id: str, db) -> None:
+    """accounts flight writes: national/system admin anywhere; Wing Admin in a
+    Squadron of their own Wing; Squadron Admin in their own Squadron."""
+    if is_national_admin(p):
+        return
+    if p.role == "wing_admin":
+        from .models import Squadron
+        sqn = db.get(Squadron, squadron_id)
+        if not sqn or wing_admin_outside_own_wing(p, sqn.wing_id):
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return
+    if p.role == "sqn_admin":
+        if sqn_admin_outside_own_squadron(p, squadron_id):
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return
+    raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def require_can_create_squadron_reference(p: "Principal", squadron_id: str | None, noun: str) -> None:
+    """Squadron-scope creation of curriculum phases and subject-area tags
+    (training._can_create_phase / _can_create_tag had this verbatim, noun
+    apart). Squadron Admin: own Squadron (a missing squadron_id is allowed).
+    Wing Admin: needs Proxy Mode, and only its target. National/System Admin:
+    needs Delegated Intervention, and only its target."""
+    if p.role == "sqn_admin":
+        if squadron_id and squadron_id != p.squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Squadron admin can only create {noun}s for their own squadron."})
+    elif p.role == "wing_admin":
+        if not p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "proxy_required",
+                                             "message": f"Wing Admin must enter Proxy Mode to create a squadron-scope {noun}."})
+        if squadron_id and squadron_id != p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Can only create a squadron-scope {noun} for the squadron currently in Proxy Mode."})
+    elif is_national_admin(p):
+        if not p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "intervention_required",
+                                             "message": f"National Admin must enter Delegated Intervention Mode to create a squadron-scope {noun}."})
+        if squadron_id and squadron_id != p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Can only create a squadron-scope {noun} for the squadron currently in Delegated Intervention Mode."})
+    else:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+
 @dataclass
 class Principal:
     user_id: str
@@ -260,13 +379,18 @@ def require_write_role(p: Principal, message: str | None = None):
         })
 
 
-def resolve_view_squadron_id(p: Principal, squadron_id: str | None, db) -> str | None:
+def resolve_view_squadron_id(p: Principal, squadron_id: str | None, db, *,
+                             out_of_scope_as_none: bool = False) -> str | None:
     """Resolve the Squadron an unqualified READ means.
 
     An explicit Squadron is validated through the same central view-policy used
     everywhere else. With no explicit target, a Squadron account reads its
     home Squadron and a higher-scope account reads its current proxy/
     intervention target (or None when no Squadron has been selected).
+
+    out_of_scope_as_none: a Squadron outside the caller's view scope resolves
+    to None instead of a 403 (the dashboard degrades to "no Squadron charts").
+    A Squadron that does not exist is a 404 either way.
 
     This helper intentionally performs no write authorization.
     """
@@ -275,9 +399,100 @@ def resolve_view_squadron_id(p: Principal, squadron_id: str | None, db) -> str |
         squadron = db.get(Squadron, squadron_id)
         if not squadron:
             raise HTTPException(404, detail={"error": "squadron_not_found"})
+        if out_of_scope_as_none and not p.can_view_squadron(squadron.id, squadron.wing_id):
+            return None
         require_can_view_squadron(p, squadron.id, squadron.wing_id)
         return squadron.id
     return p.active_squadron_id
+
+
+# ── View scope: which Squadrons / Wing may this principal see? ──────────────
+#
+# One answer, by organisational level of the caller's HOME scope (not the
+# proxy/intervention target; that is resolve_view_squadron_id's job):
+#   national level (incl. auditor) -> everything (helpers return None = no filter)
+#   Wing level                      -> their own Wing / its Squadrons
+#   anything else                   -> their own Squadron
+# Routers used to spell these filters out inline (accounts, organisations,
+# planning, search, service desk, system). The guard counts any that come back.
+
+def visible_squadron_ids(p: Principal, db, *, include_archived: bool = True) -> list[str] | None:
+    """Squadron ids this principal may view. None means unrestricted."""
+    if p.is_national:
+        return None
+    if p.is_wing:
+        from .models import Squadron
+        q = db.query(Squadron).filter(Squadron.wing_id == p.wing_id)
+        if not include_archived:
+            q = q.filter(Squadron.is_archived == False)  # noqa: E712
+        return [s.id for s in q.all()]
+    return [p.squadron_id] if p.squadron_id else []
+
+
+def squadron_scope_clause(p: Principal, db, squadron_column, *, include_archived: bool = True):
+    """Filter for rows scoped only by a Squadron column (flights, training
+    areas, sessions). None = no filter."""
+    if p.is_national:
+        return None
+    if p.is_wing:
+        return squadron_column.in_(visible_squadron_ids(p, db, include_archived=include_archived))
+    return squadron_column == p.squadron_id
+
+
+def level_scope_clause(p: Principal, *, wing_column, squadron_column):
+    """Filter for rows that carry their own wing and squadron columns (audit
+    rows, planning years, facilitators): a Wing account matches on the row's
+    wing column. None = no filter."""
+    if p.is_national:
+        return None
+    if p.is_wing:
+        return wing_column == p.wing_id
+    return squadron_column == p.squadron_id
+
+
+def wing_or_squadron_scope_clause(p: Principal, db, *, wing_column, squadron_column):
+    """Like level_scope_clause, but a Wing account also sees rows whose
+    Squadron is in its Wing even when the row's own wing column is not set
+    (accounts, service tickets). Archived Squadrons included. None = no filter."""
+    if p.is_national:
+        return None
+    if p.is_wing:
+        from sqlalchemy import or_
+        return or_(wing_column == p.wing_id, squadron_column.in_(visible_squadron_ids(p, db)))
+    return squadron_column == p.squadron_id
+
+
+def wing_scope_clause(p: Principal, wing_column):
+    """The Wing(s) this principal may see. Every non-national account (Wing
+    AND Squadron level) sees its own Wing. None = no filter."""
+    if p.is_national:
+        return None
+    return wing_column == p.wing_id
+
+
+def wing_in_view(p: Principal, wing_id: str | None) -> bool:
+    """Row form of wing_scope_clause. Deliberately differs from
+    Principal.can_view_wing, which refuses Squadron accounts any Wing-level
+    record; GET /api/wings and Wing-calendar reads show a Squadron account its
+    own Wing."""
+    return p.is_national or wing_id == p.wing_id
+
+
+def may_view_account(p: Principal, target, db) -> bool:
+    """Row form of the accounts list filter (wing_or_squadron_scope_clause on
+    User). An unrecognised role sees nothing."""
+    if p.is_national:
+        return True
+    if p.is_wing:
+        if target.wing_id == p.wing_id:
+            return True
+        if target.squadron_id:
+            from .models import Squadron
+            sqn = db.get(Squadron, target.squadron_id)
+            return sqn is not None and sqn.wing_id == p.wing_id
+    if p.is_squadron:
+        return target.squadron_id == p.squadron_id
+    return False
 
 
 def require_system_admin(p: Principal):

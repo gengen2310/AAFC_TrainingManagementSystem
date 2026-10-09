@@ -20,6 +20,7 @@ from ..models.training import (ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_C
                                SessionAssistantFacilitator)
 from ..dependencies import get_principal, client_meta
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
+from ..permissions import require_can_create_squadron_reference, sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import is_national_admin, is_wing_writer, is_read_only_role, is_writer, may_record_session_outcomes, may_view_cadet_records  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                           require_can_view_squadron, require_can_write_squadron,
@@ -4116,7 +4117,7 @@ def list_faq(db: DBSession = Depends(get_db), p: Principal = Depends(get_princip
     q = db.query(FaqEntry)
     # Everyone else only ever sees published entries, so an admin can draft an
     # answer without it appearing half-written on every squadron's Help page.
-    if p.role != "system_admin":
+    if not p.is_system_admin:
         q = q.filter(FaqEntry.is_published == True)  # noqa: E712
     rows = q.order_by(FaqEntry.category, FaqEntry.sort_order, FaqEntry.created_at).all()
 
@@ -4842,7 +4843,7 @@ def _can_create_element(p: Principal, scope_level: str,
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(ELEMENT_SCOPE_LEVELS)}"})
     if scope_level == "system":
-        if p.role != "system_admin":
+        if not p.is_system_admin:
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only system_admin can create system-scope elements."})
     elif scope_level == "national":
@@ -4860,7 +4861,7 @@ def _can_create_element(p: Principal, scope_level: str,
     elif scope_level == "squadron":
         if not is_writer(p):
             raise HTTPException(403, detail={"error": "forbidden"})
-        if p.role == "sqn_admin" and squadron_id and squadron_id != p.squadron_id:
+        if squadron_id and sqn_admin_outside_own_squadron(p, squadron_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Squadron admin can only create elements for their own squadron."})
 
@@ -4882,9 +4883,7 @@ def _visible_elements(db: DBSession, p: Principal) -> list[CurriculumElement]:
     if sq_id:
         conditions.append(
             (CurriculumElement.scope_level == "squadron") & (CurriculumElement.squadron_id == sq_id))
-    elif p.role == "wing_admin":
-        pass  # wing admin: no sqn-scope elements unless proxied
-    elif is_national_admin(p):
+    elif is_national_admin(p):  # a Wing Admin sees no sqn-scope elements unless proxied
         conditions.append(CurriculumElement.scope_level == "squadron")
     return db.query(CurriculumElement).filter(
         CurriculumElement.is_archived == False,  # noqa: E712
@@ -5012,7 +5011,7 @@ def _can_create_phase(p: Principal, scope_level: str,
         raise HTTPException(400, detail={"error": "invalid_scope",
                                           "message": f"scope_level must be one of: {sorted(PHASE_SCOPE_LEVELS)}"})
     if scope_level == "system":
-        if p.role != "system_admin":
+        if not p.is_system_admin:
             raise HTTPException(403, detail={"error": "forbidden",
                                               "message": "Only system_admin can create system-scope phases."})
     elif scope_level == "national":
@@ -5028,26 +5027,7 @@ def _can_create_phase(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create phases for their own wing."})
     elif scope_level == "squadron":
-        if p.role == "sqn_admin":
-            if squadron_id and squadron_id != p.squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Squadron admin can only create phases for their own squadron."})
-        elif p.role == "wing_admin":
-            if not p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "proxy_required",
-                                                  "message": "Wing Admin must enter Proxy Mode to create a squadron-scope phase."})
-            if squadron_id and squadron_id != p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Proxy Mode."})
-        elif is_national_admin(p):
-            if not p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "intervention_required",
-                                                  "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope phase."})
-            if squadron_id and squadron_id != p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Delegated Intervention Mode."})
-        else:
-            raise HTTPException(403, detail={"error": "forbidden"})
+        require_can_create_squadron_reference(p, squadron_id, "phase")
 
 
 def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
@@ -5071,9 +5051,7 @@ def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
     if sq_id:
         conditions.append(
             (CurriculumPhase.scope_level == "squadron") & (CurriculumPhase.squadron_id == sq_id))
-    elif p.role == "wing_admin":
-        pass  # wing admin: no sqn-scope phases unless proxied
-    elif is_national_admin(p):
+    elif is_national_admin(p):  # a Wing Admin sees no sqn-scope phases unless proxied
         conditions.append(CurriculumPhase.scope_level == "squadron")
     return db.query(CurriculumPhase).filter(
         CurriculumPhase.is_archived == False,  # noqa: E712
@@ -6031,26 +6009,7 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create tags for their own wing."})
     else:  # squadron
-        if p.role == "sqn_admin":
-            if squadron_id and squadron_id != p.squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Squadron admin can only create tags for their own squadron."})
-        elif p.role == "wing_admin":
-            if not p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "proxy_required",
-                                                  "message": "Wing Admin must enter Proxy Mode to create a squadron-scope tag."})
-            if squadron_id and squadron_id != p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Can only create a squadron-scope tag for the squadron currently in Proxy Mode."})
-        elif is_national_admin(p):
-            if not p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "intervention_required",
-                                                  "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope tag."})
-            if squadron_id and squadron_id != p.acting_squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope",
-                                                  "message": "Can only create a squadron-scope tag for the squadron currently in Delegated Intervention Mode."})
-        else:
-            raise HTTPException(403, detail={"error": "forbidden"})
+        require_can_create_squadron_reference(p, squadron_id, "tag")
 
 
 def _tag_national_id(db: DBSession, p: Principal) -> str | None:

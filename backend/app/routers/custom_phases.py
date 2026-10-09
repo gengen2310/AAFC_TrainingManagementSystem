@@ -15,8 +15,6 @@ from ..services import resolve_national_id
 
 router = APIRouter()
 
-_NATIONAL_ROLES = frozenset({"national_admin", "national_viewer", "auditor"})
-_WING_ROLES = frozenset({"wing_admin", "wing_viewer"})
 
 
 def _above_wing_visible(db, p: Principal):
@@ -43,12 +41,11 @@ def _above_wing_visible(db, p: Principal):
 def _visible_phases(db, p: Principal) -> list[CustomTrainingPhase]:
     """Return phases visible to this principal (scope inheritance downward)."""
     q = db.query(CustomTrainingPhase).filter(CustomTrainingPhase.is_deleted == False)  # noqa: E712
-    role = p.role
-    if role == "system_admin":
+    if p.is_system_admin:
         pass  # sees all
-    elif role in _NATIONAL_ROLES:
+    elif p.is_national:  # national_admin, national_viewer, auditor
         q = q.filter(_above_wing_visible(db, p))
-    elif role in _WING_ROLES:
+    elif p.is_wing:
         q = q.filter(or_(
             _above_wing_visible(db, p),
             and_(CustomTrainingPhase.scope_type == "wing",
@@ -118,7 +115,7 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
         # scope_id names the national entity. Forcing it to None (the pre-v61
         # behaviour) left _visible_phases nothing to filter on, so every
         # national saw every other national's phases.
-        if p.role == "system_admin":
+        if p.is_system_admin:
             scope_id = body.scope_id or resolve_national_id(db, p)
         else:
             scope_id = resolve_national_id(db, p)  # own national; body ignored
