@@ -18,6 +18,7 @@ from ..permissions import (
     Principal, require_role, require_can_view_squadron, require_can_write_squadron,
     require_system_or_nat_admin, require_audit_access,
 )
+from ..permissions import level_scope_clause, wing_in_view  # noqa: E402
 from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
@@ -44,8 +45,7 @@ def list_wings(include_archived: bool = False, db: DBSession = Depends(get_db),
     if not include_archived:
         q = q.filter(Wing.is_archived == False)  # noqa: E712
     wings = q.all()
-    if not p.is_national:
-        wings = [w for w in wings if w.id == p.wing_id]
+    wings = [w for w in wings if wing_in_view(p, w.id)]
     return [{"wing_id": w.id, "code": w.code, "name": w.name,
              "short_name": getattr(w, "short_name", w.code), "is_archived": w.is_archived} for w in wings]
 
@@ -278,12 +278,7 @@ def list_squadrons(wing_id: str | None = None, unit_type: str | None = None, inc
     if not include_archived:
         q = q.filter(Squadron.is_archived == False)  # noqa: E712
     sqns = q.all()
-    if p.is_national:
-        pass
-    elif p.is_wing:
-        sqns = [s for s in sqns if s.wing_id == p.wing_id]
-    else:
-        sqns = [s for s in sqns if s.id == p.squadron_id]
+    sqns = [s for s in sqns if p.can_view_squadron(s.id, s.wing_id)]
     if wing_id:
         sqns = [s for s in sqns if s.wing_id == wing_id]
     if unit_type:
@@ -604,11 +599,12 @@ def update_squadron(squadron_id: str, body: SquadronUpdateIn, db: DBSession = De
 def list_users(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     q = db.query(User).filter(User.active_status == True)  # noqa: E712
-    if p.role == "sqn_admin":
-        q = q.filter(User.squadron_id == p.squadron_id)
-    elif p.role == "wing_admin":
-        q = q.filter(User.wing_id == p.wing_id)
-    # national_admin / system_admin: no additional filter
+    # After require_role: sqn_admin -> own Squadron, wing_admin -> users whose
+    # own wing_id is theirs (NOT accounts.py's wider "or in a Squadron of the
+    # Wing"; see role-check-classification.md), national/system -> all.
+    scope = level_scope_clause(p, wing_column=User.wing_id, squadron_column=User.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
     users = q.order_by(User.display_name).all()
     return [_user(u, db) for u in users]
 
@@ -701,11 +697,9 @@ def get_audit(object_type: str | None = None, object_id: str | None = None, batc
               limit: int = 300, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_audit_access(p)
     q = db.query(AuditLog)
-    if not p.is_national:
-        if p.is_wing:
-            q = q.filter(AuditLog.wing_id == p.wing_id)
-        else:
-            q = q.filter(AuditLog.squadron_id == p.squadron_id)
+    scope = level_scope_clause(p, wing_column=AuditLog.wing_id, squadron_column=AuditLog.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
     if object_type:
         q = q.filter(AuditLog.object_type == object_type)
     if object_id:

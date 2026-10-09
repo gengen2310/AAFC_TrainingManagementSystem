@@ -27,7 +27,7 @@ from ..models import (
     PlanningYear, Session, CurriculumItem, NationalEntity, JobStatus,
     # ParadeDate removed (Phase B migration a1c68e84caf5) — T5 handles router updates
 )
-from ..permissions import Principal, require_system_admin, require_audit_access
+from ..permissions import Principal, require_system_admin, require_audit_access, level_scope_clause
 from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db
 from ..services import audit
 from ..services_year import timezone_for_new_wing
@@ -309,11 +309,9 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     # Keep this surface aligned with /api/audit: role authorization alone is
     # not enough. Squadron and Wing readers must never receive audit rows from
     # outside their tenancy.
-    if not p.is_national:
-        if p.is_wing:
-            q = q.filter(AuditLog.wing_id == p.wing_id)
-        else:
-            q = q.filter(AuditLog.squadron_id == p.squadron_id)
+    scope = level_scope_clause(p, wing_column=AuditLog.wing_id, squadron_column=AuditLog.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
     if action:
         q = q.filter(AuditLog.action == action)
     if role:
