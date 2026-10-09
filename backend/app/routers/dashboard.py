@@ -35,7 +35,6 @@ from ..models import (
 )
 from ..permissions import (
     Principal,
-    require_can_view_squadron,
     require_can_view_wing,
     resolve_view_squadron_id,
 )
@@ -230,14 +229,7 @@ def _view_squadron_id_for_dashboard(p: Principal, squadron_id: str, db: DBSessio
     unrelated bad id degrades to "no squadron charts" rather than a hard error
     on a read-heavy dashboard endpoint; a squadron that simply doesn't exist
     still 404s, matching training.py's behaviour for a broken link/typo."""
-    sq = db.get(Squadron, squadron_id)
-    if not sq:
-        raise HTTPException(404, detail={"error": "squadron_not_found"})
-    try:
-        require_can_view_squadron(p, sq.id, sq.wing_id)
-    except HTTPException:
-        return None
-    return sq.id
+    return resolve_view_squadron_id(p, squadron_id, db, out_of_scope_as_none=True)
 
 
 # ── main endpoints ────────────────────────────────────────────────────────────
