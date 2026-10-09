@@ -4,9 +4,9 @@
   "captured_at": "2026-10-03",
   "connected_frontend": {
     "path": "connected-frontend/index.html",
-    "max_bytes": 651639,
-    "max_lines": 9276,
-    "max_named_function_declarations": 186
+    "max_bytes": 623990,
+    "max_lines": 8765,
+    "max_named_function_declarations": 166
   },
   "router_direct_role_checks": {
     "backend/app/routers/__init__.py": 0,
