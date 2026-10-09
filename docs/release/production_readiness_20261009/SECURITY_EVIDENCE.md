@@ -55,7 +55,39 @@ staging-scoped project token for agent sessions.
   Naming only, but key custody documentation should say which environments it
   serves (beta-release gate 10, key custody).
 
+## Packaging security greps (`.claude/rules/security.md`, run 2026-10-09 at `8ecd2cd`)
+
+| Grep | Matches | Review |
+|---|---|---|
+| removed wording | 0 | — |
+| access-code exposure wording | 0 | — |
+| seeded codes / code fields / localStorage in connected-frontend | 3 | `access_code_reset` = audit-log filter option label (l.2851); `localStorage` ×2 = nav-collapsed UI preference only (l.18717, 18732). Benign. |
+| server secrets in connected-frontend | 1 | `DATABASE_URL` = literal placeholder in pg_restore help text (l.6782). Benign. |
+
+Must be re-run after C6 (frontend extraction) moves code into `js/*.js`: the
+greps cover the directory, so they still apply.
+
+## Dependency audit (2026-10-09)
+
+- Backend `requirements.txt`: `pip-audit` 2.10.1 -> **No known vulnerabilities found**.
+- Playwright tooling: `npm audit` -> 0.
+- Planning Workspace (`frontend/`), **shipped** deps (`--omit=dev`): 0 critical,
+  0 high, 3 moderate:
+  - `moment` path traversal via crafted locale name — transitive (not imported by
+    app code); practical risk in a browser bundle is low; non-breaking fix exists.
+  - `react-router(-dom)` open redirect via backslash in `<Link>`/`useNavigate` —
+    every navigation target in `frontend/src` is a literal path (grep), so no
+    user-controlled value reaches it; fix needs a major upgrade (v7).
+- Planning Workspace **dev/build toolchain**: 2 critical, 6 high (`vitest`,
+  `tinypool`, `vite`, `vite-plugin-singlefile`, `braces`, `micromatch`,
+  `brace-expansion`, `source-map-js`). Not shipped: the deployed artifact is
+  static files behind nginx. Fixes need major upgrades (vite 8, vitest 5).
+- **Owner decision needed (known limitation):** accept the dev-toolchain and two
+  moderate shipped findings for this release with a follow-up upgrade, or upgrade
+  first. Not upgraded here: a major build-toolchain change during stabilisation
+  is a redesign-sized risk, and `frontend/node_modules` in this worktree is shared
+  with the owner's checkout.
+
 ## Not yet run (Phase 5)
 
-Security greps from `.claude/rules/security.md`, `pip-audit`, `npm audit`,
-`security-review` skill over the full branch diff.
+`security-review` skill over the full branch diff (after C3/C4/C6 integrate).

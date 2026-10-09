@@ -26,6 +26,15 @@ red until this branch's workflow is merged.
 - Restored counts: users 22, squadrons 18, sessions 86, parade_nights 154,
   facilitators 97, curriculum_items 214, planning_years 23, audit_logs 878.
 
-## Not yet done (Phase 5)
+## Local migration rehearsal (2026-10-09, migrations as of `8ecd2cd`)
 
-Alembic downgrade/upgrade rehearsal on SQLite + PostgreSQL at the final SHA.
+Throwaway databases, removed afterwards. Sequence: empty -> head -> downgrade to the
+production revision `a4e9507a9c51` -> head (the rollback-then-redeploy path).
+
+| Engine | empty -> head | head -> prod rev | prod rev -> head | errors |
+|---|---|---|---|---|
+| SQLite (fresh file) | 89 upgrades | 15 downgrades | 15 upgrades | none |
+| PostgreSQL 18.4 (scratch cluster, port 5499, pid verified) | 89 upgrades | 15 downgrades | 15 upgrades | none |
+
+`alembic heads`: single head `63c110addb63`. To repeat at the final SHA if any
+migration is added after `8ecd2cd` (none planned).
