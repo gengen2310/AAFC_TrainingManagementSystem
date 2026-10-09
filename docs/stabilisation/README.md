@@ -85,9 +85,21 @@ Pinned by `test_role_predicates.py`, `test_role_matrix.py`,
 `test_sqn_general_record_policies.py`, `test_wing_admin_scope_predicate.py`
 and `test_cross_wing_write_isolation.py`.
 
-Remaining: 43 checks, each classified with its reason in
-`role-check-classification.md`. Most are scope selection or role-specific
-product rules that stay where they are.
+2026-10-09 (C3/C4): 43 -> **7** direct checks (ten named gate predicates,
+set-equal role sets onto `Principal` properties). View scope ("which
+Squadrons / Wing may this principal see?") has one source, the view-scope
+section of `permissions.py`; the new ratchet `router_inline_scope_comparisons`
+went 71 -> **11**. Proven at the endpoint by `test_scope_parity.py`
+(1344/1344 responses identical across 14 principals including a second
+Wing, Proxy Mode and Delegated Intervention), plus DB oracles that keep
+pinning the boundary. Pinned by `test_moved_role_gates.py` and
+`test_view_scope_helpers.py`.
+
+Remaining: 7 checks and 11 comparisons, each classified with its reason in
+`role-check-classification.md`, which also records the call sites that
+still deliberately differ and one open authorization defect
+(`custom_phases._require_can_mutate`, cross-Wing phase edits) awaiting an
+approved fix.
 
 For every migrated rule: permission-unit tests; endpoint status/error
 contracts unchanged unless a defect is separately approved; role/scope matrix

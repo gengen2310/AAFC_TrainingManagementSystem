@@ -27,32 +27,88 @@ centralised for appearance alone.
 | #71 | 57 | `Principal.is_squadron`: 11 inline `("sqn_admin", "sqn_general")` scope tuples |
 | #71 | 46 | Router-local role sets onto central predicates (verified set-equal); 3 duplicate constants removed |
 | #71 | 43 | `sqn_admin_outside_own_squadron`: 3 sites |
+| 2026-10-09 | 7 | C3: pure gates -> named predicates in `permissions.py` (`is_oversight_role`, `may_move_account_to_another_squadron`, `may_change_unit_type`, `may_list_service_tickets`, `assi## Remaining 7, by function
 
-Every step preserved the error contract and was checked by the full backend
-suite. The rewrites to new predicates were mutation-checked (the predicate
-disabled, the tests confirmed to fail).
-
-## Remaining 43, by function
-
-| Router · function | n | Cat. | Why it stays (or what would move it) |
+| Router · function | n | Cat. | Why it stays |
 |---|---|---|---|
-| accounts · `change_scope` | 1 | B | A Squadron Admin's destination is fixed to their own Squadron. Single use. |
-| accounts · `_can_write_flight` | 2 | A/B | Per-role branch: a Wing Admin by the Squadron's Wing, a Squadron Admin by Squadron. The branches differ, so a single predicate would hide them. |
-| custom_phases · `create_custom_phase` | 2 | B | Forces `scope_id` (a Wing Admin is pinned to their own Wing; a System Admin may choose the national entity). |
-| custom_phases · `_require_can_mutate` | 2 | A | Wing and national ownership (a Wing Admin may not mutate a national or system phase, and so on). Scope-type specific. |
-| jobs · `get_job` | 1 | A | Owner or oversight role. `_OVERSIGHT_ROLES` is every role except the two Squadron roles. Could become `not p.is_squadron`, but "oversight" is the named concept; left as is. |
-| organisations · `update_squadron` | 1 | D | Which Squadron fields a Squadron Admin may edit about their own unit. |
-| organisations · `list_users` | 2 | B | Squadron and Wing filtering of the user list. |
-| organisations · `enter_proxy` | 1 | A/D | A Wing Admin may only proxy into their own Wing; national roles get delegated intervention mode. |
-| planning · `_require_year_access` | 3 | A/B | Year access by level. This is already the planning router's single access function. |
-| planning · `create_planning_year` | 2 | B | Pins `unit_id` or `wing_id` to the creator's own scope. |
+| custom_phases · `create_custom_phase` | 1 | B | Pins `scope_id`: a Wing Admin is forced to their own Wing; a National/System Admin may name one. Data targeting, single use. |
+| custom_phases · `_require_can_mutate` | 2 | A | Pure gate, **left in place on purpose**: it has a cross-Wing defect (see "Open defect" below). Moving it to `permissions.py` unchanged would present a defective rule as reviewed policy; move it together with the fix. |
+| planning · `create_planning_year` | 2 | B | Pins `unit_id` / `wing_id` to the creator's scope (Squadron Admin: own Squadron; Wing Admin: own Wing, and a named unit must be in it, via `wing_admin_outside_own_wing`). |
 | planning · `create_location` | 1 | B | Pins `unit_id` to the Squadron Admin's Squadron. |
-| search · `search_entities` | 4 | B/C | Search scope by level. `search._NATIONAL_ROLES` deliberately excludes `auditor`, which is handled on the next line. Candidates for `p.is_national` / `p.is_wing` only after the auditor branch is pinned by a test. |
-| service_desk · `list_tickets` | 2 | A/B | `auditor` and `sqn_general` are refused (A); a Squadron Admin sees their own Squadron (B). |
-| service_desk · `update_ticket` | 2 | D | Assignee eligibility: a Wing Admin may assign only to Wing Admins of their own Wing. A product rule about the assignee's role. |
-| service_desk · `get_email_config` / `upsert_email_config` | 4 | B | Which notification-config scopes each admin level may read or write. |
-| setup · `setup_status` | 1 | C | National-only counters in the setup report. |
-| training · `list_cadets` | 1 | C | `can_sensitive`: who sees sensitive cadet fields. The set happens to equal `WRITE_ROLES`, but the concept is sensitive-data access, not "writer". Deliberately **not** rewritten to `is_writer`. |
+| training · `list_cadets` | 1 | C | `can_sensitive`: who sees sensitive cadet fields. Equals `WRITE_ROLES` today, but the concept is sensitive-data access, not "writer". Deliberately not rewritten. |
+
+## View scope: one source (C4, 2026-10-09)
+
+"Which Squadrons / Wing may this principal see?" is answered in
+`permissions.py` (view-scope section) and nowhere else in the routers:
+`visible_squadron_ids`, `squadron_scope_clause`, `level_scope_clause`,
+`wing_or_squadron_scope_clause`, `wing_scope_clause`, `wing_in_view`,
+`may_view_account`, and `resolve_view_squadron_id(out_of_scope_as_none=)`.
+They live in `permissions.py`, not a new `services_scope.py`, because that
+module already owns `resolve_view_squadron_id` and states that all scope
+decisions flow through it; a second module would split tenancy in two.
+
+The guard counts `==` / `!=` comparisons against `p.wing_id`,
+`p.squadron_id`, `p.acting_wing_id`, `p.acting_squadron_id` in routers
+(`router_inline_scope_comparisons`): 71 at 8ecd2cd, **11** now.
+
+| Router · function | n | Why it stays |
+|---|---|---|
+| custom_phases · `_visible_phases` | 3 | Custom-phase ownership (`scope_id` is a Wing or Squadron id), not Squadron visibility. Disagrees with `planning._phase_visible_to` (below); not unified. |
+| planning · `_phase_visible_to` | 2 | Same concept, per row; same disagreement. |
+| planning · `_curriculum_scope_query` | 2 | Curriculum inheritance (national -> Wing -> Squadron). The Squadron branch takes the Wing from the Squadron row, not from the principal. A different question from visibility. |
+| planning · `list_cea_activities`, `set_cea_local_hide` | 2 | The caller's own Squadron's overlay rows (`ActivityLocalHide.unit_id`), only when the caller has a home Squadron. Targeting, not visibility. |
+| planning · `command_centre` | 1 | The caller's own Squadron's Wing-event review status (`SquadronEventStatus`). Targeting. |
+| planning · `create_planning_year` | 1 | `unit_id != p.squadron_id` inside the Wing Admin branch (B, above). |
+
+### Call sites that deliberately still differ
+
+- **Accounts lists.** `/api/accounts` shows a Wing account every user whose
+  own `wing_id` is theirs **or** whose Squadron is in their Wing
+  (`wing_or_squadron_scope_clause`). `/api/users` and the accounts section
+  of `/api/search` match only the user's own `wing_id`
+  (`level_scope_clause`). They differ for a Squadron account stored with no
+  `wing_id`. Kept as found; a product decision.
+- **Wings.** `wing_in_view` (and `GET /api/wings`, Wing-calendar reads) show
+  a Squadron account its own Wing; `Principal.can_view_wing` refuses Squadron
+  accounts any Wing-level record. Both kept.
+- **Custom phases.** `custom_phases._visible_phases` shows a System Admin
+  every phase; `planning._phase_visible_to` (which gates scheduling against a
+  phase) shows Wing/Squadron phases only when their `scope_id` equals the
+  caller's own Wing/Squadron, so a System Admin, or a National Admin in
+  Delegated Intervention, cannot schedule against a phase they can list.
+  With no resolvable national, `_above_wing_visible` shows every national
+  phase while `_phase_visible_to` shows only pre-v61 (NULL `scope_id`) ones.
+- **Acting-scope reference data.** `training.py` (curriculum, elements,
+  phases, tags) and `ops.py` (planning-change feed) select by
+  `p.acting_wing_id or p.wing_id`: proxy target first, not home scope. A
+  different rule, used about 20 times; not routed through the home-scope
+  helpers. A `Principal.active_wing_id` (twin of `active_squadron_id`) is
+  the natural next step.
+
+### Unrecognised roles
+
+`planning` (years, locations, command-centre default year) and
+`service_desk.list_tickets` had no `else` branch, so a principal with a role
+outside `ROLES` was unfiltered. The helpers give it the narrowest
+(own-Squadron) scope. Unreachable in practice (the API validates roles on
+account create and update); recorded because it is a change on paper.
+
+## Open defect (found 2026-10-09, not fixed here)
+
+`custom_phases._require_can_mutate` constrains only `sqn_admin` on
+Squadron phases, `wing_admin` on Wing phases and `national_admin` on
+national phases. So a **Squadron Admin can rename any Wing's Wing-scoped
+phase** and any national or system phase, and a **Wing Admin any national
+or system phase** (rename observed; DELETE runs the same guard, by reading,
+not exercised). Seen in the parity snapshot: 703's
+Squadron Admin (7WG) renamed the second Wing's Wing phase (200), and the
+second Wing's Squadron Admin renamed 7WG's (200). The docstring says
+"sqn_admin may only mutate their own squadron's phases; wing_admin only
+their own wing's". Fixing it changes status codes, so it needs its own
+approved change with a regression test.
+
+ta access, not "writer". Deliberately **not** rewritten to `is_writer`. |
 | training · `list_faq` | 1 | C | Only a System Admin sees unpublished FAQ entries. |
 | training · `_can_create_element` / `_can_create_phase` | 5 | A/B | National-scope creation is System Admin only. Squadron scope requires an active proxy for Wing and national roles, plus the Squadron Admin's own-Squadron check. That check (`squadron_id and squadron_id != p.squadron_id`) **differs** from `sqn_admin_outside_own_squadron` because a missing `squadron_id` is allowed here, so it was not merged. |
 | training · `_visible_elements` / `_visible_phases` | 2 | B | A Wing Admin sees no Squadron-scope rows unless proxied. |
