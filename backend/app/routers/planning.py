@@ -49,6 +49,7 @@ from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
+from ..permissions import level_scope_clause, squadron_scope_clause  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                            require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
@@ -705,10 +706,9 @@ def list_planning_years(
     this list, so returning them by default would break every one of them.
     """
     q = db.query(PlanningYear)
-    if p.is_squadron:
-        q = q.filter(PlanningYear.unit_id == p.squadron_id)
-    elif p.is_wing:
-        q = q.filter(PlanningYear.wing_id == p.wing_id)
+    scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(PlanningYear.unit_id == unit_id)
     if wing_id:
@@ -2775,13 +2775,9 @@ def list_locations(
         TrainingArea.active_status == True,  # noqa: E712
         TrainingArea.is_archived == False,  # noqa: E712
     )
-    if p.is_squadron:
-        q = q.filter(TrainingArea.squadron_id == p.squadron_id)
-    elif p.is_wing:
-        sqn_ids = [s.id for s in db.query(Squadron).filter(
-            Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
-        ).all()]
-        q = q.filter(TrainingArea.squadron_id.in_(sqn_ids))
+    scope = squadron_scope_clause(p, db, TrainingArea.squadron_id, include_archived=False)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(TrainingArea.squadron_id == unit_id)
     return [_location_out(loc) for loc in q.order_by(TrainingArea.name).all()]
@@ -3293,10 +3289,9 @@ def get_command_centre(
             _require_year_access(p, py)
     else:
         q = db.query(PlanningYear)
-        if p.is_squadron:
-            q = q.filter(PlanningYear.unit_id == p.squadron_id)
-        elif p.is_wing:
-            q = q.filter(PlanningYear.wing_id == p.wing_id)
+        scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+        if scope is not None:
+            q = q.filter(scope)
         py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
         if py is None:
             py = q.order_by(PlanningYear.year.desc()).first()
