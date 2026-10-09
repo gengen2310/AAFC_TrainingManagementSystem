@@ -520,9 +520,16 @@ jobs:
 
       - name: Drive authenticated reads through the real API
         if: env.NO_BACKUP != 'true'
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: restore_user
+          PGDATABASE: aafc_tms_restore_test
+          PGPASSWORD: restore_test_ci_only
         run: |
           python3 - << 'PYEOF'
           import json
+          import subprocess
           import urllib.request
           import urllib.error
 
@@ -573,6 +580,28 @@ jobs:
               else:
                   size = len(body) if isinstance(body, list) else "n/a"
                   print(f"  PASS  {path} -> 200 (items={size})" if size != "n/a" else f"  PASS  {path} -> 200")
+
+          # A 200 alone does not prove restored rows are readable: the
+          # facilitator list is squadron-scoped, so unscoped it returns 0 even
+          # with 97 rows restored (run 37909713246). Ask for the squadron that
+          # holds the most active facilitators and require the API to return
+          # exactly what the table holds.
+          row = subprocess.run(
+              ["psql", "-tAc", "SELECT squadron_id, count(*) FROM facilitators "
+               "WHERE active_status GROUP BY squadron_id ORDER BY count(*) DESC, squadron_id LIMIT 1;"],
+              capture_output=True, text=True, check=True).stdout.strip()
+          if row:
+              sq_id, expected = row.split("|")[0], int(row.split("|")[1])
+              status, body = call("GET", f"/api/planning/facilitators?unit_id={sq_id}", token=token)
+              got = len(body) if status == 200 and isinstance(body, list) else None
+              if got != expected:
+                  failures.append(f"/api/planning/facilitators?unit_id=<busiest> -> status {status}, "
+                                  f"{got} item(s); the restored table holds {expected}")
+              else:
+                  print(f"  PASS  /api/planning/facilitators?unit_id=<busiest> -> {got} item(s) = restored rows")
+          else:
+              print("  SKIP  data-bearing facilitator read: no active facilitators in this backup")
+          checks.append(("GET", "/api/planning/facilitators?unit_id=<busiest>"))
 
           print()
           if failures:
