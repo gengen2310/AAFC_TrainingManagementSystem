@@ -1,0 +1,21 @@
+# Defect register — production readiness 2026-10-09
+
+Branch `release/production-readiness-20261009` (base #72 tip `56ac1af`).
+States: NOT STARTED | IN PROGRESS | BLOCKED | VERIFIED | COMPLETE.
+COMPLETE = reproduced, failing regression seen, fixed, regression passes,
+surrounding suite passes, independently reviewed. Until the review (Phase 6)
+the best a fixed defect can be is VERIFIED.
+
+| ID | Sev | Source | Defect | Root cause | Fix | Regression | State |
+|---|---|---|---|---|---|---|---|
+| D1 | P1 | Codex on #71 `main.py:105` | During a DB outage every request about to be refused made a fresh DB checkout (20 refusals → 20 attempts), defeating the 2 s backoff | `fetched_at` only advances on success, so revalidate-before-refusal always forced a re-read | `4d551a1`: forced re-read also waits for `retry_at`, set by a failed read | `test_maintenance_refusal_revalidation.py` (outage → 1 attempt; re-read resumes after backoff). Seen failing: `assert 20 == 1` | VERIFIED |
+| D2 | P2 | Codex on #71 `services_parade_dates.py:76` | `end_date` > 30 y rejected even when `max_repeats` bounds the request | horizon check unconditional | `ff000c1` | `test_max_repeats_bounds_the_scan_even_when_the_end_date_is_far` (failed: `date_range_too_long`) | VERIFIED |
+| D3 | P2 | Codex on #71 `:77` | `max_repeats` silently truncated at the horizon (yearly ×200 → ~30) | loop stops at horizon, no check | `ff000c1`: 400 `max_repeats_beyond_horizon` | 3 tests (failed: DID NOT RAISE / wrong code) | VERIFIED |
+| D4 | P2 | Codex on #71 `:82` | start 9999-12-31 → `OverflowError` → HTTP 500 | fortnight anchor computed unguarded | `ff000c1` | `test_a_start_on_the_last_calendar_day_never_overflows` ×5 (failed: OverflowError) | VERIFIED |
+| D5 | P3 | Codex on #71 (process) | one commit mixes functional areas | — | Not rewritten (pushed; no force-push). Disposition posted on #71 | n/a | COMPLETE (disposition) |
+| D6 | P1 | scheduled restore runs on `main` failing since 2026-09-13 | Restore test on `main` required restored head == repo head; prod is at v64 `a4e9507a9c51`, so it fails by construction | test design | Already on #69: restore → upgrade to head → verify. Clears on `main` once merged | restore runs 37909713246, 37910351762 on this branch | VERIFIED on branch; first scheduled pass on `main` pending merge |
+| D7 | P2 | found reading run 37909713246 | Restore test reported **14** pending migrations; **15** ran (K-006 `b7f3c2e1d098` unlisted) → release migration impact understated | `iterate_revisions(head, rev)` already excludes `rev`; extra `[:-1]` dropped the oldest | `4473f0d` + invariant (oldest listed must have the restored rev as parent) | invariant shown to fail on the old slicing; run 37910351762: reports 15, 15 ran | VERIFIED |
+| D8 | — | found reading run 37909713246 | K-006 on real prod data: 0 created, 69 skipped | Prod has 0 training classes; squadrons use the legacy `cadet_group` path by design (`setup.py:92`, `training.py:8084`), K-006 refuses to guess | **Not a defect** — legacy path covered by existing tests (`test_sessions.py`, `test_migrate_legacy_class_data.py`, …) | n/a | COMPLETE (no change) |
+| D9 | P3 | found reading run 37909713246 | App-level restore check passed facilitators with 0 items vs 97 restored rows (status-only proof) | squadron-scoped endpoint, unscoped admin | `a98f7ae`: compare API (scoped to busiest squadron) with table count | run 37910351762: busiest squadron → 23 items = 23 restored rows | VERIFIED |
+| H1 | P2 | found while verifying D2–D4 | Test-order collision: 409 `planning_year_already_exists` (rules file before year-linkage file) | `conftest` loaded twice (`conftest` and `tests.conftest`) → two `next_test_year()` counters from 5000 | `7f414b3`: register module under both names | `test_conftest_single_module.py` (failed: 2 modules; 2 unique of 4) | VERIFIED |
+| S-series | — | background security reviews | Production guard hook bypasses (fail-open on malformed input; bash 3.2 EXIT `$?`=0; flag spellings; quote/escape rejoin; deploy globs; seed deny-list incompleteness; double `DATABASE_URL`; `railway -s x run`) and one control regression I introduced (`704cf5b` narrowed the any-tool env-flag rule) | see SECURITY_EVIDENCE.md | `13bc3bf`, `704cf5b`, `081980f`, `2aaabb1`, `4d9a28c` | `.claude/hooks/test_guard_prod.sh` 52/52 | VERIFIED; residual documented |
