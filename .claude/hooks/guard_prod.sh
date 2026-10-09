@@ -51,7 +51,9 @@ re_env_flag='(--environment[= ]+|(^|[[:space:]])-e[[:space:]]*)(production|prod)
 re_deploy_glob='deploy-[^[:space:]]*[]*?[]'
 re_seed='seed_all|reset_db'
 re_explicit_sqlite='(^|[[:space:]])database_url=sqlite:'
-re_remote_runner='railway[[:space:]]+(run|connect|ssh)'
+# Any DATABASE_URL assignment whose value is not sqlite (a later assignment
+# wins, so one sqlite URL does not vouch for the command).
+re_other_db_url='(^|[[:space:]])database_url=([^s]|s[^q]|sq[^l]|sql[^i]|sqli[^t]|sqlit[^e]|sqlite[^:])'
 
 if [[ $cmd == *"$prod_env_id"* ]]; then
   deny "command references the production Railway environment id"
@@ -70,8 +72,9 @@ if [[ $cmd =~ $re_railway && $cmd =~ $re_prod_word ]]; then
 fi
 # Allow-list, not deny-list: the target database may come from the
 # environment, invisible here. Destructive seeding runs only when the command
-# itself pins a local SQLite DATABASE_URL, and never through a remote runner.
-if [[ $cmd =~ $re_seed ]] && { [[ ! $cmd =~ $re_explicit_sqlite ]] || [[ $cmd =~ $re_remote_runner ]]; }; then
+# itself pins a local SQLite DATABASE_URL (every assignment), and never
+# alongside any railway invocation (flags may precede run/connect/ssh).
+if [[ $cmd =~ $re_seed ]] && { [[ ! $cmd =~ $re_explicit_sqlite ]] || [[ $cmd =~ $re_other_db_url ]] || [[ $cmd =~ $re_railway ]]; }; then
   deny "seed_all/reset_db is only allowed with an explicit DATABASE_URL=sqlite:... in the same command"
 fi
 

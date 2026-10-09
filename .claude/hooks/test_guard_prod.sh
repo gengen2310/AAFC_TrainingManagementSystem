@@ -27,6 +27,10 @@ for c in 'railway up --environment 571a8028-3640-4542-a4ab-7a1ee6b1f693' 'railwa
 # Seeding: allowed only with an explicit SQLite target in the command itself.
 for c in 'cd backend && python -m app.seeds.seed_all' 'python -c "from app.seeds.seed_all import reset_db; reset_db()"' \
  'DATABASE_URL=sqlite:///x.db railway run python -m app.seeds.seed_all'; do t deny "$(j "$c")" "$c"; done
+for c in 'railway -s backend run python -m app.seeds.seed_all DATABASE_URL=sqlite:///x' \
+ 'DATABASE_URL=sqlite:///x.db DATABASE_URL=postgres://h/db python -m app.seeds.seed_all' \
+ 'DATABASE_URL=sqlite:///x.db python -m app.seeds.seed_all; DATABASE_URL=postgres://h/db python -m app.seeds.seed_all' \
+ 'DATABASE_URL=sqlitex://h python -m app.seeds.seed_all'; do t deny "$(j "$c")" "$c"; done
 t allow "$(j 'cd backend && DATABASE_URL=sqlite:///./dev.db python -m app.seeds.seed_all')"
 # Shell quoting/escaping inside a word: the shell rejoins these before running.
 for c in 'rail""way up -e production' "rail''way up -e production" 'railway up -e pro\\duction' \
