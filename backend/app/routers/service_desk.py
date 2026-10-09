@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, EmailStr, TypeAdapter, field_validator
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -285,6 +286,31 @@ def create_ticket(body: TicketCreateIn, db: DBSession = Depends(get_db)):
     return {"ok": True, "ticket_id": ticket.id}
 
 
+def _scoped_tickets(p: Principal, db: DBSession):
+    """The tickets this principal may list: the list and its summary share it,
+    so the gate and the scope cannot drift apart. Wing: tickets carrying the
+    Wing directly, plus legacy squadron-only rows whose Squadron is in the Wing.
+    Squadron Admin: own Squadron. National Admin/Viewer, System Admin: all."""
+    if not may_list_service_tickets(p):
+        raise HTTPException(403, detail={"error": "forbidden"})
+    q = db.query(ServiceTicket)
+    scope = wing_or_squadron_scope_clause(
+        p, db, wing_column=ServiceTicket.wing_id, squadron_column=ServiceTicket.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
+    return q
+
+
+def _displayed_unit_expr():
+    """SQL form of the unit _ticket_out shows: unit_name, else the Squadron's
+    name, else the Wing's. NULLIF mirrors Python's `or` on an empty string."""
+    return func.coalesce(
+        func.nullif(ServiceTicket.unit_name, ""),
+        select(Squadron.name).where(Squadron.id == ServiceTicket.squadron_id).scalar_subquery(),
+        select(Wing.name).where(Wing.id == ServiceTicket.wing_id).scalar_subquery(),
+    )
+
+
 # GET /service-desk/tickets page size (see list_tickets).
 TICKET_PAGE_DEFAULT = 100
 TICKET_PAGE_MAX = 200
@@ -294,6 +320,7 @@ def list_tickets(
     response: Response,
     status: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    unit: str | None = Query(default=None, max_length=200),
     limit: int = Query(default=TICKET_PAGE_DEFAULT, ge=1, le=TICKET_PAGE_MAX),
     offset: int = Query(default=0, ge=0),
     db: DBSession = Depends(get_db),
@@ -304,18 +331,7 @@ def list_tickets(
     Always bounded (national roles would otherwise receive every ticket ever
     raised): newest first, ties broken by id so pages never overlap or skip,
     and the filtered total in X-Total-Count for the Main TMS "Load more"."""
-    if not may_list_service_tickets(p):
-        raise HTTPException(403, detail={"error": "forbidden"})
-
-    q = db.query(ServiceTicket)
-
-    # Wing: tickets carrying the Wing directly, plus legacy squadron-only rows
-    # whose Squadron is in the Wing. Squadron Admin: own Squadron.
-    # National Admin/Viewer, System Admin: all.
-    scope = wing_or_squadron_scope_clause(
-        p, db, wing_column=ServiceTicket.wing_id, squadron_column=ServiceTicket.squadron_id)
-    if scope is not None:
-        q = q.filter(scope)
+    q = _scoped_tickets(p, db)
 
     if status is not None:
         if status not in _VALID_STATUSES:
@@ -327,10 +343,27 @@ def list_tickets(
             raise HTTPException(400, detail={"error": "invalid_category"})
         q = q.filter(ServiceTicket.category == category)
 
+    if unit is not None:
+        q = q.filter(_displayed_unit_expr() == unit)
+
     response.headers["X-Total-Count"] = str(q.order_by(None).count())
     tickets = (q.order_by(ServiceTicket.created_at.desc(), ServiceTicket.id.desc())
                .limit(limit).offset(offset).all())
     return [_ticket_out(t) for t in tickets]
+
+
+@router.get("/service-desk/tickets/summary")
+def ticket_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Counts and filter options over ALL tickets the caller may list, so the
+    paged Main TMS list can show a true open count and a complete unit filter."""
+    q = _scoped_tickets(p, db)
+    unit = _displayed_unit_expr()
+    units = sorted({u for (u,) in q.with_entities(unit).distinct().all() if u})
+    return {
+        "open": q.filter(ServiceTicket.status == "open").order_by(None).count(),
+        "total": q.order_by(None).count(),
+        "units": units,
+    }
 
 
 @router.patch("/service-desk/tickets/{ticket_id}")
