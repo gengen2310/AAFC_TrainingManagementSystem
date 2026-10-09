@@ -87,6 +87,125 @@ def may_record_session_outcomes(p: "Principal") -> bool:
     return p.role != "sqn_general"
 
 
+# ── Allow/deny gates moved out of routers (2026-10-09) ─────────────────────
+# Each was an inline role check in one router (or the same check repeated in
+# two). Each caller keeps its own error response unless the helper raises.
+
+OVERSIGHT_ROLES = frozenset({"wing_admin", "wing_viewer", "national_admin", "national_viewer",
+                             "system_admin", "auditor"})
+
+
+def is_oversight_role(p: "Principal") -> bool:
+    """May read another account's background job (jobs.get_job): every role
+    except the two Squadron roles; an unrecognised role is refused."""
+    return p.role in OVERSIGHT_ROLES
+
+
+def may_move_account_to_another_squadron(p: "Principal") -> bool:
+    """accounts.change_scope: a Squadron Admin can never move an account to a
+    different Squadron (its manage authority is its own Squadron)."""
+    return p.role != "sqn_admin"
+
+
+def may_change_unit_type(p: "Principal") -> bool:
+    """organisations.update_squadron: the unit type is locked for Squadron
+    Admins; Wing and national admins (through Proxy/Intervention) may change it."""
+    return p.role != "sqn_admin"
+
+
+def may_list_service_tickets(p: "Principal") -> bool:
+    """service_desk.list_tickets: refused to auditor and sqn_general."""
+    return p.role not in ("auditor", "sqn_general")
+
+
+def assignee_outside_wing_admin_authority(p: "Principal", assignee) -> bool:
+    """service_desk.update_ticket: a Wing Admin may assign a ticket only to a
+    Wing Admin of their own Wing. Other callers are not constrained here."""
+    return p.role == "wing_admin" and (
+        assignee.role != "wing_admin" or assignee.wing_id != p.wing_id)
+
+
+def may_write_email_config(p: "Principal", scope: str, wing_id: str | None) -> bool:
+    """service_desk.upsert_email_config: which notification-address scope a
+    caller may write. Wing Admin: their own Wing's; National Admin: the
+    national address (never the system one); System Admin: any."""
+    if p.role == "wing_admin":
+        return scope == "wing" and wing_id == p.wing_id
+    if p.role == "national_admin":
+        return scope == "national"
+    return p.role == "system_admin"
+
+
+def planning_year_outside_scope(p: "Principal", unit_id: str | None, wing_id: str | None) -> bool:
+    """planning._require_year_access: a Squadron account may reach only its
+    own Squadron's years, a Wing account only its own Wing's. National-level
+    roles are not constrained here."""
+    if p.is_squadron:
+        return unit_id != p.squadron_id
+    if p.is_wing:
+        return wing_id != p.wing_id
+    return False
+
+
+def proxy_mode_for(p: "Principal", squadron_wing_id: str | None) -> str:
+    """organisations.enter_proxy: the intervention mode this caller enters on
+    a Squadron, or 403. Wing Admin -> "proxy", only inside their own Wing;
+    National/System Admin -> "delegated_intervention"; everyone else refused."""
+    if p.role == "wing_admin":
+        if squadron_wing_id != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return "proxy"
+    if is_national_admin(p):
+        return "delegated_intervention"
+    raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def require_can_write_flight(p: "Principal", squadron_id: str, db) -> None:
+    """accounts flight writes: national/system admin anywhere; Wing Admin in a
+    Squadron of their own Wing; Squadron Admin in their own Squadron."""
+    if is_national_admin(p):
+        return
+    if p.role == "wing_admin":
+        from .models import Squadron
+        sqn = db.get(Squadron, squadron_id)
+        if not sqn or wing_admin_outside_own_wing(p, sqn.wing_id):
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return
+    if p.role == "sqn_admin":
+        if sqn_admin_outside_own_squadron(p, squadron_id):
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        return
+    raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def require_can_create_squadron_reference(p: "Principal", squadron_id: str | None, noun: str) -> None:
+    """Squadron-scope creation of curriculum phases and subject-area tags
+    (training._can_create_phase / _can_create_tag had this verbatim, noun
+    apart). Squadron Admin: own Squadron (a missing squadron_id is allowed).
+    Wing Admin: needs Proxy Mode, and only its target. National/System Admin:
+    needs Delegated Intervention, and only its target."""
+    if p.role == "sqn_admin":
+        if squadron_id and squadron_id != p.squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Squadron admin can only create {noun}s for their own squadron."})
+    elif p.role == "wing_admin":
+        if not p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "proxy_required",
+                                             "message": f"Wing Admin must enter Proxy Mode to create a squadron-scope {noun}."})
+        if squadron_id and squadron_id != p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Can only create a squadron-scope {noun} for the squadron currently in Proxy Mode."})
+    elif is_national_admin(p):
+        if not p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "intervention_required",
+                                             "message": f"National Admin must enter Delegated Intervention Mode to create a squadron-scope {noun}."})
+        if squadron_id and squadron_id != p.acting_squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                             "message": f"Can only create a squadron-scope {noun} for the squadron currently in Delegated Intervention Mode."})
+    else:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+
 @dataclass
 class Principal:
     user_id: str
