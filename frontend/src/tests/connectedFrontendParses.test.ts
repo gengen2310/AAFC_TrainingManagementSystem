@@ -29,6 +29,10 @@ const modules = import.meta.glob("../../../connected-frontend/js/*.js",
 import dockerfile from "../../../connected-frontend/Dockerfile?raw";
 import runScript from "../../../RUN_TMS_CONNECTED_FRONTEND_MAC.sh?raw";
 
+// The application's script source: index.html plus every extracted js/ module.
+// Content contracts below must hold wherever the code lives after an extraction.
+const app: string = [source, ...Object.keys(modules).sort().map(k => modules[k])].join("\n");
+
 const blocks = [...source.matchAll(
   /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 
@@ -73,22 +77,22 @@ describe("connected-frontend/index.html", () => {
 
   it("leaves no function declared with nothing calling it", () => {
     for (const name of ["ynCreateYear", "ynDoRollover", "ynStartEdit"]) {
-      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(source);
+      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(app);
       const referenced = new RegExp(`${name}\\s*\\(`).test(
-        source.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
+        app.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
       expect(declared && !referenced,
         `${name} is declared but never called`).toBe(false);
     }
   });
 
   it("has one outcome-entry workflow and no authorised Matrix shortcut", () => {
-    expect(source).not.toContain("Matrix ↗");
-    expect(source.match(/>Sessions Needing Outcome Entry</g)).toHaveLength(1);
-    expect(source).not.toContain("Outcome needed —");
+    expect(app).not.toContain("Matrix ↗");
+    expect(app.match(/>Sessions Needing Outcome Entry</g)).toHaveLength(1);
+    expect(app).not.toContain("Outcome needed —");
   });
 
   it("passes the canonical timing block when creating a direct planner session", () => {
-    expect(source).toContain("const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;");
-    expect(source).toContain("timing_block_id:s.timingBlockId||null,");
+    expect(app).toContain("const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;");
+    expect(app).toContain("timing_block_id:s.timingBlockId||null,");
   });
 });
