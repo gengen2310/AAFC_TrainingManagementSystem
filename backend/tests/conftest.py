@@ -1,8 +1,16 @@
 """Pytest fixtures: isolated SQLite DB, seeded data, and an authenticated client."""
 import itertools
 import os
+import sys
 import tempfile
 import pytest
+
+# Test files import this module as both `conftest` and `tests.conftest`.
+# Register it under both names so the second spelling reuses it instead of
+# re-executing it: two copies meant two next_test_year() counters handing out
+# the same years (see test_conftest_single_module.py).
+for _name in ("conftest", "tests.conftest"):
+    sys.modules.setdefault(_name, sys.modules[__name__])
 
 # Use a throwaway SQLite file before importing the app/config.
 _tmp = tempfile.mkdtemp()
