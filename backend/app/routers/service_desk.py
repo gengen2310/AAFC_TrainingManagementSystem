@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, TypeAdapter, field_validator
-from sqlalchemy import or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -9,6 +8,10 @@ from ..models.service_desk_email_config import ServiceDeskEmailConfig as _EmailC
 from ..dependencies import get_principal
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_role
+from ..permissions import (  # noqa: E402
+    assignee_outside_wing_admin_authority, is_national_admin, may_list_service_tickets,
+    may_write_email_config, wing_or_squadron_scope_clause, wing_scope_clause,
+)
 from ..services import audit
 from ..email_service import send_ticket_notification, send_ticket_update_notification
 
@@ -290,24 +293,18 @@ def list_tickets(
     p: Principal = Depends(get_principal),
 ):
     """List tickets, scoped by caller's role."""
-    if p.role in ("auditor", "sqn_general"):
+    if not may_list_service_tickets(p):
         raise HTTPException(403, detail={"error": "forbidden"})
 
     q = db.query(ServiceTicket)
 
-    if p.is_wing:
-        # New rows carry ServiceTicket.wing_id directly; the outer join keeps
-        # legacy squadron-only rows visible during/after migration.
-        q = (
-            q.outerjoin(Squadron, ServiceTicket.squadron_id == Squadron.id)
-            .filter(or_(
-                ServiceTicket.wing_id == p.wing_id,
-                Squadron.wing_id == p.wing_id,
-            ))
-        )
-    elif p.role == "sqn_admin":
-        q = q.filter(ServiceTicket.squadron_id == p.squadron_id)
-    # national_admin, national_viewer, system_admin see all — no additional filter
+    # Wing: tickets carrying the Wing directly, plus legacy squadron-only rows
+    # whose Squadron is in the Wing. Squadron Admin: own Squadron.
+    # National Admin/Viewer, System Admin: all.
+    scope = wing_or_squadron_scope_clause(
+        p, db, wing_column=ServiceTicket.wing_id, squadron_column=ServiceTicket.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
 
     if status is not None:
         if status not in _VALID_STATUSES:
@@ -394,9 +391,7 @@ def update_ticket(
                 not ticket_wing_id or assignee.wing_id != ticket_wing_id
             ):
                 raise HTTPException(422, detail={"error": "assignee_out_of_scope"})
-            if p.role == "wing_admin" and (
-                assignee.role != "wing_admin" or assignee.wing_id != p.wing_id
-            ):
+            if assignee_outside_wing_admin_authority(p, assignee):
                 raise HTTPException(403, detail={"error": "assignee_out_of_scope"})
             changed["assigned_to_user_id"] = assignee.id
             changed["assigned_to_name"] = assignee.display_name
@@ -429,9 +424,7 @@ def update_ticket(
                 not ticket_wing_id or assignee.wing_id != ticket_wing_id
             ):
                 raise HTTPException(422, detail={"error": "assignee_out_of_scope"})
-            if p.role == "wing_admin" and (
-                assignee.role != "wing_admin" or assignee.wing_id != p.wing_id
-            ):
+            if assignee_outside_wing_admin_authority(p, assignee):
                 raise HTTPException(403, detail={"error": "assignee_out_of_scope"})
             changed["assigned_to_user_id"] = assignee.id
             changed["assigned_to_name"] = assignee.display_name
@@ -478,13 +471,13 @@ def get_email_config(
     """Return notification email configuration visible to this role."""
     require_role(p, "system_admin", "national_admin", "wing_admin")
 
-    if p.role == "system_admin":
+    if p.is_system_admin:
         configs = db.query(_EmailCfg).all()
-    elif p.role == "national_admin":
+    elif is_national_admin(p):
         configs = db.query(_EmailCfg).filter(_EmailCfg.scope.in_(["system", "national"])).all()
     else:  # wing_admin
         configs = db.query(_EmailCfg).filter(
-            (_EmailCfg.scope == "wing") & (_EmailCfg.wing_id == p.wing_id)
+            (_EmailCfg.scope == "wing") & wing_scope_clause(p, _EmailCfg.wing_id)
         ).all()
 
     return [
@@ -508,16 +501,9 @@ def upsert_email_config(
     """Create or update a notification email address for a scope."""
     require_role(p, "system_admin", "national_admin", "wing_admin")
 
-    # Permission scope checks
-    if p.role == "wing_admin":
-        if body.scope != "wing" or body.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "forbidden"})
-    elif p.role == "national_admin":
-        if body.scope not in ("national", "system"):
-            raise HTTPException(403, detail={"error": "forbidden"})
-        if body.scope == "system":
-            # national_admin cannot change system_admin email
-            raise HTTPException(403, detail={"error": "forbidden"})
+    # Permission scope checks (national_admin cannot change the system address)
+    if not may_write_email_config(p, body.scope, body.wing_id):
+        raise HTTPException(403, detail={"error": "forbidden"})
 
     q = db.query(_EmailCfg).filter(_EmailCfg.scope == body.scope)
     if body.scope == "wing":
