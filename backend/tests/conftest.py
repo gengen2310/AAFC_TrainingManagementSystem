@@ -27,6 +27,7 @@ os.environ["API_RATE_LIMIT"] = "10000"
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app                    # noqa: E402
 from app.main import _5xx_times             # noqa: E402
+from app.main import _maint_cache           # noqa: E402
 from app.seeds.seed_all import seed_all     # noqa: E402
 from app.security import reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
@@ -69,6 +70,11 @@ def _reset_shared_state():
     reset_rate_limiter()
     reset_api_rate_limiter()
     _5xx_times.clear()
+    # The maintenance gate's per-worker cache is module state. Tests seed it and
+    # simulate DB failures, and a failed refresh sets a real-time backoff
+    # (retry_at); without a reset that backoff leaked into the next file's
+    # tests (test_maintenance_gate_event_loop -> ..._refusal_revalidation).
+    _maint_cache_before = dict(_maint_cache)
     # K-001: alembic.command.upgrade/stamp calls fileConfig('alembic.ini') which sets
     # disable_existing_loggers=True by default, silencing any logger not listed in
     # alembic.ini's [loggers] keys (including "security"). Re-enable it before each test.
@@ -101,6 +107,9 @@ def _reset_shared_state():
         db.close()
 
     yield
+
+    _maint_cache.clear()
+    _maint_cache.update(_maint_cache_before)
 
 
 @pytest.fixture()
