@@ -50,6 +50,7 @@ from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import level_scope_clause, squadron_scope_clause  # noqa: E402
+from ..permissions import planning_year_outside_scope, wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import (Principal, resolve_view_squadron_id,
                            require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
@@ -372,16 +373,10 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
         _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
-    if p.is_squadron:
-        if py.unit_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role == "wing_admin":
-        if py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role in ("wing_viewer", "national_viewer", "auditor"):
-        if p.role == "wing_viewer" and py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    # national_admin, system_admin: unrestricted
+    # Squadron accounts: own Squadron's years; Wing accounts: own Wing's;
+    # national roles: unrestricted.
+    if planning_year_outside_scope(p, py.unit_id, py.wing_id):
+        raise HTTPException(403, detail={"error": "out_of_scope"})
 
 
 def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
@@ -872,7 +867,7 @@ def create_planning_year(
         wing_id = p.wing_id
         if unit_id and unit_id != p.squadron_id:
             sqn = db.get(Squadron, unit_id)
-            if not sqn or sqn.wing_id != p.wing_id:
+            if not sqn or wing_admin_outside_own_wing(p, sqn.wing_id):
                 raise HTTPException(403, detail={"error": "out_of_scope"})
     # A squadron-scoped plan is a delegated write on that squadron's data --
     # require the same Proxy/Delegated Intervention state every other
