@@ -19,6 +19,7 @@ from ..permissions import (
     require_system_or_nat_admin, require_audit_access,
 )
 from ..permissions import level_scope_clause, wing_in_view  # noqa: E402
+from ..permissions import may_change_unit_type, proxy_mode_for  # noqa: E402
 from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
@@ -551,7 +552,7 @@ def update_squadron(squadron_id: str, body: SquadronUpdateIn, db: DBSession = De
     if (
         body.unit_type is not None
         and body.unit_type != s.unit_type
-        and p.role == "sqn_admin"
+        and not may_change_unit_type(p)
     ):
         raise HTTPException(403, detail={"error": "unit_type_locked",
                                          "message": "Unit type can only be changed by wing or national admin."})
@@ -648,14 +649,7 @@ def enter_proxy(squadron_id: str, body: EnterIn, request: Request,
     s = db.get(Squadron, squadron_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
-    if p.role == "wing_admin":
-        if s.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        mode = "proxy"
-    elif is_national_admin(p):
-        mode = "delegated_intervention"
-    else:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    mode = proxy_mode_for(p, s.wing_id)
     # close any existing active sessions
     for old in db.query(ProxySession).filter(ProxySession.actor_user_id == p.user_id,
                                              ProxySession.active == True).all():  # noqa: E712

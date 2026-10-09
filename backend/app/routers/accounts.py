@@ -34,11 +34,12 @@ from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
 from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
-from ..permissions import has_known_role, is_national_admin  # noqa: E402
+from ..permissions import has_known_role  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
 from ..permissions import Principal, require_write_role
 from ..permissions import (  # noqa: E402
-    may_view_account, squadron_scope_clause, wing_or_squadron_scope_clause,
+    may_move_account_to_another_squadron, may_view_account, require_can_write_flight,
+    squadron_scope_clause, wing_or_squadron_scope_clause,
 )
 import re
 
@@ -649,7 +650,7 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
     if wing_admin_outside_own_wing(p, sqn.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
-    if p.role == "sqn_admin":
+    if not may_move_account_to_another_squadron(p):
         # sqn_admin's manage-authority already restricts them to accounts in
         # their own Squadron, and they can never have a valid *different*
         # destination Squadron -- reject explicitly rather than falling
@@ -1081,18 +1082,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
 
 def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
     """Only sqn_admin (own SQN), wing_admin (own Wing), nat_admin, system_admin."""
-    if is_national_admin(p):
-        return
-    if p.role == "wing_admin":
-        sqn = db.get(Squadron, sqn_id)
-        if not sqn or sqn.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    if p.role == "sqn_admin":
-        if sqn_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    raise HTTPException(403, detail={"error": "forbidden"})
+    require_can_write_flight(p, sqn_id, db)
 
 
 @router.get("/flights")
