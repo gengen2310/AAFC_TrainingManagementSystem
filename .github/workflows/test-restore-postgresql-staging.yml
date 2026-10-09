@@ -311,7 +311,17 @@ jobs:
           except Exception:
               print(f"::error::Restored alembic revision '{rev}' is not part of this repository's migration graph.")
               sys.exit(1)
-          pending = [r.revision for r in sd.iterate_revisions(head, rev)][:-1]
+          # iterate_revisions(upper, lower) already excludes `lower` (the
+          # restored revision). A former [:-1] here dropped the oldest pending
+          # migration from the report (K-006 went unlisted, 14 shown, 15 ran).
+          pending = [r.revision for r in sd.iterate_revisions(head, rev)]
+          if pending:
+              oldest = sd.get_revision(pending[-1])
+              parents = oldest.down_revision if isinstance(oldest.down_revision, tuple) else (oldest.down_revision,)
+              if rev not in parents:
+                  print(f"::error::Pending-migration list does not start at the restored revision {rev} "
+                        f"(oldest listed {oldest.revision} has parent(s) {parents}).")
+                  sys.exit(1)
           print(f"Restored (staging) revision:    {rev}")
           print(f"Repository head:                {head}")
           print(f"Migrations the next deploy will apply: {len(pending)}")
