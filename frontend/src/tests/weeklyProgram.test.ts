@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import html from "../../../connected-frontend/index.html?raw";
 
+// Markup and CSS live in index.html; script may live in an extracted js/ module.
+const modules = import.meta.glob("../../../connected-frontend/js/*.js",
+  { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const app: string = [html, ...Object.keys(modules).sort().map(k => modules[k])].join("\n");
+
 // Extract the body of `@media print{ ... }` by matching braces, so a rule can be
 // tested for which side of it it lives on. The whole defect this file guards
 // against is a rule sitting INSIDE that block when it was meant to apply on
@@ -52,16 +57,16 @@ describe("the night row and the phase columns are no longer the same class", () 
   // phase column headers (th). One class doing two jobs meant neither could be
   // styled without disturbing the other.
   it("renders the night row with its own class", () => {
-    expect(html).toMatch(/<td colspan="\$\{totalCols\+2\}" class="night-header"/);
+    expect(app).toMatch(/<td colspan="\$\{totalCols\+2\}" class="night-header"/);
   });
 
   it("leaves the phase column headers on group-header", () => {
-    expect(html).toMatch(/<th colspan="\$\{gc\.cols\.length\}" class="group-header"/);
+    expect(app).toMatch(/<th colspan="\$\{gc\.cols\.length\}" class="group-header"/);
   });
 });
 
 describe("an empty night says so", () => {
   it("has an explicit empty state rather than a bare grid", () => {
-    expect(html).toContain("No sessions planned");
+    expect(app).toContain("No sessions planned");
   });
 });

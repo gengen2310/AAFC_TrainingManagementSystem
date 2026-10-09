@@ -102,17 +102,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          if grep -nE "SYSADMIN2026|ADMIN703|ADMIN7WG|ADMINNATIONAL|703SQN2026|AUDITOR2026" connected-frontend/index.html; then
+          if grep -nE "SYSADMIN2026|ADMIN703|ADMIN7WG|ADMINNATIONAL|703SQN2026|AUDITOR2026" connected-frontend/index.html connected-frontend/js/*.js; then
             echo "Seeded/demo access code found in Main TMS production frontend"
             exit 1
           fi
 
-          if grep -nE "localStorage\.(setItem|getItem)\(['\"]+(token|jwt|role|session|user|scope|access_code|squadron|wing)" connected-frontend/index.html; then
+          if grep -nE "localStorage\.(setItem|getItem)\(['\"]+(token|jwt|role|session|user|scope|access_code|squadron|wing)" connected-frontend/index.html connected-frontend/js/*.js; then
             echo "Operational/session data found in Main TMS localStorage"
             exit 1
           fi
 
-          if grep -nE "code_hash|plain_code|JWT_SECRET|SECRET_KEY" connected-frontend/index.html; then
+          if grep -nE "code_hash|plain_code|JWT_SECRET|SECRET_KEY" connected-frontend/index.html connected-frontend/js/*.js; then
             echo "Sensitive backend/auth implementation token found in Main TMS frontend"
             exit 1
           fi
