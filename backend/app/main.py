@@ -34,6 +34,7 @@ _maint_cache: dict = {
     "pending_until": None,  # ISO timestamp; None = no drain period / immediate lock
     "expires": 0.0,
     "fetched_at": 0.0,      # monotonic time of the last successful DB read
+    "retry_at": 0.0,        # after a failed read: no forced re-read before this
 }
 # Before refusing a request, a copy older than this is re-read: turning
 # maintenance off is otherwise seen by the other workers only when their
@@ -90,6 +91,7 @@ def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
             # Keep the last known state and briefly back off. The same lock also
             # prevents an error boundary from turning into repeated pool waits.
             _maint_cache["expires"] = now + 2.0
+            _maint_cache["retry_at"] = now + 2.0
             return cached_result()
         return (active, msg, block_reads, block_logins,
                 _compute_phase(active, pending_until_iso), pending_until_iso)
@@ -101,7 +103,12 @@ def _confirm_maintenance_before_refusal() -> tuple[bool, str, bool, bool, str, s
     A copy younger than REVALIDATE_BEFORE_REFUSAL_SEC is trusted; an older one
     is re-read through the same single-flight refresh, so concurrent refusals
     collapse to one read and normal traffic (state off) never reaches here."""
-    if _time.monotonic() - _maint_cache["fetched_at"] > REVALIDATE_BEFORE_REFUSAL_SEC:
+    now = _time.monotonic()
+    # After a failed read the copy stays "old" until the database answers; the
+    # failure backoff still applies, or every refusal would queue on another
+    # failing checkout.
+    if (now - _maint_cache["fetched_at"] > REVALIDATE_BEFORE_REFUSAL_SEC
+            and now >= _maint_cache["retry_at"]):
         _maint_cache["expires"] = 0.0
     return _maintenance_active()
 
