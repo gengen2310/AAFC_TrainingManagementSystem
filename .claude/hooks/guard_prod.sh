@@ -37,22 +37,32 @@ deny() {
   exit 0
 }
 
-# Normalise: drop line continuations, flatten whitespace (case is ignored by
-# nocasematch).
+# Normalise: drop line continuations, flatten whitespace, then delete quotes
+# and backslashes -- the shell rejoins rail""way / pro\duction into one word
+# before running it, so the guard must too. (Case is ignored by nocasematch.)
 cmd=${raw//$'\\\n'/ }
 cmd=${cmd//[$'\n\t\r']/ }
+cmd=${cmd//[\"\'\\]/}
 
 prod_env_id='571a8028-3640-4542-a4ab-7a1ee6b1f693'
 re_railway='(^|[^a-z0-9_])railway([^a-z0-9_]|$)'
 re_prod_word='(^|[^a-z0-9_]|-e)(production|prod)([^a-z0-9_]|$)'
+re_env_flag='(--environment[= ]+|(^|[[:space:]])-e[[:space:]]*)(production|prod)([^a-z0-9_]|$)'
+re_deploy_glob='deploy-[^[:space:]]*[]*?[]'
 re_seed='seed_all|reset_db'
 re_non_sqlite='postgres(ql)?://|railway[[:space:]]+(run|connect|ssh)|database_url=[^s[:space:]]'
 
 if [[ $cmd == *"$prod_env_id"* ]]; then
   deny "command references the production Railway environment id"
 fi
-if [[ $cmd == *deploy-production* ]]; then
-  deny "command runs the production deploy script"
+# deploy-prod covers deploy-production.sh; a glob over deploy-* could expand
+# to it (scripts/ holds deploy-production.sh and deploy-staging.sh only).
+if [[ $cmd == *deploy-prod* || $cmd =~ $re_deploy_glob ]]; then
+  deny "command runs, or may glob-expand to, the production deploy script"
+fi
+# Any tool, not only railway: an explicit production environment flag.
+if [[ $cmd =~ $re_env_flag ]]; then
+  deny "command passes a production environment flag"
 fi
 if [[ $cmd =~ $re_railway && $cmd =~ $re_prod_word ]]; then
   deny "railway command mentions the production environment"

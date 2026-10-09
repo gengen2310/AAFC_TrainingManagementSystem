@@ -24,6 +24,13 @@ for c in 'railway up --environment 571a8028-3640-4542-a4ab-7a1ee6b1f693' 'railwa
  "railway up --environment 'prod'" 'railway up --environment="production"' 'RAILWAY up -e Production' \
  'cd x && railway up --service backend --environment production --detach' 'bash scripts/DEPLOY-PRODUCTION.sh'; do
   t deny "$(j "$c")" "$c"; done
+# Shell quoting/escaping inside a word: the shell rejoins these before running.
+for c in 'rail""way up -e production' "rail''way up -e production" 'railway up -e pro\\duction' \
+ 'deploy-produ""ction.sh' 'bash scripts/deploy-prod*.sh' 'bash scripts/deploy-p?oduction.sh'; do
+  t deny "$(j "$c")" "$c"; done
+# Regression (control lost in 704cf5b): the flag rule applies to any tool.
+for c in 'bash scripts/verify-deployed-build.sh --environment production' 'some-tool -e prod' 'tool --environment=PRODUCTION'; do
+  t deny "$(j "$c")" "$c"; done
 # A long command must not turn a match into a miss (no pipelines in the hook).
 t deny "$(j "railway up --environment production # $PAD")" "env flag+300KB"
 t deny "$(j "DATABASE_URL=postgresql://h/db python -m app.seeds.seed_all # $PAD")" "seed+300KB"
