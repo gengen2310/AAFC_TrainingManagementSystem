@@ -207,6 +207,7 @@ def _build_world() -> dict:
             uw2_general=uid(f"{TAG} Sqn General"), uw2_admin=uid(f"{TAG} Sqn Admin"),
             uw2_wing_viewer=uid(f"{TAG} Wing Viewer"), uw2_orphan=uid(f"{TAG} Orphan General"),
             uw2_arch=uid(f"{TAG} Archived-Sqn General"), u7_wing_admin=uid("7 Wing Admin"),
+            u_nat_admin=uid("National Admin"),
             job_703=jobs["SPX_ADMIN703"], job_w2=jobs[f"{TAG}_{TAG}SADM2026"], job_7wg=jobs["SPX_ADMIN7WG"],
             year_w2=years[f"{TAG} 2026"], year_w2_wing=years[f"{TAG} Wing 2026"],
             year_703=y703.id if y703 else None,
@@ -299,6 +300,8 @@ def _write_probes(w: dict) -> list[tuple[str, str, dict | None]]:
         ("PATCH", f"/api/service-desk/tickets/{w['ticket_704']}", {"assigned_to_user_id": w["u7_wing_admin"]}),
         ("PATCH", f"/api/service-desk/tickets/{w['ticket_w2']}", {"assigned_to_user_id": w["u7_wing_admin"]}),
         ("PATCH", f"/api/service-desk/tickets/{w['ticket_704']}", {"assigned_to_name": "7 Wing Admin"}),
+        # A Wing Admin may assign only to a Wing Admin of their own Wing.
+        ("PATCH", f"/api/service-desk/tickets/{w['ticket_704']}", {"assigned_to_user_id": w["u_nat_admin"]}),
         ("PUT", "/api/service-desk/email-config",
          {"scope": "wing", "wing_id": w["w7"], "notification_email": "w7@example.org"}),
         ("PUT", "/api/service-desk/email-config",
