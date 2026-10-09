@@ -3,7 +3,9 @@
 
 This is a ratchet, not a style checker:
 - the connected Main TMS monolith may shrink, but may not silently grow;
-- router-local direct role branching may be reduced, but may not increase.
+- router-local direct role branching may be reduced, but may not increase;
+- router-local Wing/Squadron scope comparisons against the principal may be
+  reduced, but may not increase (permissions.py owns view scope).
 
 Intentional baseline increases require an explicit baseline edit and PR rationale.
 """
@@ -46,6 +48,30 @@ def router_imports(text: str, router_names: set[str], self_name: str) -> set[str
                 if a.name.startswith("app.routers."):
                     found.add(a.name.split(".")[2])
     return {n for n in found if n in router_names and n != self_name}
+
+PRINCIPAL_SCOPE_ATTRS = frozenset({"wing_id", "squadron_id", "acting_wing_id", "acting_squadron_id"})
+
+
+def _is_principal_scope(node: ast.AST) -> bool:
+    return (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+            and node.value.id == "p" and node.attr in PRINCIPAL_SCOPE_ATTRS)
+
+
+def inline_scope_comparisons(text: str) -> int:
+    """Count ==/!= comparisons against the principal's own or acting Wing/
+    Squadron (p.wing_id, p.squadron_id, p.acting_*). Each one is a router
+    deciding tenancy inline -- "which Squadrons/Wing may this caller see or
+    touch" -- instead of asking permissions.py (visible_squadron_ids,
+    level_scope_clause, wing_in_view, wing_admin_outside_own_wing, ...).
+    Parsed with ast, so strings and comments never count; passing p.wing_id
+    as an argument or reading it is not a comparison."""
+    count = 0
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Compare) and all(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
+            if any(_is_principal_scope(o) for o in [node.left, *node.comparators]):
+                count += 1
+    return count
+
 
 def main() -> int:
     baseline=json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
@@ -98,6 +124,17 @@ def main() -> int:
                 f"{rel} has {count} direct p.role checks (baseline max {allowed}). "
                 "Put authorization/scope policy in backend/app/permissions.py or a named permission helper."
             )
+    expected_scope=baseline.get("router_inline_scope_comparisons", {})
+    for file in sorted(router_dir.glob("*.py")):
+        rel=file.relative_to(ROOT).as_posix()
+        count=inline_scope_comparisons(file.read_text(encoding="utf-8"))
+        allowed=int(expected_scope.get(rel,0))
+        if count>allowed:
+            failures.append(
+                f"{rel} has {count} inline comparisons against the principal's Wing/Squadron "
+                f"(baseline max {allowed}). Use the view-scope helpers in backend/app/permissions.py."
+            )
+
     missing=sorted(set(expected)-seen)
     if missing:
         failures.append("Baseline lists removed routers: "+", ".join(missing))
@@ -117,6 +154,8 @@ def main() -> int:
     edge_count=sum(len(v) for v in actual_edges.values())
     print(f" - router-to-router dependency edges: {edge_count} (ratcheted, no increase)")
     print(f" - router-local direct role checks: {total} (ratcheted, no increase)")
+    scope_total=sum(inline_scope_comparisons(f.read_text(encoding="utf-8")) for f in router_dir.glob("*.py"))
+    print(f" - router-local inline Wing/Squadron scope comparisons: {scope_total} (ratcheted, no increase)")
     return 0
 
 if __name__=="__main__":

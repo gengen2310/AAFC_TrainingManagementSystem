@@ -9,7 +9,7 @@ Run: python -m unittest discover -s tools/architecture -p "test_*.py"
 """
 import unittest
 
-from guard import DIRECT_ROLE_RE, router_imports
+from guard import DIRECT_ROLE_RE, inline_scope_comparisons, router_imports
 
 NAMES = {"training", "planning", "dashboard", "timing", "accounts", "auth"}
 
@@ -47,6 +47,34 @@ class RoleCheckDetection(unittest.TestCase):
     def test_counts_each_direct_role_comparison_form(self):
         text = "p.role == 'a'\np.role != 'b'\np.role in X\np.role not in Y\nrole = p.role\n"
         self.assertEqual(len(DIRECT_ROLE_RE.findall(text)), 4)
+
+
+
+class InlineScopeComparisonDetection(unittest.TestCase):
+    def test_counts_comparisons_against_the_principals_own_or_acting_scope(self):
+        text = (
+            "q.filter(Squadron.wing_id == p.wing_id)\n"
+            "x = [s for s in sqns if s.id == p.squadron_id]\n"
+            "if p.wing_id != wing_id: pass\n"
+            "if squadron_id != p.acting_squadron_id: pass\n"
+            "ok = a.wing_id == p.acting_wing_id\n"
+        )
+        self.assertEqual(inline_scope_comparisons(text), 5)
+
+    def test_ignores_non_comparisons_other_names_and_strings(self):
+        text = (
+            "level_scope_clause(p, wing_column=AuditLog.wing_id)\n"
+            "wing_id = p.acting_wing_id or p.wing_id\n"
+            "require_can_write_squadron(p, sqn_id, p.wing_id)\n"
+            "if principal.wing_id == w: pass\n"
+            "if p.role == 'x': pass\n"
+            "s = 'Squadron.wing_id == p.wing_id'  # q.filter(X.wing_id == p.wing_id)\n"
+        )
+        self.assertEqual(inline_scope_comparisons(text), 0)
+
+    def test_chained_and_membership_forms(self):
+        self.assertEqual(inline_scope_comparisons("a == p.wing_id == b\n"), 1)
+        self.assertEqual(inline_scope_comparisons("x in (p.wing_id,)\n"), 0)
 
 
 if __name__ == "__main__":
