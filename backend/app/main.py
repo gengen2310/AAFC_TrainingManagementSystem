@@ -511,6 +511,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+    # Paged lists report their total here; the Main TMS is cross-origin.
+    expose_headers=["X-Total-Count"],
 )
 
 

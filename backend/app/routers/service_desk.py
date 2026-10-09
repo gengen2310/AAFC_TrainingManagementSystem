@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, EmailStr, TypeAdapter, field_validator
 from sqlalchemy.orm import Session as DBSession
 
@@ -285,14 +285,25 @@ def create_ticket(body: TicketCreateIn, db: DBSession = Depends(get_db)):
     return {"ok": True, "ticket_id": ticket.id}
 
 
+# GET /service-desk/tickets page size (see list_tickets).
+TICKET_PAGE_DEFAULT = 100
+TICKET_PAGE_MAX = 200
+
 @router.get("/service-desk/tickets")
 def list_tickets(
+    response: Response,
     status: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    limit: int = Query(default=TICKET_PAGE_DEFAULT, ge=1, le=TICKET_PAGE_MAX),
+    offset: int = Query(default=0, ge=0),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """List tickets, scoped by caller's role."""
+    """List tickets, scoped by caller's role, one page at a time.
+
+    Always bounded (national roles would otherwise receive every ticket ever
+    raised): newest first, ties broken by id so pages never overlap or skip,
+    and the filtered total in X-Total-Count for the Main TMS "Load more"."""
     if not may_list_service_tickets(p):
         raise HTTPException(403, detail={"error": "forbidden"})
 
@@ -316,7 +327,9 @@ def list_tickets(
             raise HTTPException(400, detail={"error": "invalid_category"})
         q = q.filter(ServiceTicket.category == category)
 
-    tickets = q.order_by(ServiceTicket.created_at.desc()).all()
+    response.headers["X-Total-Count"] = str(q.order_by(None).count())
+    tickets = (q.order_by(ServiceTicket.created_at.desc(), ServiceTicket.id.desc())
+               .limit(limit).offset(offset).all())
     return [_ticket_out(t) for t in tickets]
 
 
