@@ -29,7 +29,7 @@ from ..models.wing_calendar import (
 from ..dependencies import get_principal
 from ..permissions import has_known_role, is_wing_writer, is_writer  # noqa: E402
 from ..permissions import wing_admin_outside_own_wing  # noqa: E402
-from ..permissions import Principal, NATIONAL_LEVEL
+from ..permissions import Principal, wing_in_view
 from ..services import audit
 
 router = APIRouter(prefix="/api/wing-calendar", tags=["wing-calendar"])
@@ -50,10 +50,9 @@ def _require_write(p: Principal, wing_id: str) -> None:
 def _require_read(p: Principal, wing_id: str) -> None:
     if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
-    # Scope enforcement for scoped roles
-    if p.is_squadron and p.wing_id != wing_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
-    if p.is_wing and p.wing_id != wing_id:
+    # Scope enforcement for scoped roles: Squadron and Wing accounts read
+    # their own Wing's calendar only.
+    if not wing_in_view(p, wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope"})
 
 
@@ -315,7 +314,7 @@ def list_wing_events(
     wing_id.in_(...) query keeps pagination/filter semantics identical to
     the single-wing path (no N+1 loop needed for a flat list like this)."""
     if wing_id is None:
-        if p.role not in NATIONAL_LEVEL:
+        if not p.is_national:
             raise HTTPException(400, detail={"error": "wing_id_required"})
         wing_ids = [w.id for w in db.query(Wing).filter(Wing.is_archived == False).all()]  # noqa: E712
     else:
@@ -716,7 +715,7 @@ def get_squadron_overlay(
             raise HTTPException(403, detail={"error": "out_of_scope"})
         if p.is_wing:
             sqn = db.get(Squadron, squadron_id)
-            if not sqn or sqn.wing_id != p.wing_id:
+            if not sqn or not p.can_view_squadron(sqn.id, sqn.wing_id):
                 raise HTTPException(403, detail={"error": "out_of_scope"})
 
     links_map = _load_links_for_events([e.id for e in events], db)
