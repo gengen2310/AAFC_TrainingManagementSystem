@@ -609,9 +609,15 @@ async function sdSave(ticketId) {
     closeModal('m-sd-ticket');
     _sdSelectedTicketId = null;
     // A saved status can move the ticket out of the active filter, and the
-    // open count changes: re-read the first page and the summary.
-    await sdReloadList();
+    // open count changes: re-read the first page and the summary. The save has
+    // already succeeded and the modal is closed, so a failed refresh must not
+    // land in the (hidden) modal error: report both facts as a toast.
     showToast('Ticket updated.');
+    try {
+      await sdReloadList();
+    } catch (reloadErr) {
+      showToast('Ticket updated, but the list could not be refreshed: ' + apiErr(reloadErr), true);
+    }
   } catch (e) {
     if (errEl) {
       errEl.textContent = apiErr(e);
