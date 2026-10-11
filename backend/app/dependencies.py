@@ -2,6 +2,7 @@
 and overlay any active proxy/intervention session from the database.
 """
 import ipaddress
+from urllib.parse import urlsplit
 
 from fastapi import Depends, Request, HTTPException
 from sqlalchemy.orm import Session as DBSession
@@ -19,6 +20,36 @@ def _token_from_request(request: Request) -> str | None:
     if auth.startswith("Bearer "):
         return auth[7:].strip()
     return request.cookies.get(settings.COOKIE_NAME)
+
+
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _request_origin(request: Request) -> str | None:
+    """The Origin header, else the scheme://host of the Referer."""
+    origin = request.headers.get("Origin")
+    if origin:
+        return origin
+    parts = urlsplit(request.headers.get("Referer") or "")
+    return f"{parts.scheme}://{parts.netloc}" if parts.scheme and parts.netloc else None
+
+
+def _require_trusted_origin_for_cookie_write(request: Request) -> None:
+    """CSRF guard for the session cookie (D13, 2026-10-11).
+
+    The cookie is SameSite=None because the Planning Workspace handoff needs it
+    cross-origin, so a browser attaches it to requests any site triggers (an
+    auto-submitting form needs no CORS permission). When the cookie is the
+    credential for a state-changing request, the request must come from one of
+    the configured frontend origins. Bearer requests never reach here: a
+    cross-site page cannot add an Authorization header without a preflight
+    CORS refuses. Routes without a principal (login, public ticket submission)
+    are not affected, because they never call get_principal."""
+    if request.method in _UNSAFE_METHODS and _request_origin(request) not in settings.cors_origins:
+        raise HTTPException(403, detail={
+            "error": "origin_not_allowed",
+            "message": "This request did not come from an AAFC TMS page.",
+        })
 
 
 # RFC 6598 (Carrier-Grade NAT / shared address space) -- the range Railway's own internal
@@ -108,6 +139,8 @@ def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principa
     token = _token_from_request(request)
     if not token:
         raise HTTPException(401, detail={"error": "auth_required"})
+    if not request.headers.get("Authorization", "").startswith("Bearer "):
+        _require_trusted_origin_for_cookie_write(request)
     payload = decode_token(token)
     if not payload:
         raise HTTPException(401, detail={"error": "invalid_or_expired"})
