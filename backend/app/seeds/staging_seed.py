@@ -28,6 +28,7 @@ import sys
 from ..database import SessionLocal
 from ..models import NationalEntity, User, AccessCode
 from ..security import hash_code
+from ..services import audit
 
 
 def staging_seed() -> None:
@@ -78,6 +79,11 @@ def staging_seed() -> None:
 
         db.add(AccessCode(user_id=sysadmin.id, code_hash=code_hash))
         db.commit()
+        # No principal exists yet: the actor is the deployment itself. The
+        # code is never recorded, only that an account was created this way.
+        audit(db, None, object_type="account", object_id=sysadmin.id,
+              action="system_admin_bootstrapped",
+              new={"source": "STAGING_BOOTSTRAP_SYSADMIN_CODE", "must_change_code": True})
 
         print("[staging_seed] Bootstrap complete: system_admin account created.",
               file=sys.stderr)
