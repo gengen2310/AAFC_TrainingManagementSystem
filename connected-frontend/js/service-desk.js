@@ -222,6 +222,13 @@ let _sdActiveUnitFilter = '';
 let _sdEditStatus = null;
 let _sdSelectedTicketId = null;
 let _sdAssignableAccounts = [];
+// The list is paged by the server (100 per page); filters run server-side so a
+// filter or count never covers only the loaded page. _sdTotal is the filtered
+// total (X-Total-Count); _sdSummary counts ALL tickets the user may list.
+const SD_PAGE = 100;
+let _sdTotal = 0;
+let _sdSummary = {open: 0, total: 0, units: []};
+let _sdSeq = 0;
 
 function sdFmtDate(iso) {
   // Was: new Date(iso) then getUTCDate(). That parsed a naive UTC string as
@@ -266,16 +273,16 @@ async function loadServiceDesk() {
 
   try {
     const canAssign = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
-    const [r, accounts] = await Promise.all([
-      api('/api/service-desk/tickets'),
-      canAssign ? api('/api/accounts') : Promise.resolve([]),
+    const [, accounts] = await Promise.all([
+      sdReloadList(),
+      // Only the eligible assignees, not every account in scope.
+      canAssign ? api('/api/accounts?role=system_admin&role=national_admin&role=wing_admin&active_status=true')
+                : Promise.resolve([]),
     ]);
-    _sdAllTickets = r;
     _sdAssignableAccounts = (accounts||[]).filter(a =>
       a.active_status && !a.is_archived &&
       ['system_admin','national_admin','wing_admin'].includes(a.role)
     );
-    sdRenderList();
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:var(--fs-sm)">${esc(apiErr(e))}</td></tr>`;
   }
@@ -289,17 +296,67 @@ function sdSetFilter(filter, btn) {
   });
   btn.classList.add('active');
   btn.setAttribute('aria-pressed', 'true');
-  sdRenderList();
+  sdApplyFilters();
 }
 
 function sdSetCategoryFilter(val) {
   _sdActiveCategoryFilter = val;
-  sdRenderList();
+  sdApplyFilters();
 }
 
 function sdSetUnitFilter(val) {
   _sdActiveUnitFilter = val;
+  sdApplyFilters();
+}
+
+function sdTicketsPath(offset) {
+  const q = new URLSearchParams({limit: String(SD_PAGE), offset: String(offset)});
+  if (_sdActiveFilter !== 'all') q.set('status', _sdActiveFilter);
+  if (_sdActiveCategoryFilter) q.set('category', _sdActiveCategoryFilter);
+  if (_sdActiveUnitFilter) q.set('unit', _sdActiveUnitFilter);
+  return '/api/service-desk/tickets?' + q.toString();
+}
+
+// First page for the current filters, plus the counts over every ticket.
+// A newer reload supersedes an older one still in flight (fast filter clicks).
+async function sdReloadList() {
+  const seq = ++_sdSeq;
+  const [page, summary] = await Promise.all([
+    api(sdTicketsPath(0), {returnHeaders: true}),
+    api('/api/service-desk/tickets/summary'),
+  ]);
+  if (seq !== _sdSeq) return;
+  _sdAllTickets = page.body || [];
+  _sdTotal = Number(page.headers.get('X-Total-Count')) || _sdAllTickets.length;
+  _sdSummary = summary || {open: 0, total: 0, units: []};
   sdRenderList();
+}
+
+async function sdApplyFilters() {
+  try {
+    await sdReloadList();
+  } catch (e) {
+    showToast(apiErr(e), true);
+  }
+}
+
+async function sdLoadMore(btn) {
+  const seq = _sdSeq;
+  if (btn) btn.disabled = true;
+  try {
+    const page = await api(sdTicketsPath(_sdAllTickets.length), {returnHeaders: true});
+    if (seq !== _sdSeq) return;           // filters changed meanwhile
+    // A ticket raised since the first page shifts every offset by one, so the
+    // next page can repeat the last loaded row: keep each id once.
+    const seen = new Set(_sdAllTickets.map(t => t.ticket_id));
+    _sdAllTickets = _sdAllTickets.concat((page.body || []).filter(t => !seen.has(t.ticket_id)));
+    _sdTotal = Number(page.headers.get('X-Total-Count')) || _sdTotal;
+    sdRenderList();
+  } catch (e) {
+    showToast(apiErr(e), true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 const _SD_CAT_LABELS = {
@@ -310,30 +367,27 @@ const _SD_CAT_LABELS = {
 function sdRenderList() {
   const tbody = document.getElementById('sd-tbody');
   const empty = document.getElementById('sd-empty');
-  let filtered = _sdActiveFilter === 'all'
-    ? _sdAllTickets
-    : _sdAllTickets.filter(t => t.status === _sdActiveFilter);
-  if (_sdActiveCategoryFilter) {
-    filtered = filtered.filter(t => (t.category || 'other') === _sdActiveCategoryFilter);
-  }
-  if (_sdActiveUnitFilter) {
-    filtered = filtered.filter(t => (t.unit_name || t.squadron_name || '') === _sdActiveUnitFilter);
-  }
+  // The server already applied the filters; this is the loaded part of the
+  // filtered list.
+  const filtered = _sdAllTickets;
+  const anyFilter = _sdActiveFilter !== 'all' || _sdActiveCategoryFilter || _sdActiveUnitFilter;
 
   sdRenderUnitFilter();
-  const openCount = _sdAllTickets.filter(t => t.status === 'open').length;
   const countEl = document.getElementById('sd-count');
   if (countEl) {
-    countEl.textContent = filtered.length === _sdAllTickets.length
-      ? `${_sdAllTickets.length} ticket${_sdAllTickets.length === 1 ? '' : 's'} · ${openCount} open`
-      : `${filtered.length} of ${_sdAllTickets.length} tickets · ${openCount} open`;
+    let txt = anyFilter
+      ? `${_sdTotal} of ${_sdSummary.total} tickets`
+      : `${_sdTotal} ticket${_sdTotal === 1 ? '' : 's'}`;
+    if (filtered.length < _sdTotal) txt += ` (showing ${filtered.length})`;
+    countEl.textContent = `${txt} · ${_sdSummary.open} open`;
   }
+  sdMoreControl().style.display = filtered.length < _sdTotal ? '' : 'none';
 
   if (filtered.length === 0) {
     tbody.innerHTML = '';
     // "No tickets" and "nothing matches your filters" are different situations
     // and need different wording -- the second one tells you what to do next.
-    empty.textContent = _sdAllTickets.length === 0
+    empty.textContent = _sdSummary.total === 0
       ? 'No tickets yet.'
       : 'No tickets match these filters. Clear a filter to see the rest.';
     empty.style.display = 'block';
@@ -368,10 +422,26 @@ function sdRenderList() {
   }).join('');
 }
 
+// "Load more" lives with the module, not in index.html (Phase 4: no new
+// feature markup in the monolith). Created once, right after the table.
+function sdMoreControl() {
+  let more = document.getElementById('sd-more');
+  if (!more) {
+    more = document.createElement('div');
+    more.id = 'sd-more';
+    more.style.cssText = 'display:none;text-align:center;padding:var(--sp-md)';
+    more.innerHTML = '<button type="button" class="btn btn-secondary btn-sm" onclick="sdLoadMore(this)">Load more tickets</button>';
+    document.getElementById('sd-table').after(more);
+  }
+  return more;
+}
+
 function sdRenderUnitFilter() {
   const sel = document.getElementById('sd-unit-filter');
   if (!sel) return;
-  const units = [...new Set(_sdAllTickets.map(t => t.unit_name || t.squadron_name || '').filter(Boolean))].sort();
+  // Every unit with a ticket the user may see (server summary), not only the
+  // units on the loaded page.
+  const units = _sdSummary.units || [];
   // A unit filter with one option filters nothing -- hide it rather than show a
   // control that cannot change the result.
   sel.style.display = units.length > 1 ? '' : 'none';
@@ -538,8 +608,16 @@ async function sdSave(ticketId) {
     sdRenderList();
     closeModal('m-sd-ticket');
     _sdSelectedTicketId = null;
-    sdRenderList();
+    // A saved status can move the ticket out of the active filter, and the
+    // open count changes: re-read the first page and the summary. The save has
+    // already succeeded and the modal is closed, so a failed refresh must not
+    // land in the (hidden) modal error: report both facts as a toast.
     showToast('Ticket updated.');
+    try {
+      await sdReloadList();
+    } catch (reloadErr) {
+      showToast('Ticket updated, but the list could not be refreshed: ' + apiErr(reloadErr), true);
+    }
   } catch (e) {
     if (errEl) {
       errEl.textContent = apiErr(e);
