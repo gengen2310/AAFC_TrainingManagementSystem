@@ -348,8 +348,8 @@ async function sdLoadMore(btn) {
     if (seq !== _sdSeq) return;           // filters changed meanwhile
     // A ticket raised since the first page shifts every offset by one, so the
     // next page can repeat the last loaded row: keep each id once.
-    const seen = new Set(_sdAllTickets.map(t => t.id));
-    _sdAllTickets = _sdAllTickets.concat((page.body || []).filter(t => !seen.has(t.id)));
+    const seen = new Set(_sdAllTickets.map(t => t.ticket_id));
+    _sdAllTickets = _sdAllTickets.concat((page.body || []).filter(t => !seen.has(t.ticket_id)));
     _sdTotal = Number(page.headers.get('X-Total-Count')) || _sdTotal;
     sdRenderList();
   } catch (e) {
