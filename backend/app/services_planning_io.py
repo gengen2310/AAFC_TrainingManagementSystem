@@ -1,0 +1,152 @@
+"""Planning spreadsheet I/O helpers: Annual Program import parsing (dates,
+times, parade-night rows, unit matching, CSV/XLSX decoding), CEA export row
+normalisation, and formula-injection neutralisation for exported cells.
+
+Moved verbatim from routers/planning.py (stabilisation Phase 3, C5). Pure
+parsing over bytes, strings and already-loaded rows: no HTTP, no authorization.
+"""
+from __future__ import annotations
+
+import csv as _csv, io, re
+
+from .models import Squadron
+
+
+_PROG_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
+
+
+def _parse_prog_date(raw: str) -> str | None:
+    """Parse a date string to ISO YYYY-MM-DD."""
+    if not raw:
+        return None
+    from datetime import datetime
+    for fmt in _PROG_DATE_FMTS:
+        try:
+            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    return raw.strip()[:10] or None
+
+
+def _parse_prog_time(raw: str) -> str | None:
+    """Normalise a time string to HH:MM."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    parts = raw.split(":")
+    if len(parts) >= 2:
+        try:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
+        except ValueError:
+            pass
+    return raw[:5] or None
+
+
+_PARADE_KWORDS = ("parade night", "training night", "parade ngt", "parade nt")
+
+
+def _is_parade_row(name: str) -> bool:
+    n = name.strip().lower()
+    return any(kw in n for kw in _PARADE_KWORDS)
+
+
+def _resolve_unit_sqn(unit_str: str, all_sqns: list) -> "Squadron | None":
+    """Match a Unit column value to a Squadron by code or number prefix."""
+    if not unit_str:
+        return None
+    u_up = unit_str.strip().upper()
+    for sq in all_sqns:
+        if sq.code and sq.code.strip().upper() == u_up:
+            return sq
+    m = re.match(r'^(\d+)', unit_str.strip())
+    if m:
+        num = m.group(1)
+        for sq in all_sqns:
+            if sq.code and re.match(r'^' + re.escape(num) + r'\b', sq.code.strip()):
+                return sq
+    u_lo = unit_str.strip().lower()
+    for sq in all_sqns:
+        if sq.name and u_lo in sq.name.lower():
+            return sq
+    return None
+
+
+def _parse_program_file(content: bytes, is_xlsx: bool) -> list[dict]:
+    """Decode CSV or XLSX bytes into a list of {header: value} dicts."""
+    if is_xlsx:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        header_row = next(rows_iter, None)
+        if not header_row:
+            return []
+        headers = [str(c).strip() if c is not None else "" for c in header_row]
+        result = []
+        for row in rows_iter:
+            if all(v is None for v in row):
+                continue
+            result.append({h: (str(v) if v is not None else "") for h, v in zip(headers, row)})
+        return result
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+    reader = _csv.DictReader(io.StringIO(text))
+    return [dict(row) for row in reader]
+
+
+def _neutralise_cell(v):
+    """Prevent CSV/formula injection in spreadsheet cells."""
+    s = str(v) if v is not None else ""
+    return ("'" + s) if s[:1] in ("=", "+", "-", "@") else s
+
+
+def _parse_cea_date(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    raw = raw.strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            from datetime import datetime as _dt
+            return _dt.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return raw[:10] if len(raw) >= 10 else raw
+
+
+def _parse_cea_time(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    raw = raw.strip()
+    if len(raw) >= 5 and ":" in raw:
+        return raw[:5]
+    return None
+
+
+def _normalise_cea_row(row: dict) -> dict:
+    """Map both full-export and simple-export CSV column names to internal fields."""
+    def g(*keys: str) -> str | None:
+        for k in keys:
+            v = row.get(k, "").strip()
+            if v:
+                return v
+        return None
+
+    return {
+        "cea_activity_id": g("ActivityID", "SeqNr"),
+        "activity_type": g("ActivityTypeName", "SupportRequestType"),
+        "status_name": g("StatusName"),
+        "parent_unit": g("UnitParentName"),
+        "host_unit": g("UnitName", "Unit"),
+        "activity_name": g("SeqNrAndName", "Name", "ActivityName"),
+        "nomination_start_date": _parse_cea_date(g("NominationStartDate")),
+        "nomination_end_date": _parse_cea_date(g("NominationEndDate")),
+        "activity_start_date": _parse_cea_date(g("StartDate", "Start date")),
+        "activity_end_date": _parse_cea_date(g("EndDate", "End date")),
+        "start_time": _parse_cea_time(g("StartTime", "Start time")),
+        "end_time": _parse_cea_time(g("EndTime", "End time")),
+        "location": g("Location"),
+        "activity_poc": g("POC"),
+        "notes": g("ActivityNotes", "Activity Notes", "SupportRequestTypeCode"),
+    }
