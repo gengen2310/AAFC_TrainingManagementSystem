@@ -7,9 +7,11 @@ These tests pin the detection itself, not just the current count.
 
 Run: python -m unittest discover -s tools/architecture -p "test_*.py"
 """
+import tempfile
 import unittest
+from pathlib import Path
 
-from guard import DIRECT_ROLE_RE, inline_scope_comparisons, router_imports
+from guard import DIRECT_ROLE_RE, inline_scope_comparisons, router_imports, router_line_failures
 
 NAMES = {"training", "planning", "dashboard", "timing", "accounts", "auth"}
 
@@ -75,6 +77,24 @@ class InlineScopeComparisonDetection(unittest.TestCase):
     def test_chained_and_membership_forms(self):
         self.assertEqual(inline_scope_comparisons("a == p.wing_id == b\n"), 1)
         self.assertEqual(inline_scope_comparisons("x in (p.wing_id,)\n"), 0)
+
+
+class RouterLineRatchet(unittest.TestCase):
+    def check(self, lines, allowed):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "r.py").write_text("x = 1\n" * lines)
+            return router_line_failures({"r.py": allowed}, Path(d))
+
+    def test_at_or_below_the_limit_passes(self):
+        self.assertEqual(self.check(10, 10), [])
+        self.assertEqual(self.check(9, 10), [])
+
+    def test_growth_fails(self):
+        self.assertEqual(len(self.check(11, 10)), 1)
+
+    def test_a_listed_router_that_vanished_fails(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(len(router_line_failures({"gone.py": 5}, Path(d))), 1)
 
 
 if __name__ == "__main__":

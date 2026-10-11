@@ -5,7 +5,9 @@ This is a ratchet, not a style checker:
 - the connected Main TMS monolith may shrink, but may not silently grow;
 - router-local direct role branching may be reduced, but may not increase;
 - router-local Wing/Squadron scope comparisons against the principal may be
-  reduced, but may not increase (permissions.py owns view scope).
+  reduced, but may not increase (permissions.py owns view scope);
+- the routers whose domain helpers were extracted into service modules
+  (training.py, planning.py) may shrink, but may not silently grow back.
 
 Intentional baseline increases require an explicit baseline edit and PR rationale.
 """
@@ -73,6 +75,26 @@ def inline_scope_comparisons(text: str) -> int:
     return count
 
 
+def router_line_failures(limits: dict, root: Path) -> list[str]:
+    """Routers listed in the baseline's router_max_lines may not exceed their
+    line count. Lines are counted the same way as the connected frontend's
+    (str.splitlines). New domain logic belongs in a services_* module, not
+    back in the router it was extracted from."""
+    failures = []
+    for rel, allowed in sorted(limits.items()):
+        path = root / rel
+        if not path.exists():
+            failures.append(f"Baseline router_max_lines lists a missing file: {rel}")
+            continue
+        count = len(path.read_text(encoding="utf-8").splitlines())
+        if count > int(allowed):
+            failures.append(
+                f"{rel} grew to {count:,} lines (baseline max {int(allowed):,}). "
+                "Put domain helpers in a backend/app/services_* module instead."
+            )
+    return failures
+
+
 def main() -> int:
     baseline=json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     failures=[]
@@ -135,6 +157,9 @@ def main() -> int:
                 f"(baseline max {allowed}). Use the view-scope helpers in backend/app/permissions.py."
             )
 
+    line_limits=baseline.get("router_max_lines", {})
+    failures.extend(router_line_failures(line_limits, ROOT))
+
     missing=sorted(set(expected)-seen)
     if missing:
         failures.append("Baseline lists removed routers: "+", ".join(missing))
@@ -156,6 +181,9 @@ def main() -> int:
     print(f" - router-local direct role checks: {total} (ratcheted, no increase)")
     scope_total=sum(inline_scope_comparisons(f.read_text(encoding="utf-8")) for f in router_dir.glob("*.py"))
     print(f" - router-local inline Wing/Squadron scope comparisons: {scope_total} (ratcheted, no increase)")
+    for rel in sorted(line_limits):
+        n=len((ROOT/rel).read_text(encoding="utf-8").splitlines())
+        print(f" - {rel}: {n:,} lines (ratcheted, max {int(line_limits[rel]):,})")
     return 0
 
 if __name__=="__main__":
