@@ -168,30 +168,45 @@ def record_login_success_db(key: str, db: "DBSession") -> None:
 # Replaces the in-memory _api_hits for non-development environments so the
 # 300 req/60 s limit is accurate across all gunicorn workers.
 
+def _atomic_window_hit(db: "DBSession", model, key_attr: str, key: str) -> int:
+    """Count one request for `key` in a fixed window; return the count so far.
+
+    One atomic UPDATE while the window is live (no read-modify-write: D14
+    measured 400 concurrent requests recorded as 25-36). Otherwise the window
+    is (re)started; a concurrent first insert is retried, never a 500."""
+    from sqlalchemy import update
+    from sqlalchemy.exc import IntegrityError
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    window_open = now - timedelta(seconds=settings.API_RATE_WINDOW_SEC)
+    key_col = getattr(model, key_attr)
+    for _ in range(3):
+        res = db.execute(update(model)
+                         .where(key_col == key, model.window_start > window_open)
+                         .values(request_count=model.request_count + 1))
+        if res.rowcount:
+            db.commit()
+            return db.query(model.request_count).filter(key_col == key).scalar()
+        # No live window: restart an expired row, or create the first one.
+        res = db.execute(update(model)
+                         .where(key_col == key, model.window_start <= window_open)
+                         .values(request_count=1, window_start=now))
+        if res.rowcount:
+            db.commit()
+            return 1
+        db.add(model(**{key_attr: key}, request_count=1, window_start=now))
+        try:
+            db.commit()
+            return 1
+        except IntegrityError:          # another worker created it first
+            db.rollback()
+    return settings.API_RATE_LIMIT + 1  # still contended after retries: refuse
+
+
 def check_api_rate_db(ip: str, db: "DBSession") -> bool:
     """Return True if the IP has exceeded the API rate limit (caller must 429).
-
-    Uses a sliding window: counts how many seconds have elapsed since
-    window_start; resets the counter when the window expires.
-    """
+    Fixed window of API_RATE_WINDOW_SEC, shared by every worker."""
     from .models import IpApiRequest
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    window = settings.API_RATE_WINDOW_SEC
-    row = db.get(IpApiRequest, ip)
-    if not row:
-        row = IpApiRequest(ip=ip, request_count=0, window_start=now)
-        db.add(row)
-    ws = row.window_start
-    if ws and ws.tzinfo:
-        ws = ws.replace(tzinfo=None)
-    elapsed = (now - ws).total_seconds() if ws else window + 1
-    if elapsed > window:
-        row.request_count = 0
-        row.window_start = now
-    row.request_count += 1
-    over_limit = row.request_count > settings.API_RATE_LIMIT
-    db.commit()
-    return over_limit
+    return _atomic_window_hit(db, IpApiRequest, "ip", ip) > settings.API_RATE_LIMIT
 
 
 def reset_api_rate_limiter_db(db: "DBSession") -> None:
@@ -210,23 +225,7 @@ def reset_api_rate_limiter_db(db: "DBSession") -> None:
 def check_user_api_rate_db(user_id: str, db: "DBSession") -> bool:
     """Return True if the user account has exceeded the API rate limit (caller must 429)."""
     from .models import UserApiRequest
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    window = settings.API_RATE_WINDOW_SEC
-    row = db.get(UserApiRequest, user_id)
-    if not row:
-        row = UserApiRequest(user_id=user_id, request_count=0, window_start=now)
-        db.add(row)
-    ws = row.window_start
-    if ws and ws.tzinfo:
-        ws = ws.replace(tzinfo=None)
-    elapsed = (now - ws).total_seconds() if ws else window + 1
-    if elapsed > window:
-        row.request_count = 0
-        row.window_start = now
-    row.request_count += 1
-    over_limit = row.request_count > settings.API_RATE_LIMIT
-    db.commit()
-    return over_limit
+    return _atomic_window_hit(db, UserApiRequest, "user_id", user_id) > settings.API_RATE_LIMIT
 
 
 def reset_user_api_rate_limiter_db(db: "DBSession") -> None:
