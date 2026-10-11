@@ -4246,7 +4246,9 @@ def export_annual_program_xlsx(
     for cell in ws3[1]:
         cell.fill = hdr_fill; cell.font = hdr_font
     for a in db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id, AnchorEvent.is_archived == False).order_by(AnchorEvent.start_date).all():  # noqa: E712
-        ws3.append([_neutralise_cell(a.name), a.start_date, a.end_date or "",
+        # AnchorEvent has event_name/notes and no location column (D15); the
+        # Location column stays so the sheet layout is unchanged.
+        ws3.append([_neutralise_cell(a.event_name), a.start_date, a.end_date or "",
                     a.event_type or "", a.importance_level or "",
                     _neutralise_cell(a.location or ""), _neutralise_cell(a.description or "")])
 

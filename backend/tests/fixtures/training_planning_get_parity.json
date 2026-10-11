@@ -348,10 +348,10 @@
    "status": 200
   },
   "703SQN2026 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "703SQN2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 146,
@@ -840,10 +840,10 @@
    "status": 200
   },
   "7WG2026 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "7WG2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 146,
@@ -1332,10 +1332,10 @@
    "status": 200
   },
   "ADMIN703 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "ADMIN703 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 125,
@@ -1824,10 +1824,10 @@
    "status": 200
   },
   "ADMIN7WG GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "ADMIN7WG GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 125,
@@ -2316,10 +2316,10 @@
    "status": 200
   },
   "ADMINNATIONAL GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "ADMINNATIONAL GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 125,
@@ -2808,10 +2808,10 @@
    "status": 200
   },
   "AUDITOR2026 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "AUDITOR2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 146,
@@ -3300,10 +3300,10 @@
    "status": 200
   },
   "NATIONAL2026 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "NATIONAL2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 146,
@@ -3792,10 +3792,10 @@
    "status": 200
   },
   "SYSADMIN2026 GET /planning/years/{year_id}/export.xlsx": {
-   "body_len": 26,
-   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
-   "content_type": "application/json",
-   "status": 500
+   "body_len": 996,
+   "body_sha256": "ba166cab3454ad1bac995c72ca4554ce5f81d37cff40e2e3c05c25ffd8a982b2",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
   },
   "SYSADMIN2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
    "body_len": 125,

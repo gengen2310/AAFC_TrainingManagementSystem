@@ -6,6 +6,11 @@ equal the snapshot in fixtures/training_planning_get_parity.json. That
 snapshot was generated on the BASE commit 6ec3935, before any helper moved, so
 a passing test means the extraction changed no GET response.
 
+Deliberate snapshot changes since (each a reviewed defect fix, regenerated
+with PARITY_REGEN=1 and diffed so only the named entries moved):
+- D15 (2026-10-11): GET /planning/years/{year_id}/export.xlsx, all 8
+  principals, 500 -> 200 xlsx (the export read AnchorEvent.name).
+
 The harness runs in a SUBPROCESS against its own freshly seeded SQLite file.
 The suite's shared DB is mutated by hundreds of other tests (and by test order),
 so it cannot give a stable baseline; a fresh seed can, provided the three
