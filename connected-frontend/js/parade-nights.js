@@ -161,18 +161,18 @@ function buildPNCard(pn){
     </div>`).join('');
   return `<div class="pn-card" id="pncard-${esc(pn.id)}">
     <div class="pn-hdr">
-      ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:var(--ctl-min);min-height:var(--ctl-min);padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
+      ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:var(--ctl-min);min-height:var(--ctl-min);padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle(${jsq(pn.id)})" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
       <div><h2 class="pn-date">${fmtDL(pn.date)}</h2><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div><div style="margin-top:3px">${tmplBadge}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')" title="Open this parade night to edit its sessions, facilitators, rooms and periods">Open / edit</button>
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="${tplName?'Change timing template (current: '+esc(tplName)+')':'Set timing template'}" onclick="openPNTimingOverrideModal('${esc(pn.id)}')">Timing…</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="${tplName?'Change timing template (current: '+esc(tplName)+')':'Set timing template'}" onclick="openPNTimingOverrideModal(${jsq(pn.id)})">Timing…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,'${esc(pn.id)}')">More ▾</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,${jsq(pn.id)})">More ▾</button>`:''}
         ${canWriteSquadron()?`<span class="pn-more" id="pnmore-${esc(pn.id)}">
-          ${(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
-          <button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>
+          ${(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate(${jsq(pn.id)})">Save as Tpl</button>`:''}
+          <button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal(${jsq(pn.id)})">Apply Tpl…</button>
           <button class="btn btn-xs btn-red" aria-label="Delete parade night ${esc(fmtDL(pn.date))}" onclick="delPN('${pn.date}')">×</button>
         </span>`:''}
       </div>
@@ -270,8 +270,8 @@ async function openApplyTemplateModal(pnId){
           <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:3px">${t.session_count} session${t.session_count!==1?'s':''} · Saved ${fmtD(t.created_at.substring(0,10))}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btn btn-xs btn-primary" onclick="doApplyTemplate('${esc(t.id)}')">Apply</button>
-          <button class="btn btn-xs btn-red-out" title="Delete this template" aria-label="Delete template ${esc(t.name||t.id)}" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
+          <button class="btn btn-xs btn-primary" onclick="doApplyTemplate(${jsq(t.id)})">Apply</button>
+          <button class="btn btn-xs btn-red-out" title="Delete this template" aria-label="Delete template ${esc(t.name||t.id)}" onclick="doArchiveTemplate(${jsq(t.id)},this)">×</button>
         </div>
       </div>`).join('');
   }catch(e){ listEl.innerHTML=''; errEl.textContent=apiErr(e); errEl.style.display='block'; }
@@ -445,7 +445,7 @@ function _wizRenderCurrList(q){
   if(!items.length){list.innerHTML='<span class="muted" style="font-size:var(--fs-sm)">No matching items.</span>';return;}
   list.innerHTML=items.map(c=>{
     const sel=_wizState.currId===c.id;
-    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr('${esc(c.id)}','${_jsAttr(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
+    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr(${jsq(c.id)},'${_jsAttr(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
   }).join('');
 }
 
@@ -492,7 +492,7 @@ function _wizSetupStep4(){
       panel.innerHTML=`<div class="wiz-fac-sugg-title">Suggestions</div><div class="wiz-fac-pill-row">`+
         suggs.map(s=>{
           const cls=_pillCls[s.rank_label]||'available';
-          return `<span class="fac-sugg-item" style="cursor:pointer" onclick="_wizPickFac('${esc(s.facilitator_id)}')" title="${esc((s.reasons||[]).join('; '))}">
+          return `<span class="fac-sugg-item" style="cursor:pointer" onclick="_wizPickFac(${jsq(s.facilitator_id)})" title="${esc((s.reasons||[]).join('; '))}">
             <span class="fac-sugg-pill ${cls}">${esc(s.rank_label)}</span>
             <span class="fac-sugg-name" style="font-size:var(--fs-sm)">${esc(s.display_name)}</span>
           </span>`;
@@ -843,7 +843,7 @@ async function showPNDetail(ds){
   // ── Legacy banner ─────────────────────────────────────────────────────────
   if(!pnd.timing_template_id){
     html+=`<div class="alert a-warn" style="margin-bottom:10px"><b>Legacy timing</b> — no Timing Template assigned to this Parade Night.`;
-    if(canWriteSquadron()) html+=` <button class="btn btn-xs btn-sky" style="margin-left:8px" onclick="openPNTimingOverrideModal('${esc(pnd.parade_night_id)}')">Choose Timing Template</button>`;
+    if(canWriteSquadron()) html+=` <button class="btn btn-xs btn-sky" style="margin-left:8px" onclick="openPNTimingOverrideModal(${jsq(pnd.parade_night_id)})">Choose Timing Template</button>`;
     html+=`</div>`;
   }
 
@@ -864,7 +864,7 @@ async function showPNDetail(ds){
       <option value="normal">Normal</option>
       <option value="urgent">Urgent</option>
     </select>
-    <button class="btn btn-xs btn-sky" onclick="addPNNotice('${esc(pnd.parade_night_id)}')">Add</button>
+    <button class="btn btn-xs btn-sky" onclick="addPNNotice(${jsq(pnd.parade_night_id)})">Add</button>
   </div>`;
   html+=`</div>`;
 
@@ -903,11 +903,11 @@ async function showPNDetail(ds){
   if(canWriteSquadron()){
     html+=`<div class="no-print" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);display:flex;flex-wrap:wrap;gap:8px;align-items:center">`;
     if(sessions.length>0){
-      html+=`<button class="btn btn-out" onclick="doMarkRemainingDelivered('${esc(ds)}')" title="Mark every Planned session as Delivered.">Mark remaining delivered</button>`;
-      html+=`<button class="btn btn-red-out" onclick="doCancelAllSessions('${esc(ds)}')" title="Cancel every Planned session.">Cancel all remaining</button>`;
+      html+=`<button class="btn btn-out" onclick="doMarkRemainingDelivered(${jsq(ds)})" title="Mark every Planned session as Delivered.">Mark remaining delivered</button>`;
+      html+=`<button class="btn btn-red-out" onclick="doCancelAllSessions(${jsq(ds)})" title="Cancel every Planned session.">Cancel all remaining</button>`;
     }
     if(pnd.closeout_status!=='closed'){
-      html+=`<button class="btn btn-xs btn-red-out" onclick="doClosePN('${esc(pnd.parade_night_id)}')" title="Closes this Parade Night once all outcomes are recorded.">Close Parade Night</button>`;
+      html+=`<button class="btn btn-xs btn-red-out" onclick="doClosePN(${jsq(pnd.parade_night_id)})" title="Closes this Parade Night once all outcomes are recorded.">Close Parade Night</button>`;
       html+=`<span style="font-size:var(--fs-xs);color:var(--muted);margin-left:4px">Locks the night once all outcomes are recorded.</span>`;
     }else{
       html+=`<span class="badge b-amber">Closed</span> <span style="font-size:var(--fs-xs);color:var(--muted)">This Parade Night is closed.</span>`;
@@ -934,8 +934,8 @@ async function showPNDetail(ds){
 // ── Matrix cell renderer ──────────────────────────────────────────────────────
 function _pnMatrixCell(pnId,ds,period,classId,customPhaseId,sess){
   const canWrite=canWriteSquadron();
-  const cArg=classId?`'${esc(classId)}'`:'null';
-  const cpArg=customPhaseId?`'${esc(customPhaseId)}'`:'null';
+  const cArg=classId?jsq(classId):'null';
+  const cpArg=customPhaseId?jsq(customPhaseId):'null';
   if(sess){
     const sc={planned:'var(--blue)',delivered:'var(--ok)',cancelled:'var(--red)',not_delivered:'var(--red)',delivered_with_issue:'var(--warn)',cancelled_late:'var(--red)',rescheduled:'var(--warn)'};
     const col=sc[sess.status]||'var(--muted)';
@@ -954,10 +954,10 @@ function _pnMatrixCell(pnId,ds,period,classId,customPhaseId,sess){
 <div style="font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${fac?esc(fac):'—'}</div>
 <div style="font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:88px">${room?esc(room):'—'}</div>
 ${badge}</div>`;
-    if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top;cursor:pointer" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},'${esc(sess.session_id)}')">${inner}</td>`;
+    if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top;cursor:pointer" onclick="_pnCellClick(${jsq(pnId)},${jsq(ds)},${period},${cArg},${cpArg},${jsq(sess.session_id)})">${inner}</td>`;
     return `<td style="border:1px solid var(--border);padding:4px;vertical-align:top">${inner}</td>`;
   }
-  if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer;opacity:.4" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},null)"><div style="font-size:11px;color:var(--blue)">+</div></td>`;
+  if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer;opacity:.4" onclick="_pnCellClick(${jsq(pnId)},${jsq(ds)},${period},${cArg},${cpArg},null)"><div style="font-size:11px;color:var(--blue)">+</div></td>`;
   return `<td style="border:1px solid var(--border);padding:4px;text-align:center"><div style="font-size:10px;color:var(--lgrey)">—</div></td>`;
 }
 
@@ -986,9 +986,9 @@ async function _pnCellClick(pnId,ds,period,classId,customPhaseId,sessionId){
     const cl=plan.groups.flatMap(g=>g.classes||[]).find(c=>c.training_class_id===classId);
     if(cl){classLabel=cl.display_name; if(cl.stage_code)derivedPhase=sess?sess.phase_at_time||cl.stage_code:cl.stage_code;}
   } else if(customPhaseId){const cg=plan.groups.find(g=>g.custom_phase_id===customPhaseId);if(cg)classLabel=cg.name;}
-  const cArg=classId?`'${esc(classId)}'`:'null';
-  const cpArg=customPhaseId?`'${esc(customPhaseId)}'`:'null';
-  const sessArg=sess?`'${esc(sess.session_id)}'`:'null';
+  const cArg=classId?jsq(classId):'null';
+  const cpArg=customPhaseId?jsq(customPhaseId):'null';
+  const sessArg=sess?jsq(sess.session_id):'null';
   // Phase row is shown only when phase cannot be derived from the Training Class's stage_code.
   const phaseRow=derivedPhase
     ? `<input type="hidden" id="pce-ph" value="${esc(derivedPhase)}">`
@@ -1015,8 +1015,8 @@ async function _pnCellClick(pnId,ds,period,classId,customPhaseId,sessionId){
       <span id="pce-asst-help" class="muted" style="font-size:var(--fs-2xs)">Select one or more facilitators. The lead facilitator cannot also be an assistant.</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-sm btn-dk" onclick="_pnCellSave('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},${sessArg})">${sess?'Save Session':'Create Session'}</button>
-      ${sess?`<button class="btn btn-sm btn-red-out" onclick="_pnCellDelete('${esc(sess.session_id)}','${esc(ds)}')">Delete</button>`:''}
+      <button class="btn btn-sm btn-dk" onclick="_pnCellSave(${jsq(pnId)},${jsq(ds)},${period},${cArg},${cpArg},${sessArg})">${sess?'Save Session':'Create Session'}</button>
+      ${sess?`<button class="btn btn-sm btn-red-out" onclick="_pnCellDelete(${jsq(sess.session_id)},${jsq(ds)})">Delete</button>`:''}
       <span id="pce-err" style="font-size:var(--fs-xs);color:var(--red)"></span>
     </div>`;
     editorEl.style.display='';
@@ -1355,7 +1355,7 @@ async function savePNDetail(ds,cnt){
                 `${detail.conflicts.length===1?'is':'are'} already in another session at this period. `+
                 `<a href="#" style="font-weight:700;text-decoration:underline" `+
                 `onclick="event.preventDefault();this.parentElement.textContent='Overriding…';`+
-                `_saveSessionAudience('${esc(s.id)}',${JSON.stringify(checked)},true)`+
+                `_saveSessionAudience(${jsq(s.id)},${esc(JSON.stringify(checked))},true)`+
                 `.then(()=>{reloadAndRender();closeModal('m-pn-detail');})`+
                 `.catch(e2=>{this.parentElement.style.color='var(--red)';this.parentElement.textContent=apiErr(e2);})">Override</a>`;
               errEl.style.color='var(--warn)';
@@ -1696,7 +1696,7 @@ async function saveSessEdit(){
               `${detail.conflicts.length===1?'is':'are'} already scheduled in another session at this period. `+
               `<a href="#" style="font-weight:700;text-decoration:underline" `+
               `onclick="event.preventDefault();this.parentElement.textContent='Overriding…';`+
-              `_saveSessionAudience('${esc(s.id)}',${JSON.stringify(checked)},true)`+
+              `_saveSessionAudience(${jsq(s.id)},${esc(JSON.stringify(checked))},true)`+
               `.then(()=>{reloadAndRender();closeModal('m-sess-edit');editSessRef=null;})`+
               `.catch(e2=>{this.parentElement.style.color='var(--red)';this.parentElement.textContent=apiErr(e2);})">Override</a>`;
             sessErrEl.style.color='var(--warn)';

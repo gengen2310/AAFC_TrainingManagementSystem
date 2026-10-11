@@ -298,6 +298,12 @@ function _rteValue(mountId){
 //  TIMING TEMPLATES
 // ═══════════════════════════════════════════════════════════
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// A value for an inline handler's JavaScript, e.g. onclick="f(${jsq(id)})".
+// esc() alone is wrong there: the browser decodes &#39; back to ' while parsing
+// the attribute, before the script runs, so a quote in the value closes the
+// string literal (D11). jsq() emits a whole JSON string literal, then
+// HTML-escapes it so it survives either attribute quoting. Falsy -> "" like esc().
+function jsq(v){return esc(JSON.stringify(String(v||'')));}
 // Returns a value safe to drop straight into an href="..." attribute.
 // Two jobs, and it used to do only the first: reject non-http(s) schemes
 // (javascript:, data:) AND escape the result. Returning the raw string meant a

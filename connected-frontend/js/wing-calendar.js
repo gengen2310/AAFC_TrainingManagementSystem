@@ -181,7 +181,7 @@ function renderWingCalendarGrid(){
         <div class="cal-grid-daynum">${d.getDate()}</div>
         ${shown.map(e=>e.source==='activity'
           ?`<span class="cal-grid-evt" style="background:#eef1f4;color:#455560;border:1px dashed #9aa5ad" title="${esc(e.title)}${e.owning_org_label?' — '+esc(e.owning_org_label):''} (Activity)">${esc(e.title)}</span>`
-          :`<span class="cal-grid-evt" style="background:${_WC_IMP_COLOR[e.planning_importance]||'#7a8590'}" title="${esc(e.title)}${e.wing_code?' — '+esc(e.wing_code):''}" onclick="openWingEventDetail('${esc(e.id)}')">${esc(e.title)}</span>`
+          :`<span class="cal-grid-evt" style="background:${_WC_IMP_COLOR[e.planning_importance]||'#7a8590'}" title="${esc(e.title)}${e.wing_code?' — '+esc(e.wing_code):''}" onclick="openWingEventDetail(${jsq(e.id)})">${esc(e.title)}</span>`
         ).join('')}
         ${extra>0?`<span class="cal-grid-more">+${extra} more</span>`:''}
       </td>`;
@@ -232,7 +232,7 @@ function renderWingCalendar(){
     // click-through either -- same convention as Activity rows above.
     const isArchived=!!e.is_archived;
     const clickable=!isAct&&!isArchived;
-    return `<tr${clickable?' style="cursor:pointer" onclick="openWingEventDetail(\''+esc(e.id)+'\')"':(isArchived?' style="opacity:.6"':'')}>
+    return `<tr${clickable?' style="cursor:pointer" onclick="openWingEventDetail('+jsq(e.id)+')"':(isArchived?' style="opacity:.6"':'')}>
       <td>${esc(dateStr)}</td>
       <td><strong>${esc(e.title)}</strong>${isAct?' <span class="badge b-grey" style="font-size:var(--fs-3xs)">Activity</span>':''}${isArchived?' <span class="badge b-grey" style="font-size:var(--fs-3xs)">Archived</span>':''}${e.location?`<br><span class="muted" style="font-size:var(--fs-2xs)">${esc(e.location)}</span>`:''}</td>
       <td>${isAct?'—':`<span class="badge b-grey" style="font-size:var(--fs-3xs)">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span>`}</td>
@@ -240,9 +240,9 @@ function renderWingCalendar(){
       <td style="font-size:var(--fs-2xs)">${esc(aud)}</td>
       <td>${(!isAct&&!isArchived&&e.requires_squadron_action)?'<span class="badge b-amber">Action needed</span>':''}</td>
       ${isWingWrite?`<td>${isAct?'':(isArchived
-        ?`<button class="btn-xs btn-ok" onclick="event.stopPropagation();doRestoreWingEvent('${esc(e.id)}','${_jsAttr(e.title||'')}')">Restore</button>`
-        :`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
-        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button>`)}</td>`:''}
+        ?`<button class="btn-xs btn-ok" onclick="event.stopPropagation();doRestoreWingEvent(${jsq(e.id)},'${_jsAttr(e.title||'')}')">Restore</button>`
+        :`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent(${jsq(e.id)})">Edit</button>
+        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent(${jsq(e.id)})">Archive</button>`)}</td>`:''}
     </tr>`;
   }).join('')+
   `</tbody></table>`;
@@ -467,7 +467,7 @@ function _renderWingEventsOverlay(){
       <td><span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:var(--fs-3xs)">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span></td>
       <td style="font-size:var(--fs-2xs)">${esc((e.audience||[]).join(', ')||'—')}</td>
       <td><span class="badge ${ssCls}" style="font-size:var(--fs-3xs)">${esc(ssLabel)}</span></td>
-      <td><button class="btn-xs btn-secondary" onclick="openWingEventDetail('${esc(e.id)}')">Detail</button></td>
+      <td><button class="btn-xs btn-secondary" onclick="openWingEventDetail(${jsq(e.id)})">Detail</button></td>
     </tr>`;
   }).join('')+
   `</tbody></table>`;
@@ -509,7 +509,7 @@ function _apShowDateDetail(ds){
   we.forEach(e=>{
     const bc=e.planning_importance==='must_attend'?'#7c3aed':e.planning_importance==='key_event'?'#8b5cf6':'#a78bfa';
     h+=`<div style="padding:6px 8px;border-left:3px solid ${bc};margin-bottom:5px;background:#f5f3ff;border-radius:0 4px 4px 0;cursor:pointer"
-      onclick="openWingEventDetail('${esc(e.id)}')">
+      onclick="openWingEventDetail(${jsq(e.id)})">
       <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:var(--fs-3xs)">${esc((S.session&&S.session.wing_code)||'Wing')} HQ</span>
       <strong style="font-size:var(--fs-xs);margin-left:4px">${esc(e.title)}</strong>
       <span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:var(--fs-3xs);margin-left:4px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>

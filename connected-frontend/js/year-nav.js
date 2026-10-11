@@ -406,14 +406,14 @@ function _ynRenderYearList(el, years, opts){
         acts += '<button class="btn btn-xs btn-dk" onclick="ynSetUpYear('+(+y.year)+')">Set up '+esc(String(y.year))+'</button>';
       }
     }else{
-      acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
+      acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear('+jsq(id)+','+(+y.year)+')">Export</button>';
       const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
       if(canRemediate){
         acts += activeRow
-          ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
-          : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+          ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear('+jsq(id)+')">Archive</button>'
+          : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear('+jsq(id)+')">Restore</button>';
         if(!activeRow){
-          acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+          acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear('+jsq(id)+','+(+y.year)+')">Delete</button>';
         }
       }
     }

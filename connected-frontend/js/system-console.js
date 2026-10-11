@@ -378,13 +378,13 @@ async function scLoadSdEmailConfig(){
       const key=scope+(wingId||'');
       const cur=byScope[key];
       const val=cur?esc(cur.notification_email):'';
-      const wParam=wingId?`,'${esc(wingId)}'`:'';
+      const wParam=wingId?`,${jsq(wingId)}`:'';
       return `<div style="display:grid;grid-template-columns:160px 1fr auto;gap:var(--sp-sm);align-items:center;margin-bottom:var(--sp-xs)">
         <label for="sd-email-cfg-${esc(key)}" style="font-size:var(--fs-xs);font-weight:600">${esc(label)}</label>
         <input type="email" class="ff-input" style="font-size:var(--fs-sm);padding:5px 8px" value="${val}"
           placeholder="not configured" id="sd-email-cfg-${esc(key)}" autocomplete="off">
         <button class="btn btn-secondary" style="font-size:var(--fs-xs);padding:4px 10px;white-space:nowrap"
-          onclick="scSaveSdEmail('${esc(scope)}',document.getElementById('sd-email-cfg-${esc(key)}').value${wParam})">Save</button>
+          onclick="scSaveSdEmail(${jsq(scope)},document.getElementById(${jsq('sd-email-cfg-'+key)}).value${wParam})">Save</button>
       </div>`;
     };
 

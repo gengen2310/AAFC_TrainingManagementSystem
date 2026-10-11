@@ -65,7 +65,7 @@ function _chartHBar(chart){
   };
   return rows.map(r=>{
     const v=+(r[valKey])||0;const w=Math.round(v/maxV*100);const lbl=String(r.label||r.name||'—').substring(0,32);
-    const drill=chart.drill_down&&r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
+    const drill=chart.drill_down&&r.drill_id?`onclick="drillDashChart(${jsq(chart.chart_id)},${jsq(r.drill_id)})" style="cursor:pointer"`:'';
     // A data-quality gap (missing phase/reason — see _curriculum_backlog/
     // _cancellation_reasons) is never a real ranked category: shown distinctly
     // (muted dashed bar, "ⓘ" prefix), not styled like a genuine cause.
@@ -989,7 +989,7 @@ function _renderPareto(chart){
   return rows.map(r=>{
     const w=Math.round(r.count/maxV*100);
     const isGap=!!r.data_quality_gap;
-    const drill=r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
+    const drill=r.drill_id?`onclick="drillDashChart(${jsq(chart.chart_id)},${jsq(r.drill_id)})" style="cursor:pointer"`:'';
     return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%" ${drill}>
       <div class="ph-name" style="min-width:130px;font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(_dLabel(r.label).substring(0,40))}</div>
       <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':'var(--royal)'};border-radius:3px"></div></div></div>

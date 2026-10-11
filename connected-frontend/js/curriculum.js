@@ -114,7 +114,7 @@ function renderCurr(){
           const dp=deriveProgress(e.code);
           const sc=allSess().filter(s=>s.code===e.code).length;
           const editable=canEditCurr(e);
-          return `<div class="exp-item" onclick="showCurrDetail('${e.code}')">
+          return `<div class="exp-item" onclick="showCurrDetail(${jsq(e.code)})">
             <div style="flex:1;min-width:0">
               <div class="exp-code">${esc(e.code)} · ${e.hours}h · ${getProgramType(e.phase)} ${sourceBadge(e)}</div>
               <div class="exp-title">${esc(e.title)}</div>
@@ -127,8 +127,8 @@ function renderCurr(){
               ${_currClassBreakdownHtml((S.classByCode||{})[e.code])}
             </div>
             <div class="exp-right">
-              ${sc>0?`<button class="btn-lnk" style="font-size:var(--fs-2xs)" onclick="event.stopPropagation();drillCurr('${esc(e.code)}')">${sc} sess.</button>`:''}
-              ${editable?`<button class="btn btn-xs btn-out" onclick="event.stopPropagation();editCurr('${esc(e.code)}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Delete curriculum item" onclick="event.stopPropagation();deleteCurrItem('${e.id}')">×</button>`:''}
+              ${sc>0?`<button class="btn-lnk" style="font-size:var(--fs-2xs)" onclick="event.stopPropagation();drillCurr(${jsq(e.code)})">${sc} sess.</button>`:''}
+              ${editable?`<button class="btn btn-xs btn-out" onclick="event.stopPropagation();editCurr(${jsq(e.code)})">Edit</button> <button class="btn btn-xs btn-red" aria-label="Delete curriculum item" onclick="event.stopPropagation();deleteCurrItem('${e.id}')">×</button>`:''}
             </div>
           </div>`;
         }).join('')}

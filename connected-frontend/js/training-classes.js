@@ -134,13 +134,13 @@ async function _renderTrainingClasses(yearId){
     });
     const hasMergeTarget=(c,grp)=>grp.some(o=>o.training_class_id!==c.training_class_id);
     const rowActions=(c,grp)=>{
-      if(c.is_archived) return canWrite?`<button class="btn btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
+      if(c.is_archived) return canWrite?`<button class="btn btn-xs btn-ok" onclick="doRestoreTrainingClass(${jsq(c.training_class_id)},${jsq(yearId)})">Restore</button>`:'';
       const tid=esc(c.training_class_id);
       let btns=`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">View Progress</button>`;
       if(canWrite) btns+=`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`;
       if(canWrite) btns+=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')" style="margin-right:4px">Split</button>`;
       if(canWrite&&hasMergeTarget(c,grp)) btns+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')" style="margin-right:4px">Merge into…</button>`;
-      if(canWrite) btns+=`<button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${esc(yearId)}')">Archive</button>`;
+      if(canWrite) btns+=`<button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}',${jsq(yearId)})">Archive</button>`;
       return btns;
     };
     const cols=showArchived?4:5;
@@ -323,8 +323,8 @@ async function loadCustomPhases(){
         +'<div class="yn-year-body"><div class="cp-name">'+esc(ph.name)+'</div>'
         +'<div class="cp-range">'+esc(range)+'</div></div>'
         +'<div class="cp-acts">'
-        +'<button class="btn btn-xs btn-out admin-el" onclick="cpOpenEdit(\''+esc(ph.custom_phase_id)+'\',\''+esc(ph.name)+'\',\''+esc(ph.applies_from||'')+'\',\''+esc(ph.applies_to||'')+'\')">Edit</button>'
-        +'<button class="btn btn-xs btn-red admin-el" onclick="cpDelete(\''+esc(ph.custom_phase_id)+'\',\''+esc(ph.name)+'\')">Delete</button>'
+        +'<button class="btn btn-xs btn-out admin-el" onclick="cpOpenEdit('+jsq(ph.custom_phase_id)+','+jsq(ph.name)+','+jsq(ph.applies_from||'')+','+jsq(ph.applies_to||'')+')">Edit</button>'
+        +'<button class="btn btn-xs btn-red admin-el" onclick="cpDelete('+jsq(ph.custom_phase_id)+','+jsq(ph.name)+')">Delete</button>'
         +'</div></div>';
     }).join('')+'</div>';
   }catch(e){

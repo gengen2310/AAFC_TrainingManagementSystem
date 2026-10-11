@@ -84,9 +84,9 @@ function renderActions(){
       <td style="font-size:var(--fs-xs);color:var(--muted);white-space:nowrap">${it.due?fmtD(it.due,{day:'numeric',month:'short',year:'numeric'}):'—'}</td>
       <td><span class="badge b-amber" style="font-size:var(--fs-3xs)">${esc(it.issue)}</span></td>
       <td class="no-print">
-        ${it.type==='curr'?`<button class="btn btn-xs btn-sky" onclick="showCurrDetail('${esc(it.code)}')">View</button>`:''}
-        ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${esc(it.date)}',${it.si})">Edit</button>`:''}
-        ${it.type==='backend'&&it.id&&canWriteSquadron()?`<button class="btn btn-xs" onclick="_closeActionItem('${esc(it.id)}')">Done</button>`:''}
+        ${it.type==='curr'?`<button class="btn btn-xs btn-sky" onclick="showCurrDetail(${jsq(it.code)})">View</button>`:''}
+        ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit(${jsq(it.date)},${it.si})">Edit</button>`:''}
+        ${it.type==='backend'&&it.id&&canWriteSquadron()?`<button class="btn btn-xs" onclick="_closeActionItem(${jsq(it.id)})">Done</button>`:''}
       </td>
     </tr>`;}).join('')
     :`<tr><td colspan="5"><div class="empty" style="padding:18px">
@@ -126,9 +126,9 @@ async function loadNeedsAttentionSessions(){
       const cls=(r.training_classes||[]).map(tc=>esc(tc.display_name)).join(', ')||'—';
       const status=r.status;
       const canWrite=S.role!=='sqn_general';
-      const deliverBtn=canWrite?`<button class="btn btn-primary btn-sm" onclick="sessionDeliver('${esc(r.session_id)}',this)">Deliver</button>`:'';
-      const cancelBtn=canWrite?`<button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="sessionCancel('${esc(r.session_id)}',this)">Cancel</button>`:'';
-      const rescheduleBtn=(status==='cancelled'&&canWrite)?`<button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="sessionReschedule('${esc(r.session_id)}',this)">Reschedule</button>`:'';
+      const deliverBtn=canWrite?`<button class="btn btn-primary btn-sm" onclick="sessionDeliver(${jsq(r.session_id)},this)">Deliver</button>`:'';
+      const cancelBtn=canWrite?`<button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="sessionCancel(${jsq(r.session_id)},this)">Cancel</button>`:'';
+      const rescheduleBtn=(status==='cancelled'&&canWrite)?`<button class="btn btn-secondary btn-sm" style="margin-left:4px" onclick="sessionReschedule(${jsq(r.session_id)},this)">Reschedule</button>`:'';
       const statusBadge=status==='cancelled'?`<span style="color:var(--warn-text);font-size:var(--fs-xs)">(cancelled)</span>`:'';  /* G1: --warn on white=3.29:1(fail); --warn-text=7.0:1(pass) */
       return `<tr>
         <td>${esc(date)}</td>

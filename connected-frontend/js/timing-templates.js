@@ -78,7 +78,7 @@ function renderTimingTemplates(){
       <div style="flex:1;font-size:var(--fs-sm)"><span style="font-weight:600">${esc(t.name)}</span>${badge}
         <span style="color:var(--muted);font-size:var(--fs-xs);margin-left:8px">from ${t.effective_from}${t.effective_to?' to '+t.effective_to:''} · ${t.instructional_period_count||0} Training Period block${t.instructional_period_count===1?'':'s'}</span>
       </div>
-      <button class="btn admin-el" style="font-size:var(--fs-xs);padding:2px 8px" onclick="openTimingTemplateModal('${esc(t.timing_template_id)}')">Edit</button>
+      <button class="btn admin-el" style="font-size:var(--fs-xs);padding:2px 8px" onclick="openTimingTemplateModal(${jsq(t.timing_template_id)})">Edit</button>
     </div>`;
   }).join('');
 }

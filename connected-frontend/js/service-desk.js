@@ -40,7 +40,7 @@ function sdUnitFilter() {
   _sdUnitFocusIdx = -1;
   dd.innerHTML = filtered.slice(0, 40).map((u, i) =>
     `<div class="sd-unit-opt" data-uid="${esc(u.unit_id)}" data-uname="${esc(u.name)}" data-utype="${esc(u.type)}"
-      onmousedown="sdUnitSelect('${esc(u.unit_id)}','${esc(u.name.replace(/'/g,"&#39;"))}','${esc(u.type)}')">
+      onmousedown="sdUnitSelect(${jsq(u.unit_id)},${jsq(u.name)},${jsq(u.type)})">
       <span class="sd-unit-type sd-unit-type-${esc(u.type)}">${esc(u.type === 'wing' ? 'Wing' : 'Sqn')}</span>
       ${esc(u.name)}
     </div>`

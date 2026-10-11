@@ -347,7 +347,7 @@ function renderMissions() {
         const extraRows=m.scheduled_sessions.length>1
           ?`<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`:'';
         const schedCell=schedDate
-          ?`${esc(schedDate)} ${esc(schedSess)}${extraRows}<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`
+          ?`${esc(schedDate)} ${esc(schedSess)}${extraRows}<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN(${jsq(schedDate)})" title="Go to this parade night">↗ View PN</button>`
           :'<span class="muted">—</span>';
         return `<tr style="${rowStyle}">
           <td><code>${esc(m.code)}</code></td>
@@ -356,7 +356,7 @@ function renderMissions() {
           <td>${esc(m.recommended_term||'')}</td>
           <td>${statusBadge}</td>
           <td>${schedCell}</td>
-          ${canWrite?`<td>${isNeedsAction?`<button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button>`:'</td>'}`:''}
+          ${canWrite?`<td>${isNeedsAction?`<button class="btn-xs" onclick="openAssignModal(${jsq(m.curriculum_id)},'${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button>`:'</td>'}`:''}
         </tr>`;
       }).join('')+
       `</tbody></table></div>`;
@@ -402,11 +402,11 @@ function renderMissions() {
           <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
           <td>${esc(m.element||'')}</td>
           <td>${esc(m.recommended_term||'')}</td>
-          <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
+          <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN(${jsq(schedDate)})" title="Go to this parade night">↗ View PN</button>`:''}</td>
           <td style="font-size:var(--fs-base)">${esc(facName)}</td>
           <td>${badge}</td>
           ${classTd}
-          ${canWrite?`<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>`:''}
+          ${canWrite?`<td><button class="btn-xs" onclick="openAssignModal(${jsq(m.curriculum_id)},'${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>`:''}
         </tr>`;
       }).join('')+
       `</tbody></table></div>`;
@@ -809,7 +809,7 @@ async function _renderParadeDates(yearId){
         <td>${_dayName(d.parade_date)}</td>
         <td>${esc(d.parade_type)}</td>
         <td>${d.in_holiday ? '<span class="badge badge-yellow">Holiday</span>' : ''}</td>
-        <td><button class="btn-xs btn-danger" onclick="deleteParadeDate('${esc(d.parade_date_id)}','${esc(yearId)}')">Remove</button></td>
+        <td><button class="btn-xs btn-danger" onclick="deleteParadeDate(${jsq(d.parade_date_id)},${jsq(yearId)})">Remove</button></td>
       </tr>`).join('')+
       `</tbody></table></div>`;
   } catch(e){ el.innerHTML='<p class="muted">Could not load parade dates. Refresh the page to try again.</p>'; }
@@ -836,7 +836,7 @@ async function _renderHolidays(yearId){
         <td>${esc(h.start_date)}</td>
         <td>${esc(h.end_date)}</td>
         <td>${h.affects_parade?'Yes':'No'}</td>
-        <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick='openEditHolidayModal(${JSON.stringify(h)})' style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="deleteHoliday('${esc(h.holiday_id)}','${esc(yearId)}')">Remove</button>`:''}</td>
+        <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick="openEditHolidayModal(${esc(JSON.stringify(h))})" style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="deleteHoliday(${jsq(h.holiday_id)},${jsq(yearId)})">Remove</button>`:''}</td>
       </tr>`).join('')+
       `</tbody></table></div>`;
   } catch(e){ el.innerHTML='<p class="muted">Could not load holiday periods. Refresh the page to try again.</p>'; }
@@ -1024,8 +1024,8 @@ function renderAnchors(){
       <td>${_audienceBadges(a.audience)}</td>
       <td>
         ${a.is_archived
-          ?`<button class="btn btn-xs btn-ok" onclick="doRestoreAnchor('${esc(a.anchor_event_id)}','${_jsAttr(a.event_name)}')">Restore</button>`
-          :`<button class="btn-xs btn-danger" onclick="deleteAnchor('${esc(a.anchor_event_id)}')">Archive</button>`}
+          ?`<button class="btn btn-xs btn-ok" onclick="doRestoreAnchor(${jsq(a.anchor_event_id)},'${_jsAttr(a.event_name)}')">Restore</button>`
+          :`<button class="btn-xs btn-danger" onclick="deleteAnchor(${jsq(a.anchor_event_id)})">Archive</button>`}
       </td>
     </tr>`).join('')+
     `</tbody></table>`;
@@ -1395,7 +1395,7 @@ function _renderConflicts(conflicts, yearId){
       <td><span class="badge ${c.severity==='critical'?'badge-red':'badge-yellow'}">${esc(_cap(c.severity))}</span></td>
       <td>${esc(_cap(c.conflict_type.replace(/_/g,' ')))}</td>
       <td>${esc(c.message)}</td>
-      <td><button class="btn-xs btn-secondary" onclick="promptOverrideConflict('${esc(c.conflict_id)}','${esc(yearId)}')">Override</button></td>
+      <td><button class="btn-xs btn-secondary" onclick="promptOverrideConflict(${jsq(c.conflict_id)},${jsq(yearId)})">Override</button></td>
     </tr>`).join('')+
     `</tbody></table>`;
 }

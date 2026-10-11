@@ -61,13 +61,13 @@ async function loadCadetRoster(){
         <td>${esc(c.last_name||'')}</td>
         <td>${esc(c.first_name||'')}</td>
         <td>${c.active_status?'Active':'Inactive'}</td>
-        ${canWrite?`<td class="no-print"><button class="btn btn-danger btn-xs" onclick="removeCadetFromClass('${esc(classId)}','${esc(c.cadet_id||c.id)}',this)">Remove from Class</button></td>`:''}
+        ${canWrite?`<td class="no-print"><button class="btn btn-danger btn-xs" onclick="removeCadetFromClass(${jsq(classId)},${jsq(c.cadet_id||c.id)},this)">Remove from Class</button></td>`:''}
       </tr>`).join('')}</tbody>
     </table></div>
     ${canWrite?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="openAddCadetModal()">Add Cadet</button>
-      <button class="btn btn-out btn-sm" onclick="bulkAddCadetsToClass('${esc(classId)}')">Add to Class</button>
-      <button class="btn btn-out btn-sm" onclick="moveCadetsToClass('${esc(classId)}')">Move to Class</button>
+      <button class="btn btn-out btn-sm" onclick="bulkAddCadetsToClass(${jsq(classId)})">Add to Class</button>
+      <button class="btn btn-out btn-sm" onclick="moveCadetsToClass(${jsq(classId)})">Move to Class</button>
     </div>`:''}`;
   }catch(e){wrap.innerHTML=`<p class="warn">${esc(apiErr(e))}</p>`;}
 }
@@ -213,7 +213,7 @@ async function loadTrainingRecords(){
         }
       }).join('');
       return `<tr>
-        <td style="font-size:var(--fs-sm);white-space:nowrap"><a href="#" onclick="showCadetTrainingRecord('${esc(r.cadet_id)}');return false">${esc(r.rank||'')} ${esc(r.last_name||'')}</a></td>
+        <td style="font-size:var(--fs-sm);white-space:nowrap"><a href="#" onclick="showCadetTrainingRecord(${jsq(r.cadet_id)});return false">${esc(r.rank||'')} ${esc(r.last_name||'')}</a></td>
         ${cells}
       </tr>`;
     }).join('');
