@@ -1,0 +1,3957 @@
+{
+ "ids_resolved": {
+  "activity": true,
+  "anchor": true,
+  "cadet": true,
+  "citem": true,
+  "class": true,
+  "fac": true,
+  "period": true,
+  "pn": true,
+  "pn_date": true,
+  "pnt": true,
+  "session": true,
+  "sq": true,
+  "stage": true,
+  "timing": true,
+  "year": true
+ },
+ "responses": {
+  "703SQN2026 GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /cadets": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /cadets/risk": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /curriculum": {
+   "body_len": 6682,
+   "body_sha256": "cf6616f252f41dd0c2808d501c479854b4e85fdf17b22702b653e6c53d54bfce",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/learning-hub/validation": {
+   "body_len": 135,
+   "body_sha256": "64643066861219fd24e8bf55e8e19170285e40138bed5dc803c5fe16c220d315",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /curriculum/{cid}/sessions": {
+   "body_len": 11095,
+   "body_sha256": "64b5973a39c4a88c7b1a912ba566a441ab7c73372c67fe2bf16177313d178ce6",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /facilitators/import/template.csv": {
+   "body_len": 101,
+   "body_sha256": "0d989ca00a39559dd0662b2f9dad8dde04dace2e8a03e094f7494d0eb1a38f68",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-night-templates": {
+   "body_len": 230,
+   "body_sha256": "e868ff7ecc88b28210715d4e0e16802822256f182f449e5fcea9fb9653fb6ab0",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/command-centre": {
+   "body_len": 2398,
+   "body_sha256": "011b91055fc2ace0269a918223c740ea2105ecf73b0523015a49fa7641dbf780",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/facilitators": {
+   "body_len": 1313,
+   "body_sha256": "2580c6aa868f6b0f4f3956e66776b92e0728da1945e75d8b30854cf70a1f5774",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/export": {
+   "body_len": 3611,
+   "body_sha256": "af163d84e49487b79ba6ec7771c76ab2a89511b0176ee04809ff27951249934e",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "703SQN2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 30729,
+   "body_sha256": "c6bb2adfd70c34cfa50d783827e30d3ffc02659d337b0f225b192d43ac9df8e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "703SQN2026 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /resources/clashes": {
+   "body_len": 429,
+   "body_sha256": "ae7acd4efe1f3e3fd12f92700038bc7f4897f5bc69d8a7258da53a72bbc39876",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /sessions/needs-attention": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "703SQN2026 GET /training-classes/{cid}/members": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /training-classes/{class_id}/roster": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /training-records": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /training-records/export": {
+   "body_len": 32,
+   "body_sha256": "56158e7d39a31a938306e2155b78d2c7dae14881a323c78d023be80804b215c7",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "703SQN2026 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/learning-hub/validation": {
+   "body_len": 135,
+   "body_sha256": "64643066861219fd24e8bf55e8e19170285e40138bed5dc803c5fe16c220d315",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /facilitators/import/template.csv": {
+   "body_len": 101,
+   "body_sha256": "0d989ca00a39559dd0662b2f9dad8dde04dace2e8a03e094f7494d0eb1a38f68",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "7WG2026 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/export": {
+   "body_len": 3608,
+   "body_sha256": "edfacaf4de246967b925a62a5e981d57896b2518e6889dc47ccada0cfe33777c",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "7WG2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 159,
+   "body_sha256": "ff1b704a92e87193e4049e678dcc2c76f3ca23b13ec7c1971a79bcb452355237",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "7WG2026 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "7WG2026 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "7WG2026 GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "7WG2026 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /activities": {
+   "body_len": 590,
+   "body_sha256": "439b56c77fb585ee9daeb16340a3221d34672b36367182e14d580de8a0289e71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /activities/{aid}": {
+   "body_len": 623,
+   "body_sha256": "ac81c96f9e2ccc8b702fd9f0b32e832d459a28691d868d379da100f2aeea2ad7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /cadets": {
+   "body_len": 770,
+   "body_sha256": "d966c74360340b4005d71ab4a6098382ac654d919c542b01a8f1b3ff1ae7cd22",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /cadets/risk": {
+   "body_len": 111,
+   "body_sha256": "868d6e62a477551d8683da84dc817d231250d62ef9993136eb7bcfc8e884470b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum": {
+   "body_len": 6682,
+   "body_sha256": "cf6616f252f41dd0c2808d501c479854b4e85fdf17b22702b653e6c53d54bfce",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/learning-hub/validation": {
+   "body_len": 135,
+   "body_sha256": "64643066861219fd24e8bf55e8e19170285e40138bed5dc803c5fe16c220d315",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "ADMIN703 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /curriculum/{cid}/sessions": {
+   "body_len": 11095,
+   "body_sha256": "64b5973a39c4a88c7b1a912ba566a441ab7c73372c67fe2bf16177313d178ce6",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /facilitators/import/template.csv": {
+   "body_len": 113,
+   "body_sha256": "844c4b9a74d324452f3253473acea990aed9384662255a143ba4b4503bc3fed4",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN703 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-night-templates": {
+   "body_len": 230,
+   "body_sha256": "e868ff7ecc88b28210715d4e0e16802822256f182f449e5fcea9fb9653fb6ab0",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/command-centre": {
+   "body_len": 2398,
+   "body_sha256": "011b91055fc2ace0269a918223c740ea2105ecf73b0523015a49fa7641dbf780",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/facilitators": {
+   "body_len": 1313,
+   "body_sha256": "2580c6aa868f6b0f4f3956e66776b92e0728da1945e75d8b30854cf70a1f5774",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 17,
+   "body_sha256": "6d8bee8bada36a121d48cb57f3fb2739efdff9046cc30610b196a08bf4464b24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 14,
+   "body_sha256": "0a84feaedf4229b1d4570fd643645ca8f43c7bfcc15fe930805efa7285bb9f77",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/export": {
+   "body_len": 3611,
+   "body_sha256": "af163d84e49487b79ba6ec7771c76ab2a89511b0176ee04809ff27951249934e",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "ADMIN703 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 125,
+   "body_sha256": "8e8d75486aa8954190312244f6a7e009ed4b1c1df898d30f798282ddfb4e966a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 30729,
+   "body_sha256": "c6bb2adfd70c34cfa50d783827e30d3ffc02659d337b0f225b192d43ac9df8e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMIN703 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /resources/clashes": {
+   "body_len": 429,
+   "body_sha256": "ae7acd4efe1f3e3fd12f92700038bc7f4897f5bc69d8a7258da53a72bbc39876",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN703 GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN703 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/learning-hub/validation": {
+   "body_len": 45,
+   "body_sha256": "5da1de42c06f7daad337270e5185e534082b9afdd58f3655154484d0e6241a24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /facilitators/import/template.csv": {
+   "body_len": 113,
+   "body_sha256": "844c4b9a74d324452f3253473acea990aed9384662255a143ba4b4503bc3fed4",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN7WG GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "ADMIN7WG GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 17,
+   "body_sha256": "6d8bee8bada36a121d48cb57f3fb2739efdff9046cc30610b196a08bf4464b24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 14,
+   "body_sha256": "0a84feaedf4229b1d4570fd643645ca8f43c7bfcc15fe930805efa7285bb9f77",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/export": {
+   "body_len": 3608,
+   "body_sha256": "edfacaf4de246967b925a62a5e981d57896b2518e6889dc47ccada0cfe33777c",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 125,
+   "body_sha256": "8e8d75486aa8954190312244f6a7e009ed4b1c1df898d30f798282ddfb4e966a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 30729,
+   "body_sha256": "c6bb2adfd70c34cfa50d783827e30d3ffc02659d337b0f225b192d43ac9df8e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMIN7WG GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMIN7WG GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMIN7WG GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/learning-hub/validation": {
+   "body_len": 45,
+   "body_sha256": "5da1de42c06f7daad337270e5185e534082b9afdd58f3655154484d0e6241a24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /facilitators/import/template.csv": {
+   "body_len": 113,
+   "body_sha256": "844c4b9a74d324452f3253473acea990aed9384662255a143ba4b4503bc3fed4",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "ADMINNATIONAL GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 17,
+   "body_sha256": "6d8bee8bada36a121d48cb57f3fb2739efdff9046cc30610b196a08bf4464b24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 14,
+   "body_sha256": "0a84feaedf4229b1d4570fd643645ca8f43c7bfcc15fe930805efa7285bb9f77",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/export": {
+   "body_len": 3613,
+   "body_sha256": "06982e5550f97f1046a5d0870cc8c9fd09d10889813699bf0f03b3894a798d0d",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 125,
+   "body_sha256": "8e8d75486aa8954190312244f6a7e009ed4b1c1df898d30f798282ddfb4e966a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 30729,
+   "body_sha256": "c6bb2adfd70c34cfa50d783827e30d3ffc02659d337b0f225b192d43ac9df8e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "ADMINNATIONAL GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/learning-hub/validation": {
+   "body_len": 135,
+   "body_sha256": "64643066861219fd24e8bf55e8e19170285e40138bed5dc803c5fe16c220d315",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /facilitators/import/template.csv": {
+   "body_len": 101,
+   "body_sha256": "0d989ca00a39559dd0662b2f9dad8dde04dace2e8a03e094f7494d0eb1a38f68",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "AUDITOR2026 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/export": {
+   "body_len": 3613,
+   "body_sha256": "06982e5550f97f1046a5d0870cc8c9fd09d10889813699bf0f03b3894a798d0d",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 159,
+   "body_sha256": "ff1b704a92e87193e4049e678dcc2c76f3ca23b13ec7c1971a79bcb452355237",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "AUDITOR2026 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "AUDITOR2026 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/learning-hub/validation": {
+   "body_len": 135,
+   "body_sha256": "64643066861219fd24e8bf55e8e19170285e40138bed5dc803c5fe16c220d315",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /facilitators/import/template.csv": {
+   "body_len": 101,
+   "body_sha256": "0d989ca00a39559dd0662b2f9dad8dde04dace2e8a03e094f7494d0eb1a38f68",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "NATIONAL2026 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/export": {
+   "body_len": 3613,
+   "body_sha256": "06982e5550f97f1046a5d0870cc8c9fd09d10889813699bf0f03b3894a798d0d",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 146,
+   "body_sha256": "bfc8bedd9afa0e602211c1782d3e2b53daa035117183739c3d1aee5d10d1507f",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 159,
+   "body_sha256": "ff1b704a92e87193e4049e678dcc2c76f3ca23b13ec7c1971a79bcb452355237",
+   "content_type": "application/json",
+   "status": 403
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "NATIONAL2026 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "NATIONAL2026 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /activities": {
+   "body_len": 589,
+   "body_sha256": "79a4ca2fcd6a22a653744a364d060d25e0fd37cd9a85bb10cbf9d3d42757b873",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /activities/faq": {
+   "body_len": 27,
+   "body_sha256": "09cfbcd513bcbea4a9bdf42cdb7c9907eedfd35c3d52e5fce1ef6003536ad1a8",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /activities/getting-help": {
+   "body_len": 32,
+   "body_sha256": "9442499b01d60043dcfaaf06d8021bd684ebb117d72f0faa56226f8b246e6996",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /activities/{aid}": {
+   "body_len": 622,
+   "body_sha256": "57188e0ac7f18316693ef44118d8bf629253bf62904af4c09355cf8ae64b1a71",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /activity-type-tags": {
+   "body_len": 747,
+   "body_sha256": "8e066b0aceb98852c4f5fcdc903a52e08eab7aa25b18e37ced80e8e6f654039b",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /cadets": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /cadets/risk": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /cadets/{cadet_id}/class-memberships": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /cadets/{cadet_id}/training-record": {
+   "body_len": 3242,
+   "body_sha256": "52d82b2ed422c6cd22e05a989887e89122f04175a83042a0536763be008b5d9c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum": {
+   "body_len": 6695,
+   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum-items/{item_id}/previous-deliveries": {
+   "body_len": 605,
+   "body_sha256": "68a107ba7e277aa8c2035202ab6c31420f96d5da7841ce49c2d050b4e0deb110",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/class-matrix": {
+   "body_len": 638,
+   "body_sha256": "da1df44552dcf243953d664e1172959ab4d3e48de40ba1ecdba0d3285b58b2ac",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/elements": {
+   "body_len": 1158,
+   "body_sha256": "76d84b4dc36957a91407e9271cdde7f87bd83c7fc74367b3ea02c777bfd2d97a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "594c1c4a4a75649375cd5c04d44f7603c92e797ed5431a7689e22ae16c7f21be",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/learning-hub/validation": {
+   "body_len": 45,
+   "body_sha256": "5da1de42c06f7daad337270e5185e534082b9afdd58f3655154484d0e6241a24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/phases": {
+   "body_len": 1405,
+   "body_sha256": "8385fddf65fe01bf741a6c2aa3610ed995466549eb0b0ba58dcf2108d5159bbc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/phases/{stage_id}/class-progress": {
+   "body_len": 233,
+   "body_sha256": "59938358e143a651d086bc68f386a76ece7df12d16ac16315391c9ce5d431953",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /curriculum/{cid}/sessions": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /equipment": {
+   "body_len": 144,
+   "body_sha256": "3800caa24ebcc85ade8393152fde248ceebe686e27f35ebecb0796d05a58d86c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /facilitator-type-tags": {
+   "body_len": 1221,
+   "body_sha256": "e1ee561c8ab03abd1e51aa578c1a5dd8564e3e3b6d22976958719e4171e7be23",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /facilitators": {
+   "body_len": 1011,
+   "body_sha256": "6ef1828d591fdbde2fda9b15fec332b716f4ef82280a84ab1df8f74dff96dd29",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /facilitators/import/template.csv": {
+   "body_len": 113,
+   "body_sha256": "844c4b9a74d324452f3253473acea990aed9384662255a143ba4b4503bc3fed4",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /facilitators/ranks": {
+   "body_len": 1397,
+   "body_sha256": "20f2224f1780f9795e1f37ec989a0a81c68b37b7c17bc039a40d0247dec119ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /facilitators/{fid}/stats": {
+   "body_len": 11243,
+   "body_sha256": "f37a85896ec2292b564ec41cf2ebc3a96b30e2db698c7e1ee97241e68315155c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-night-templates": {
+   "body_len": 40,
+   "body_sha256": "c343b1202756b889bc6726380e8407d84db1e80da98874a35a81e9a1cddde556",
+   "content_type": "application/json",
+   "status": 400
+  },
+  "SYSADMIN2026 GET /parade-night-templates/{tid}": {
+   "body_len": 4671,
+   "body_sha256": "2784c748406df12e0615c9e3145cf02bad447c220352d98c91e244b4142d9c61",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights": {
+   "body_len": 73714,
+   "body_sha256": "36c5d400d9b1b97e86eace4dc378af0bf373564c8764fbfca2ed527092d67402",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights/{night_id}/template-impact": {
+   "body_len": 91,
+   "body_sha256": "6e691fff7c6f29f34d4e0645ac43d5bc438582ac2210de34a57cd8669b914a5d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights/{pnid}": {
+   "body_len": 29536,
+   "body_sha256": "dac2319ecd4c4f9f61a8476f837cca314e30bd56cc051fea58074a8cf3ae2dc3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights/{pnid}/builder": {
+   "body_len": 24005,
+   "body_sha256": "f2d67490d4f549dc31de881a00b7463a52034059d889faa87cf3a292df9ea317",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights/{pnid}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /parade-nights/{pnid}/planner": {
+   "body_len": 26430,
+   "body_sha256": "cb8ef468cdd0d42e312f6527d6522da7d59d491c5066715463c62f6360a16c8c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/anchors/{anchor_id}/prep-suggestions": {
+   "body_len": 341,
+   "body_sha256": "f25ae224b0dbf4467b7110c05a2433bc3d71693fe0a2daf812fd252939e29252",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/class-forecasts": {
+   "body_len": 1928,
+   "body_sha256": "26e5b21bf49d2b03fa0ab4adcb7b5bbddb36cedd973ba35e32deacdf14bfd9e5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/command-centre": {
+   "body_len": 2381,
+   "body_sha256": "098929aea3f711deb87472e8a750379d4c55ea2784f0c96064d46625f511b1ca",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/facilitators": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/facilitators/{fac_id}/leave": {
+   "body_len": 12,
+   "body_sha256": "a5e0933ff3d334f9c9cd85d250327ec465389d322f76d87f666cbad17cf8e3b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/locations": {
+   "body_len": 673,
+   "body_sha256": "98809ccdc10fdf73edbca812a1f24d16c55c1d98c267a0242410afd577628b0c",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/parade-dates/{date_id}/archived-sessions": {
+   "body_len": 15,
+   "body_sha256": "a1179f88a4a67a27ff6c7922fd583ba4fc86888f4882350e58bb15d0158adb76",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/parade-dates/{date_id}/builder": {
+   "body_len": 16260,
+   "body_sha256": "193549f4e4c9f298bbd4fc4504963fe229c831a56ac9da88c80028397bd697c2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/parade-dates/{date_id}/weekly-program": {
+   "body_len": 15608,
+   "body_sha256": "d0b1bc840a210573197a334ae86b81f7249abd0fb31eaf7441927c91476e44f2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/parade-dates/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/parade-nights/{night_id}/notices": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/prep-rules": {
+   "body_len": 1697,
+   "body_sha256": "9c5b012ddc88e3df9e62ffb56b5cda4e089b179e9909331c3799000a59a823e9",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/sessions/{session_id}": {
+   "body_len": 876,
+   "body_sha256": "4f809f486f426b9a80c2a69cbf00ef5385c51ce92548a94a586adc2fa0b25e0a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/year-context": {
+   "body_len": 198,
+   "body_sha256": "33ab5b6fbf7c7ab146c77cb7a2959679f79e32356c025d2f7418bc10fc130e99",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years": {
+   "body_len": 474,
+   "body_sha256": "4735849eef734d7058ed29f46d6e9bb6c52d6ca776a1bd2ecc9cd4aa0bde6b82",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}": {
+   "body_len": 467,
+   "body_sha256": "84940018b2cfa88ef5469951327d074ba3bfea6e95f571885a122383ac145301",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/anchors": {
+   "body_len": 3951,
+   "body_sha256": "3d20d12b0429de7650c69879276f966723f13e13b0d56b66a03521ecb07da68d",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/annual-program": {
+   "body_len": 43365,
+   "body_sha256": "9453e960a34a7b4ef6bbb1a74341697df15a39e81c5d25250963775aca86bfc4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/cea/activities": {
+   "body_len": 17,
+   "body_sha256": "6d8bee8bada36a121d48cb57f3fb2739efdff9046cc30610b196a08bf4464b24",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/cea/batches": {
+   "body_len": 14,
+   "body_sha256": "0a84feaedf4229b1d4570fd643645ca8f43c7bfcc15fe930805efa7285bb9f77",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/conflicts": {
+   "body_len": 16,
+   "body_sha256": "424d51165edd7dcd4dcc396d2efab3b1168fe1ba1ad88fea91124cad18d4e908",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/decision-guide": {
+   "body_len": 433,
+   "body_sha256": "8a2d0fbe768bed1c4259768ca0a0b67a2c8b1666591b0ec369e0c5a0d56dbdc7",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/export": {
+   "body_len": 3613,
+   "body_sha256": "06982e5550f97f1046a5d0870cc8c9fd09d10889813699bf0f03b3894a798d0d",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/export.xlsx": {
+   "body_len": 26,
+   "body_sha256": "b1fd618132befbb9c0fa6847793b9a066f5b17444df3d01fe2e43699f8c1eb08",
+   "content_type": "application/json",
+   "status": 500
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/facilitators/{fac_id}/workload": {
+   "body_len": 125,
+   "body_sha256": "8e8d75486aa8954190312244f6a7e009ed4b1c1df898d30f798282ddfb4e966a",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/holidays": {
+   "body_len": 2535,
+   "body_sha256": "fedc2bb0fbbf7c6039c144cdf2e0f904bebcd34c1501805d11722b1e43464d84",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/long-range": {
+   "body_len": 6589,
+   "body_sha256": "7a0d7fab4550974ac2a4de4069abcf1952bbcd518fe2245151d61d246ebdb7d1",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/missions": {
+   "body_len": 29242,
+   "body_sha256": "9fe4d35132f811e3c59aad6b7e51226612e835f1d5e9767969bd29b919e1c3cf",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/night-summaries": {
+   "body_len": 30729,
+   "body_sha256": "c6bb2adfd70c34cfa50d783827e30d3ffc02659d337b0f225b192d43ac9df8e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/parade-dates": {
+   "body_len": 14702,
+   "body_sha256": "1c71d725b9647ca9735a8c4300b90383c81a04376f7a9bc1861e6678cef5f854",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/plan-review": {
+   "body_len": 64144,
+   "body_sha256": "4e905fe7d192623278b797869fc7ccbff339181c72412dd25844d1b12cf26af5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/schedule/export.xlsx": {
+   "body_len": 808,
+   "body_sha256": "f190a520822a77ba2a0fcc3edf39d185040de04f725854c6dc92dd19bbd2d5c3",
+   "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /planning/years/{year_id}/term-planner": {
+   "body_len": 54520,
+   "body_sha256": "a4566702e7f061352d09b048e0965acbfc06e6335788c7ee7d2b15f2a0ffd6a2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /resources/clashes": {
+   "body_len": 34,
+   "body_sha256": "10e924f840259fa46719cd958fb240c0e74c862d815c91dd4cd9c5bea45082f5",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /session-status-reason-tags": {
+   "body_len": 2653,
+   "body_sha256": "f096d3a3442acc8452cbc858d54a58da0c52b071b45a77cbafa443595ec343e4",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /sessions/needs-attention": {
+   "body_len": 7712,
+   "body_sha256": "ff6454df1de7d69a8e3847e6dbfaa914ef1ce04a05da925c1bdfba849fd37dab",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /sessions/{session_id}/history": {
+   "body_len": 392,
+   "body_sha256": "8c0d33caf51c2e7a21f1d37a9b88eb934c28c402f904bd8694e94fe3be15901f",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /sessions/{sid}/audience": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /sessions/{sid}/facilitator-suggestions": {
+   "body_len": 1391,
+   "body_sha256": "9c79c86c9a99873ec2e89f94b4d3c7df9209c43e7adb79a241ce3e684ce9febc",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /sessions/{sid}/status-history": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /subject-area-tags": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-area-capability-tags": {
+   "body_len": 2031,
+   "body_sha256": "5245cc021fc97188689332414f143189c539c66cc5ffc54ae2148f8afffad103",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-areas": {
+   "body_len": 545,
+   "body_sha256": "d6a85607d670e86236e3d3a657121f0b37dacd220ff1b812758a59123b24ccf2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-classes": {
+   "body_len": 1843,
+   "body_sha256": "0f1b489c1ef63bf01496f2c2dc525d070d896d926f4f9d7d09601f349494e4ff",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-classes/{cid}/curriculum-progress": {
+   "body_len": 217,
+   "body_sha256": "41ca55bafc87d1015d3fc3f2a49fc121ee29cd64f131c4a92830cb6fad6520b3",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-classes/{cid}/members": {
+   "body_len": 2,
+   "body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-classes/{class_id}/roster": {
+   "body_len": 97,
+   "body_sha256": "a38478d75574229270d255cf9ac268fdbf6eda17acc86cc56b9310a8ea0986df",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-records": {
+   "body_len": 1899,
+   "body_sha256": "18bde04d8dbbf53100f7235dae0cc53ce29f0c8b3fbf3faa35b4f662925123b2",
+   "content_type": "application/json",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training-records/export": {
+   "body_len": 121,
+   "body_sha256": "9327d169474d5822df51787e44e4a2ee6b344e049f4972ede05b18f729c0a139",
+   "content_type": "text/csv; charset=utf-8",
+   "status": 200
+  },
+  "SYSADMIN2026 GET /training/sessions/{session_id}": {
+   "body_len": 1414,
+   "body_sha256": "654918dc6e66b24e8d41adb9ae66a7d97f17ce90aa5079083440ae329aa8939f",
+   "content_type": "application/json",
+   "status": 200
+  }
+ }
+}
