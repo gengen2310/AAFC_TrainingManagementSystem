@@ -322,10 +322,13 @@ async function loadCustomPhases(){
       return '<div class="cp-row">'
         +'<div class="yn-year-body"><div class="cp-name">'+esc(ph.name)+'</div>'
         +'<div class="cp-range">'+esc(range)+'</div></div>'
-        +'<div class="cp-acts">'
+        // Only where the server would accept it (can_edit is the same rule as
+        // PATCH/DELETE): a Squadron Admin sees Wing and national phases too.
+        +(ph.can_edit?'<div class="cp-acts">'
         +'<button class="btn btn-xs btn-out admin-el" onclick="cpOpenEdit('+jsq(ph.custom_phase_id)+','+jsq(ph.name)+','+jsq(ph.applies_from||'')+','+jsq(ph.applies_to||'')+')">Edit</button>'
         +'<button class="btn btn-xs btn-red admin-el" onclick="cpDelete('+jsq(ph.custom_phase_id)+','+jsq(ph.name)+')">Delete</button>'
-        +'</div></div>';
+        +'</div>':'')
+        +'</div>';
     }).join('')+'</div>';
   }catch(e){
     list.innerHTML=`<p style="color:var(--red);font-size:var(--fs-xs)">${esc(apiErr(e))}</p>`;

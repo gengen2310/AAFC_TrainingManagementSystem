@@ -90,7 +90,12 @@ class CustomPhaseUpdateIn(BaseModel):
 
 @router.get("/custom-training-phases")
 def list_custom_phases(db=Depends(get_db), p: Principal = Depends(get_principal)):
-    return [_phase_dict(ph) for ph in _visible_phases(db, p)]
+    """Visible phases, each with can_edit: whether this caller may rename or
+    delete it (the same rule PATCH/DELETE enforce), so the UI offers only
+    actions the server will accept."""
+    own_national_id = resolve_national_id(db, p)
+    return [{**_phase_dict(ph), "can_edit": _can_mutate(db, p, ph, own_national_id)}
+            for ph in _visible_phases(db, p)]
 
 
 @router.post("/custom-training-phases")
@@ -143,17 +148,22 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
     return _phase_dict(ph)
 
 
-def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
-    """Ownership guard shared by update and delete; the rule itself is
-    permissions.may_mutate_custom_phase. This only resolves the national ids it
-    needs: the caller's, and for a Wing phase the Wing's."""
+def _can_mutate(db, p: Principal, ph: CustomTrainingPhase, own_national_id: str | None) -> bool:
+    """permissions.may_mutate_custom_phase, with the Wing's national resolved
+    for a Wing phase. own_national_id is resolve_national_id(db, p), passed in
+    so a list resolves it once."""
     wing_national_id = None
     if ph.scope_type == "wing" and ph.scope_id:
         wing = db.get(Wing, ph.scope_id)
         wing_national_id = wing.national_id if wing else None
-    if not may_mutate_custom_phase(p, ph.scope_type, ph.scope_id,
-                                   own_national_id=resolve_national_id(db, p),
-                                   phase_wing_national_id=wing_national_id):
+    return may_mutate_custom_phase(p, ph.scope_type, ph.scope_id,
+                                   own_national_id=own_national_id,
+                                   phase_wing_national_id=wing_national_id)
+
+
+def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
+    """Ownership guard shared by update and delete."""
+    if not _can_mutate(db, p, ph, resolve_national_id(db, p)):
         raise HTTPException(403, detail={"error": "insufficient_scope"})
 
 

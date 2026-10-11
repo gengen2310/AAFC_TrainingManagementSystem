@@ -143,3 +143,15 @@ def test_delete_follows_phase_ownership(client, phases, code, key):
         assert r.status_code == 403, f"{code} deleted {key}: {r.status_code} {r.text}"
         assert not deleted
         assert _audit_rows(pid, "delete") == 0
+
+
+@pytest.mark.parametrize("code", list(ALLOWED))
+def test_list_reports_can_edit_from_the_same_rule(client, phases, code):
+    """The Main TMS shows Edit/Delete only where the server would allow it:
+    GET carries can_edit, computed by the same predicate as PATCH/DELETE."""
+    r = client.get("/api/custom-training-phases", headers=login(client, code))
+    assert r.status_code == 200, r.text
+    by_id = {ph["custom_phase_id"]: ph for ph in r.json()}
+    for key, pid in phases.items():
+        if pid in by_id:
+            assert by_id[pid]["can_edit"] is (key in ALLOWED[code]), (code, key)
