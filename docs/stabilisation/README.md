@@ -122,9 +122,22 @@ facilitators,adoption}.py`; all 75 dashboard responses byte-identical before
 and after; boundary test keeps HTTP/authorization out of them).
 `planning.py` 6,429 -> 6,289 (parade-date rule -> `services_parade_dates.py`).
 
-Not done: `training.py` (8,128 lines) is essentially unchanged. Next: pure computation and query seams in
-`training.py`, `planning.py`, `dashboard.py` (conflict detection,
-coverage/readiness, scope filters, aggregation, import validation). Do not
+C5 (2026-10-11): 53 module-level helpers moved verbatim out of `training.py`
+8,088 -> **7,542** and `planning.py` 6,280 -> **5,746** into
+`services_training_{conflicts,serialisers,reference_tags,activities,imports}.py`
+and `services_planning_{conflicts,serialisers,io}.py`. Parity: every GET route
+on both routers x 8 principals (656 responses) matches a snapshot taken on the
+base commit (`test_training_planning_extraction_parity.py`, fresh seed in a
+subprocess, seeded uuid4 + frozen clock). Boundary:
+`test_training_planning_services_boundary.py`. Ratchet: the guard now caps both
+routers' line counts (`router_max_lines`). Left in the routers on purpose:
+helpers that raise HTTPException or take scope decisions, write helpers
+(audience/assistant/snapshot/link writes), and anything typed on a router
+request model.
+
+Not done: the remaining bulk of `training.py`/`planning.py` is route-handler
+bodies; thinning further means extracting logic from inside handlers
+(coverage/readiness, aggregation, import validation), which is not a pure move. Do not
 move HTTP models and business logic at the same time. Organise by domain, not a
 `services.py` dumping ground.
 

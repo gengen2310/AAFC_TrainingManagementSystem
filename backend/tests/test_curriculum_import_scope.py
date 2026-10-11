@@ -84,7 +84,7 @@ def test_squadron_scoped_import_does_not_crash_on_facilitator_prefetch(client):
 
 def test_facilitator_name_index_uses_real_name_fields_and_skips_ambiguous_names():
     from types import SimpleNamespace as F
-    from app.routers.training import _facilitator_name_index
+    from app.services_training_imports import _facilitator_name_index
     a = F(id="a", current_rank="FLTLT", first_name="Sam", last_name="Lee")
     b = F(id="b", current_rank=None, first_name="Kim", last_name="Ng")
     c = F(id="c", current_rank="CPL", first_name="Kim", last_name="Ng")   # same first+last as b

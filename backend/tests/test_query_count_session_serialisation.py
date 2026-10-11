@@ -85,7 +85,7 @@ def test_batched_context_serialises_every_session_identically(client):
     """The batched path must produce exactly the per-session path's output."""
     from app.database import SessionLocal
     from app.models import ParadeNight, Session as TrainingSession
-    from app.routers.planning import _real_session_out, _session_out_context
+    from app.services_planning_serialisers import _real_session_out, _session_out_context
     h = login(client, "ADMIN703")
     facs = _facs(client, h, 3)
     y = _year_with_sessions(client, h, nights=3, per_night=2, facs=facs)
