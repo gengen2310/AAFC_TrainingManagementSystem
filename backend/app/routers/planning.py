@@ -55,7 +55,7 @@ from ..permissions import (Principal, resolve_view_squadron_id,
                            require_role, require_write_role,
                            require_can_write_squadron, require_can_view_squadron)
 from ..services import audit
-from ..services import (visible_curriculum_item, scoped_facilitator,
+from ..services import (resolve_national_id, visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
 from ..services_parade_dates import ParadeDateRuleError, classify_parade_dates
 from ..services_year import (
@@ -4250,7 +4250,7 @@ def export_annual_program_xlsx(
         # Location column stays so the sheet layout is unchanged.
         ws3.append([_neutralise_cell(a.event_name), a.start_date, a.end_date or "",
                     a.event_type or "", a.importance_level or "",
-                    _neutralise_cell(a.location or ""), _neutralise_cell(a.description or "")])
+                    "", _neutralise_cell(a.notes or "")])
 
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     audit(db, p, object_type="export", object_id=year_id, action="export",
