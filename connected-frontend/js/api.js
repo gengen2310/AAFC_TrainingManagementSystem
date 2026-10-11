@@ -73,6 +73,8 @@ async function api(path, opts={}){
   // Auto-serialize plain JS objects so callers don't need to JSON.stringify manually.
   // Strings (already serialised), FormData, Blob, URLSearchParams pass through unchanged.
   let fetchOpts={...opts,headers,credentials:'include'};
+  // returnHeaders is an api() option, not a fetch() one.
+  delete fetchOpts.returnHeaders;
   if(fetchOpts.body!==undefined&&fetchOpts.body!==null
      &&typeof fetchOpts.body==='object'
      &&!(fetchOpts.body instanceof FormData)
@@ -222,7 +224,9 @@ async function api(path, opts={}){
   }
   // Successful response — maintenance mode has ended; hide the banner.
   _hideMaintenanceBanner();
-  return body;
+  // Paged lists report their total in a header (e.g. X-Total-Count); callers
+  // that need it opt in, everyone else keeps receiving the body alone.
+  return opts.returnHeaders ? {body, headers: res.headers} : body;
 }
 function apiErr(e){
   if(!e) return 'Something went wrong.';
