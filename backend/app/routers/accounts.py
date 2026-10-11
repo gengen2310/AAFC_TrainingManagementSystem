@@ -25,7 +25,7 @@ Security invariants enforced here:
   • Flight assignment never grants or restricts permissions — it is display-only.
   • Viewers and auditors are read-only (no create / update / reset / disable).
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 from sqlalchemy.exc import IntegrityError
@@ -298,11 +298,25 @@ class FlightUpdateIn(BaseModel):
 # Account endpoints
 # ─────────────────────────────────────────────
 
+# GET /accounts optional page size cap (see list_accounts).
+ACCOUNT_PAGE_MAX = 500
+
+
 @router.get("/accounts")
-def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
-                  flight_id: str | None = None, role: str | None = None,
+def list_accounts(response: Response,
+                  wing_id: str | None = None, squadron_id: str | None = None,
+                  flight_id: str | None = None,
+                  role: list[str] | None = Query(default=None),
                   active_status: bool | None = None, include_archived: bool = False,
+                  limit: int | None = Query(default=None, ge=1, le=ACCOUNT_PAGE_MAX),
+                  offset: int = Query(default=0, ge=0),
                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Accounts in the caller's scope, ordered by display name then id.
+
+    The default is the full scoped list: the Main TMS Accounts page filters and
+    batch-edits it in memory (docs/stabilisation/bounded-responses.md). Callers
+    that can page pass `limit`/`offset`; `X-Total-Count` always carries the
+    filtered total. `role` may repeat (e.g. the Service Desk's assignees)."""
     if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     q = db.query(User)
@@ -328,11 +342,15 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
     if flight_id:
         q = q.filter(User.flight_id == flight_id)
     if role:
-        q = q.filter(User.role == role)
+        q = q.filter(User.role.in_(role))
     if active_status is not None:
         q = q.filter(User.active_status == active_status)
 
-    users = q.order_by(User.display_name).all()
+    response.headers["X-Total-Count"] = str(q.order_by(None).count())
+    q = q.order_by(User.display_name, User.id)
+    if limit is not None:
+        q = q.limit(limit).offset(offset)
+    users = q.all()
     ctx = _accounts_context(db, users)
     return [_account_out(u, db, ctx) for u in users]
 

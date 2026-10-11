@@ -275,7 +275,9 @@ async function loadServiceDesk() {
     const canAssign = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
     const [, accounts] = await Promise.all([
       sdReloadList(),
-      canAssign ? api('/api/accounts') : Promise.resolve([]),
+      // Only the eligible assignees, not every account in scope.
+      canAssign ? api('/api/accounts?role=system_admin&role=national_admin&role=wing_admin&active_status=true')
+                : Promise.resolve([]),
     ]);
     _sdAssignableAccounts = (accounts||[]).filter(a =>
       a.active_status && !a.is_archived &&
