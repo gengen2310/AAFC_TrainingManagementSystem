@@ -88,6 +88,25 @@ greps cover the directory, so they still apply.
   is a redesign-sized risk, and `frontend/node_modules` in this worktree is shared
   with the owner's checkout.
 
+## 2026-10-11 security closure (D10–D14 and the coverage map)
+
+A read-only coverage map of nine security behaviours (lockout, session
+revocation, recovery routing/expiry/replay/rate limit, Service Desk mail,
+cross-worker rate limiting, first System Admin bootstrap, CSRF, audit
+immutability, config redaction) was produced and every suspected defect
+was re-checked by reading the code and, where possible, reproducing it.
+
+| ID | Finding | Verified how | Disposition |
+|---|---|---|---|
+| D10 | Custom-phase mutation ignored ownership across Wings/nationals | 32/112 matrix cases failed | **Fixed** (`permissions.may_mutate_custom_phase`) |
+| D11 | Stored XSS: `esc()` used for JavaScript-in-attribute contexts | payload executed in 3/3 browsers | **Fixed** (`jsq()`, 79 sites, static ratchet) |
+| D13 | CSRF: cookie-only (SameSite=None) state-changing requests accepted from any origin | cookie-only `POST /accounts/{uid}/disable` with `Origin: https://evil.example` returned `{"ok":true}` | **Fixed**: `cookie_write_origin_check` middleware — cookie-authenticated POST/PUT/PATCH/DELETE must carry an allowed Origin/Referer; Bearer and pre-auth routes exempt (`test_cookie_write_origin_check.py`) |
+| D14 | DB API limiters lost increments under concurrency; first-insert race could 500 | 16 threads × 25 requests recorded 25–36 | **Fixed**: atomic windowed UPDATE (`security._atomic_window_hit`), `test_rate_limiting_concurrency.py` (240 → 24/21 before, 240 after) |
+| S-A | Lockout: a successful login clears the per-IP counter; `_scoped_fallback_scan` tests one guess against every same-role account but increments only the primary's counter; `/lookup` + 5 wrong codes locks any named admin for 24 h | code reading (auth.py:184–303, security.py:158) | **Owner decision (security policy)** — not changed: the per-account 24 h lock still bounds each account to 5 guesses; changing lockout semantics alters every user's login experience. Recorded in the risk register with options (do not reset IP counter on success; count the scan's guess against every candidate; CAPTCHA-free throttling on `/lookup`) |
+| S-B | Forgot-code timing reveals eligible accounts (synchronous SMTP) | code reading (auth.py:564 vs :582) | **Accepted for release, low**: requires measuring a 20-min-token flow per address under a 5/IP/h + 3/address/h limit; fix = send after responding (needs token-rollback redesign). Risk register |
+| S-D | `staging_seed` recreates a System Admin from `STAGING_BOOTSTRAP_SYSADMIN_CODE` whenever none exists, without an audit row | code reading (seeds/staging_seed.py:32–91) | **Hardening** queued (audit row + docs: unset the variable after first boot); requires every System Admin to have been hard-deleted first |
+| S-E | Weak tests: recovery JWT replay, recovery recipient, 6th forgot-code request, SMTP failure paths, audit PATCH/PUT absence, overview/migrations redaction | coverage map | Tests being added (Phase 2); any failure becomes a D-number |
+
 ## Not yet run (Phase 5)
 
 `security-review` skill over the full branch diff (after C3/C4/C6 integrate).
