@@ -79,3 +79,24 @@ The result will be one integration branch, one final PR to main, and an evidence
 - `alembic heads` = 1; up/down on SQLite + PG.
 - Restore workflow run ID green on the final SHA. Staging deploy gates all pass with the deployed SHA verified on all 3 services. Staging load/drill numbers recorded.
 - Final PR checks green on the exact SHA. The adversarial reviewer's findings are all dispositioned before RELEASE_DECISION.md is written.
+
+## Continuation approved 2026-10-11
+
+The full mission brief (security closure, workflow completion, national-scale staging,
+DR, clean-clone handover, adversarial review) was provided and approved as a
+continuation of this plan, on this branch, not a new programme. Changes to the plan above:
+
+- **D10 (P1 security)** added: `custom_phases._require_can_mutate` cross-Wing mutation, fixed
+  first (TDD), gate moved into `permissions.py`.
+- **C8** is resumed from the orphaned worktree branch `wt/c8-paging`. `/api/accounts` keeps its
+  full-list default (documented in `bounded-responses.md`), gains opt-in paging, and the Service
+  Desk no longer downloads every account to build its assignee list.
+- **C5** scope cap: cohesive helper extraction only; a per-resource router split is a
+  documented follow-up (needs route-order parity).
+- **C10/C12 acceptance thresholds, fixed before any run:** error rate < 1% with 0 unexpected
+  5xx; read p95 < 2 s; write/import p95 < 3 s at 50/100/250 users (stricter documented
+  values in `docs/stabilisation/national-qualification.md` win).
+- Claude-in-Chrome checks fall back to Playwright screenshots when the extension is not
+  connected (it was not on 2026-10-11).
+- Expected outcome: engineering gates closable; GO additionally needs the owner's merge,
+  UAT, data-governance, key-custody and known-limitation sign-offs.

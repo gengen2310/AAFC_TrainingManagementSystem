@@ -4,8 +4,9 @@ Acceptance basis (user decision 2026-10-09): issue #70 exit criteria + the
 `beta-release` gates. "Sections 1–19" were never provided, so GO/NO-GO is scoped
 to these criteria only. States: NOT STARTED | IN PROGRESS | BLOCKED | VERIFIED | COMPLETE.
 
-Checkpoint: branch `release/production-readiness-20261009`, last updated with the
-commit that adds this file. Base `56ac1af` (#72) ← `34b1d4b` (#71) ← `f8a5dca` (#69).
+Checkpoint: branch `release/production-readiness-20261009`. **Reconciled 2026-10-11**
+against git (rows C3/C4/C6 were stale at NOT STARTED although merged on 10-09;
+C8 work found unpushed in an orphaned worktree and pushed as `wt/c8-paging`). Base `56ac1af` (#72) ← `34b1d4b` (#71) ← `f8a5dca` (#69).
 
 | ID | Workstream | Pri | Owner | Depends | State | Commits | Evidence / next |
 |---|---|---|---|---|---|---|---|
@@ -16,11 +17,12 @@ commit that adds this file. Base `56ac1af` (#72) ← `34b1d4b` (#71) ← `f8a5dc
 | H1 | conftest double load | P2 | lead | — | VERIFIED | 7f414b3 | DEFECT_REGISTER |
 | D6/C11 | Restore vs prod lag; verified restore | P0 | lead | merge | VERIFIED on branch | (on #69) 4473f0d a98f7ae | runs 37909713246, 37910351762; `main` scheduled pass pending merge |
 | D7, D9 | Restore-test reporting/proof gaps | P2/P3 | lead | — | VERIFIED | 4473f0d, a98f7ae | MIGRATION_EVIDENCE |
-| C3 | Router authz → permissions.py | P1 | subagent (worktree A) | — | NOT STARTED | | |
-| C4 | One scope source of truth | P1 | subagent (worktree A) | C3 | NOT STARTED | | |
-| C8 | Bound Service Desk tickets / accounts lists | P2 | lead | C4 | NOT STARTED | | |
+| C3 | Router authz → permissions.py | P1 | subagent (worktree A) | — | VERIFIED (pending P6) | merge `4cf62d7` | 43→7 direct role checks; `test_moved_role_gates.py`; remaining 7 classified in `role-check-classification.md` |
+| C4 | One scope source of truth | P1 | subagent (worktree A) | C3 | VERIFIED (pending P6) | merge `4cf62d7` | inline scope 71→11; `test_scope_parity.py` 1344/1344 identical (14 principals incl. 2nd Wing, proxy, intervention) |
+| C8 | Bound Service Desk tickets / accounts lists | P2 | lead | C4 | IN PROGRESS | branch `wt/c8-paging` (35a52b4…39c219d) | tickets always paged + summary + Main TMS Load more (3-browser spec passes locally); accounts opt-in paging + assignee role filter; merge after review |
 | C5 | training.py / planning.py seams | P1 | subagent (worktree B) | C4 (planning.py) | NOT STARTED | | |
-| C6/C7 | Main TMS off the monolith | P1 | subagent (worktree C) | — | NOT STARTED | | |
+| C6/C7 | Main TMS off the monolith | P1 | subagent (worktree C) | — | IMPLEMENTED, verification pending | merge `b93bc12` | 28 `js/` modules; index.html 20,123→5,236 lines; `tools/architecture/frontend_parity.mjs`; 3-browser parity at final SHA pending |
+| D10 | Custom-phase cross-Wing mutation (security) | P1 | lead | — | IN PROGRESS | | DEFECT_REGISTER D10 |
 | C9 | N+1 evidence after C5 | P2 | lead | C5 | NOT STARTED | | |
 | C10/C12 | National scale + drills on staging | P1 | lead | staging deploy | NOT STARTED | | needs synthetic-only staging check |
 | C13 | Clean clone → deploy by another developer | P1 | subagent (docs only) | code done | NOT STARTED | | |
