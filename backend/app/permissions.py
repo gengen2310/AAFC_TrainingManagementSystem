@@ -147,6 +147,36 @@ def planning_year_outside_scope(p: "Principal", unit_id: str | None, wing_id: st
     return False
 
 
+def may_mutate_custom_phase(p: "Principal", scope_type: str, scope_id: str | None, *,
+                            own_national_id: str | None,
+                            phase_wing_national_id: str | None) -> bool:
+    """Rename/delete of a custom training phase, by who owns it (D10, 2026-10-11).
+
+    squadron: that Squadron's Squadron Admin. wing: that Wing's Wing Admin, or a
+    National Admin of the Wing's national. national: that national's National
+    Admin; a NULL scope_id (pre-v61) names no national, so none. system: any
+    National Admin. System Admin: every phase. Everyone else: refused.
+
+    The guard this replaces only constrained each role on its own scope type,
+    so a Squadron Admin could edit any Wing, national or system phase.
+    Callers resolve the two national ids (permissions.py stays DB-free)."""
+    if p.is_system_admin:
+        return True
+    if scope_type == "squadron":
+        return p.role == "sqn_admin" and scope_id is not None and scope_id == p.squadron_id
+    if scope_type == "wing":
+        if p.role == "wing_admin":
+            return scope_id is not None and scope_id == p.wing_id
+        return (p.role == "national_admin" and own_national_id is not None
+                and phase_wing_national_id == own_national_id)
+    if scope_type == "national":
+        return (p.role == "national_admin" and scope_id is not None
+                and scope_id == own_national_id)
+    if scope_type == "system":
+        return p.role == "national_admin"
+    return False
+
+
 def proxy_mode_for(p: "Principal", squadron_wing_id: str | None) -> str:
     """organisations.enter_proxy: the intervention mode this caller enters on
     a Squadron, or 403. Wing Admin -> "proxy", only inside their own Wing;

@@ -5,11 +5,11 @@ from sqlalchemy import or_, and_
 
 from ..database import get_db
 from ..dependencies import get_principal
-from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
 from ..permissions import is_national_admin, is_wing_writer  # noqa: E402
-from ..permissions import wing_admin_outside_own_wing  # noqa: E402
+from ..permissions import may_mutate_custom_phase  # noqa: E402
 from ..permissions import Principal, require_role
 from ..models.custom_phases import CustomTrainingPhase, CUSTOM_PHASE_SCOPE_TYPES
+from ..models.organisations import Wing
 from .. import services
 from ..services import resolve_national_id
 
@@ -144,26 +144,17 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
 
 
 def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
-    """Ownership guard shared by update and delete.
-
-    sqn_admin may only mutate their own squadron's phases; wing_admin only
-    their own wing's; national_admin only their own national's. system_admin
-    has full access. Wing and national admins cannot mutate squadron-scoped
-    phases at all (spec §5e).
-
-    A national-scoped phase with scope_id NULL predates v61 and belongs to no
-    identifiable national, so only system_admin may mutate it -- guessing an
-    owner would let one national edit another's reference data."""
-    if ph.scope_type == "squadron":
-        if sqn_admin_outside_own_squadron(p, ph.scope_id):
-            raise HTTPException(403, detail={"error": "insufficient_scope"})
-        if p.role in ("wing_admin", "national_admin"):
-            raise HTTPException(403, detail={"error": "insufficient_scope"})
-    if ph.scope_type == "wing" and wing_admin_outside_own_wing(p, ph.scope_id):
+    """Ownership guard shared by update and delete; the rule itself is
+    permissions.may_mutate_custom_phase. This only resolves the national ids it
+    needs: the caller's, and for a Wing phase the Wing's."""
+    wing_national_id = None
+    if ph.scope_type == "wing" and ph.scope_id:
+        wing = db.get(Wing, ph.scope_id)
+        wing_national_id = wing.national_id if wing else None
+    if not may_mutate_custom_phase(p, ph.scope_type, ph.scope_id,
+                                   own_national_id=resolve_national_id(db, p),
+                                   phase_wing_national_id=wing_national_id):
         raise HTTPException(403, detail={"error": "insufficient_scope"})
-    if ph.scope_type == "national" and p.role == "national_admin":
-        if ph.scope_id is None or ph.scope_id != resolve_national_id(db, p):
-            raise HTTPException(403, detail={"error": "insufficient_scope"})
 
 
 @router.patch("/custom-training-phases/{phase_id}")

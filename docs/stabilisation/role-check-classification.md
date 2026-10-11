@@ -32,7 +32,7 @@ centralised for appearance alone.
 | Router · function | n | Cat. | Why it stays |
 |---|---|---|---|
 | custom_phases · `create_custom_phase` | 1 | B | Pins `scope_id`: a Wing Admin is forced to their own Wing; a National/System Admin may name one. Data targeting, single use. |
-| custom_phases · `_require_can_mutate` | 2 | A | Pure gate, **left in place on purpose**: it has a cross-Wing defect (see "Open defect" below). Moving it to `permissions.py` unchanged would present a defective rule as reviewed policy; move it together with the fix. |
+| custom_phases · `_require_can_mutate` | 0 | — | **Moved 2026-10-11 with the D10 fix** to `permissions.may_mutate_custom_phase` (ownership by scope type; see "Fixed defect" below). The router only resolves the two national ids. |
 | planning · `create_planning_year` | 2 | B | Pins `unit_id` / `wing_id` to the creator's scope (Squadron Admin: own Squadron; Wing Admin: own Wing, and a named unit must be in it, via `wing_admin_outside_own_wing`). |
 | planning · `create_location` | 1 | B | Pins `unit_id` to the Squadron Admin's Squadron. |
 | training · `list_cadets` | 1 | C | `can_sensitive`: who sees sensitive cadet fields. Equals `WRITE_ROLES` today, but the concept is sensitive-data access, not "writer". Deliberately not rewritten. |
@@ -94,26 +94,22 @@ outside `ROLES` was unfiltered. The helpers give it the narrowest
 (own-Squadron) scope. Unreachable in practice (the API validates roles on
 account create and update); recorded because it is a change on paper.
 
-## Open defect (found 2026-10-09, not fixed here)
+## Fixed defect D10 (found 2026-10-09, fixed 2026-10-11)
 
-`custom_phases._require_can_mutate` constrains only `sqn_admin` on
+`custom_phases._require_can_mutate` constrained only `sqn_admin` on
 Squadron phases, `wing_admin` on Wing phases and `national_admin` on
-national phases. So a **Squadron Admin can rename any Wing's Wing-scoped
-phase** and any national or system phase, and a **Wing Admin any national
-or system phase** (rename observed; DELETE runs the same guard, by reading,
-not exercised). Seen in the parity snapshot: 703's
-Squadron Admin (7WG) renamed the second Wing's Wing phase (200), and the
-second Wing's Squadron Admin renamed 7WG's (200). The docstring says
-"sqn_admin may only mutate their own squadron's phases; wing_admin only
-their own wing's". Fixing it changes status codes, so it needs its own
-approved change with a regression test.
-
-ta access, not "writer". Deliberately **not** rewritten to `is_writer`. |
-| training · `list_faq` | 1 | C | Only a System Admin sees unpublished FAQ entries. |
-| training · `_can_create_element` / `_can_create_phase` | 5 | A/B | National-scope creation is System Admin only. Squadron scope requires an active proxy for Wing and national roles, plus the Squadron Admin's own-Squadron check. That check (`squadron_id and squadron_id != p.squadron_id`) **differs** from `sqn_admin_outside_own_squadron` because a missing `squadron_id` is allowed here, so it was not merged. |
-| training · `_visible_elements` / `_visible_phases` | 2 | B | A Wing Admin sees no Squadron-scope rows unless proxied. |
-| training · `_can_create_tag` | 2 | A/B | Same pattern as `_can_create_phase`. |
-| wing_calendar · `list_wing_events` | 1 | B | Non-national callers must name a Wing (400 `wing_id_required`). |
+national phases, so a Squadron Admin could rename or delete any Wing's,
+national or system phase, and a Wing Admin any national or system phase.
+Reproduced by `test_custom_phase_mutation_scope.py` (7 roles x 8 scope
+pairs x PATCH/DELETE): 32 of 112 cases failed before the fix, exactly those
+two families. The rule is now `permissions.may_mutate_custom_phase`:
+squadron -> that Squadron's Squadron Admin; wing -> that Wing's Wing Admin
+or a National Admin of the Wing's national; national -> that national's
+National Admin (never a pre-v61 NULL row); system -> any National Admin;
+System Admin -> all. Refusals write no audit row. One deliberate narrowing
+beyond the docstring: a National Admin may no longer edit another
+national's Wing phases (same rule as national phases since v61; the
+installation has one national, so no current user is affected).
 
 ## Checked and confirmed intentional
 

@@ -97,9 +97,11 @@ pinning the boundary. Pinned by `test_moved_role_gates.py` and
 
 Remaining: 7 checks and 11 comparisons, each classified with its reason in
 `role-check-classification.md`, which also records the call sites that
-still deliberately differ and one open authorization defect
-(`custom_phases._require_can_mutate`, cross-Wing phase edits) awaiting an
-approved fix.
+still deliberately differ.
+
+2026-10-11 (D10): the cross-Wing custom-phase defect is fixed and its gate
+moved to `permissions.may_mutate_custom_phase` (`test_custom_phase_mutation_scope.py`,
+112 cases): 7 -> **5** direct checks.
 
 For every migrated rule: permission-unit tests; endpoint status/error
 contracts unchanged unless a defect is separately approved; role/scope matrix

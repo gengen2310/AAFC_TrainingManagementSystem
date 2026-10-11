@@ -12,7 +12,7 @@
     "backend/app/routers/__init__.py": 0,
     "backend/app/routers/accounts.py": 0,
     "backend/app/routers/auth.py": 0,
-    "backend/app/routers/custom_phases.py": 3,
+    "backend/app/routers/custom_phases.py": 1,
     "backend/app/routers/dashboard.py": 0,
     "backend/app/routers/export_import.py": 0,
     "backend/app/routers/health.py": 0,
