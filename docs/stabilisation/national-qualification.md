@@ -69,7 +69,7 @@ Saturated throughput rose from 82 to 121 req/s after the report fixes.
 | Maintenance enabled (20 s drain) | PENDING: writes continue (3 boundary 503s); LOCKED: all 103 writes 503, reads continue; 0 × 500 |
 | Maintenance disabled | Before #71: the other worker kept refusing writes until its 10 s cache expired (re-drill on 2 workers: 57 of 192 writes refused, the last 7.8 s after switching off). After #71 (re-read the state before refusing): 0 of 184 refused. |
 | Maintenance enabled with no drain window (`drain_seconds=0`) | A worker whose cache still says OFF can accept writes for up to 10 s (2 of 40 in the drill). This is by design: closing it would cost a database read on every write. The default drain window (PENDING) allows writes anyway. |
-| Worker SIGKILL | 0 failed requests; the supervisor respawned the worker |
+| Worker SIGKILL | **Corrected 2026-10-12:** the supervisor respawns the worker, but that worker's in-flight requests are lost (connection reset). The 2026-10-04 "0 failed" result most likely killed uvicorn's non-worker multiprocessing child: the 2026-10-12 drill made that mistake first, then targeted a real worker (pid from `Started server process`) and lost 2–20 in-flight requests of ~3,600 in the window. A Railway redeploy is a graceful SIGTERM, not this. |
 | PostgreSQL stopped 15 s | every request 503 `database_unavailable` (no internals exposed); pool recovered automatically, 0 errors after |
 
 ## Sizing guidance
@@ -88,3 +88,37 @@ Saturated throughput rose from 82 to 121 req/s after the report fixes.
 - Railway CPU/network characteristics (local only).
 - Bulk cadet import (CEA) under load, and attendance-entry write bursts.
 - More than 2 workers; PgBouncer in front of PostgreSQL.
+
+## Re-run at the release candidate (2026-10-12, `8ee67b3`; drills re-run at `276a0b5`)
+
+Same tooling, dataset (6 Wings, 60 Squadrons, 10,200 cadets, 14,400 sessions, 600
+tickets, 30,000 audit rows) and stack (PostgreSQL 16 local, 2 uvicorn workers, production
+pool, `ENVIRONMENT=staging` so the DB-backed limiters — now atomic, D14 — and the cookie
+origin check, D13, are on the request path). Acceptance thresholds were fixed before the
+run (EXECUTION_PLAN "Continuation"): error rate < 1%, read p95 < 2 s, write p95 < 3 s.
+
+| Users | Pacing | req/s | p50 | p95 | p99 | Errors | DB conns max | vs 2026-10-04 |
+|---|---|---|---|---|---|---|---|---|
+| 50 | realistic | 14.4 | 16 ms | 43 ms | 76 ms | 0 | 11 | p95 46 → 43 ms |
+| 100 | realistic | 29.5 | 17 ms | 50 ms | 81 ms | 0 | 13 | 53 → 50 ms |
+| 250 | realistic | 73.6 | 27 ms | 73 ms | 115 ms | 0 | 13 | 89 → 73 ms |
+| 250 | aggressive (saturation) | 124.6 | 1.4 s | 1.9 s | 2.1 s | 0 | 16 | 121 → 125 req/s |
+
+Server log: 0 × 500. **PASS** against the thresholds at every realistic stage.
+
+### Failure drills under 100 users (scripted: `qual_drills.py` timeline 40/80/130/160 s)
+
+| Event | Result (final run, `276a0b5`) |
+|---|---|
+| SIGKILL a real worker | respawned; 2 in-flight requests lost (expected for a hard kill) |
+| Maintenance enable, 20 s drain | PENDING: 4 boundary write 503s; LOCKED: every write 503 (240), reads 200 |
+| Maintenance disable | 0 writes refused after the disable completed (all refusals precede it) |
+| PostgreSQL stopped 15 s | 3,059 of 3,060 requests 503 `database_unavailable`; recovery in seconds; 0 × 500 |
+
+The first drill run found **D19** (teardown rollback on a dead connection aborted responses
+→ clients got no HTTP response) and **D20** (dashboard chart isolation swallowed the outage →
+`PendingRollbackError` → 500). Both fixed with regression tests and re-drilled: 0 tracebacks,
+0 × 500.
+
+Still not covered: Railway hardware/network (local only; staging smoke + load is separate),
+CEA bulk import under load, more than 2 workers / PgBouncer.
