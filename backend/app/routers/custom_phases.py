@@ -114,6 +114,15 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
             scope_id = p.wing_id  # force to own wing; ignore body.scope_id
         else:
             scope_id = body.scope_id or p.wing_id  # national_admin/system_admin may specify
+            # The named Wing must exist and, for a National Admin, belong to their
+            # own national: the same ownership rule PATCH/DELETE apply (D10 follow-up).
+            wing = db.get(Wing, scope_id) if scope_id else None
+            if wing is None:
+                raise HTTPException(404, detail={"error": "wing_not_found"})
+            if not may_mutate_custom_phase(p, "wing", scope_id,
+                                           own_national_id=resolve_national_id(db, p),
+                                           phase_wing_national_id=wing.national_id):
+                raise HTTPException(403, detail={"error": "insufficient_scope"})
     elif body.scope_type == "national":
         if not is_national_admin(p):
             raise HTTPException(403, detail={"error": "insufficient_scope"})

@@ -155,3 +155,43 @@ def test_list_reports_can_edit_from_the_same_rule(client, phases, code):
     for key, pid in phases.items():
         if pid in by_id:
             assert by_id[pid]["can_edit"] is (key in ALLOWED[code]), (code, key)
+
+
+def test_a_national_admin_cannot_create_a_phase_for_another_nationals_or_unknown_wing(client):
+    """Review finding (2026-10-12): create_custom_phase took a National Admin's
+    Wing phase scope_id straight from the body (`body.scope_id or p.wing_id`)
+    without checking that the Wing exists or belongs to their national, so a
+    phase could be pinned to another national's Wing (or to nothing)."""
+    import uuid as _uuid
+    from app.models import NationalEntity
+    db = SessionLocal()
+    try:
+        other_nat = NationalEntity(name=f"D10 Other National {_uuid.uuid4().hex[:4]}", short_name="D10O")
+        db.add(other_nat)
+        db.commit()
+        foreign_wing = Wing(code=f"F{_uuid.uuid4().hex[:4].upper()}", name="D10 Foreign Wing",
+                            short_name="D10F", national_id=other_nat.id, timezone="Australia/Perth")
+        db.add(foreign_wing)
+        db.commit()
+        foreign_wing_id, other_nat_id = foreign_wing.id, other_nat.id
+        own_wing_id = db.query(Squadron).filter(Squadron.code == "703").one().wing_id
+    finally:
+        db.close()
+    nat = login(client, "ADMINNATIONAL")
+    body = {"name": "D10 create", "scope_type": "wing", "applies_from": "2093-02-01"}
+    try:
+        for bad in (foreign_wing_id, str(_uuid.uuid4())):
+            r = client.post("/api/custom-training-phases", headers=nat, json={**body, "scope_id": bad})
+            assert r.status_code in (403, 404), (bad, r.text)
+        ok = client.post("/api/custom-training-phases", headers=nat, json={**body, "scope_id": own_wing_id})
+        assert ok.status_code == 200, ok.text
+        client.delete(f"/api/custom-training-phases/{ok.json()['custom_phase_id']}", headers=nat)
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(CustomTrainingPhase).filter(CustomTrainingPhase.scope_id == foreign_wing_id).delete()
+            db.query(Wing).filter(Wing.id == foreign_wing_id).delete()
+            db.query(NationalEntity).filter(NationalEntity.id == other_nat_id).delete()
+            db.commit()
+        finally:
+            db.close()
