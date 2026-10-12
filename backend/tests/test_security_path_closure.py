@@ -143,10 +143,26 @@ def test_a_ticket_update_is_kept_when_the_submitter_mail_fails(client, monkeypat
 
 # ── Audit immutability and configuration redaction ───────────────────────────
 
+def _all_routes():
+    """(path, methods) for every route. FastAPI 0.141 wraps included routers as
+    _IncludedRouter, so app.routes shows only '/': iterating it made the first
+    version of the test below pass vacuously (found 2026-10-12)."""
+    for r in app.router.routes:
+        ctx = getattr(r, "effective_route_contexts", None)
+        if ctx is None:
+            if getattr(r, "path", None):
+                yield r.path, set(getattr(r, "methods", None) or ())
+            continue
+        for c in (ctx() if callable(ctx) else ctx):
+            yield c.path, set(c.methods or ())
+
+
 def test_no_route_can_modify_or_delete_audit_records():
-    offenders = [f"{sorted(r.methods)} {r.path}" for r in app.routes
-                 if "audit" in getattr(r, "path", "")
-                 and set(getattr(r, "methods", set())) & {"PUT", "PATCH", "DELETE"}]
+    routes = list(_all_routes())
+    assert len(routes) > 300, f"route enumeration found only {len(routes)}; the check would be vacuous"
+    audit = [(path, m) for path, m in routes if "audit" in path]
+    assert {path for path, _ in audit} >= {"/api/audit", "/api/system/audit-summary"}
+    offenders = [f"{sorted(m)} {path}" for path, m in audit if m & {"PUT", "PATCH", "DELETE"}]
     assert offenders == [], offenders
 
 
