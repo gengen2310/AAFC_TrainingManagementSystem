@@ -13,7 +13,7 @@ Every command below was run on a fresh clone on 2026-10-04.
 
 ## Prerequisites
 
-- **Python 3.13** (what CI uses) and **Node 20** (what CI uses; newer versions also work).
+- **Python 3.13** (what CI uses) and **Node 20** (what CI uses; newer versions also work — Node 26/npm 11 prints harmless "allow-scripts" warnings for esbuild/fsevents).
 - Git. macOS or Linux shell; on Windows use WSL.
 
 ## Run it locally
@@ -57,10 +57,17 @@ confusing. Check with `lsof -nP -iTCP:8000 -sTCP:LISTEN`. Then use another port
 and point both frontends at it:
 
 ```bash
-PORT=8002 bash RUN_TMS_BACKEND_MAC.sh
-AAFC_API_BASE=http://localhost:8002 bash RUN_TMS_CONNECTED_FRONTEND_MAC.sh
-cd frontend && VITE_API_BASE_URL=http://localhost:8002 npm run dev
+# Backend on 8002; allow the frontends' origins (the run script keeps any list you set)
+CORS_ALLOWED_ORIGINS=http://localhost:8081,http://localhost:5174 PORT=8002 bash RUN_TMS_BACKEND_MAC.sh
+# Main TMS on 8081 pointed at it
+FRONTEND_PORT=8081 AAFC_API_BASE=http://localhost:8002 bash RUN_TMS_CONNECTED_FRONTEND_MAC.sh
+# Planning Workspace on 5174 pointed at it (VITE_API_BASE_URL makes requests
+# cross-origin, which is why its origin must be in CORS_ALLOWED_ORIGINS)
+cd frontend && VITE_API_BASE_URL=http://localhost:8002 npm run dev -- --port 5174 --strictPort
 ```
+
+Every port is overridable this way; a browser sign-in that fails with a CORS
+error means the frontend's origin is missing from `CORS_ALLOWED_ORIGINS`.
 
 Interactive API docs (`/docs`, `/openapi.json`) are **disabled** on purpose
 (since v25). The API surface is described in `docs/api_reference.md`.
@@ -70,18 +77,33 @@ real environment.
 
 ## Test
 
-```bash
-# Backend: about 2,670 tests, roughly 5-10 minutes; must end with 0 failed
-cd backend && .venv/bin/python -m pytest -q
+Run each block from the repository root.
 
-# Architecture ratchets (monolith size, router role checks, router imports)
+```bash
+# Backend: about 3,350 tests, roughly 8-13 minutes; must end with 0 failed
+(cd backend && .venv/bin/python -m pytest -q)
+
+# Architecture ratchets (monolith size, router size, role checks, router imports)
 python3 -m unittest discover -s tools/architecture -p "test_*.py"
 python3 tools/architecture/guard.py
 
 # Frontend
-cd frontend
-npm run typecheck && npx eslint . && npm run test && npm run build
+(cd frontend && npm run typecheck && npx eslint . && npm run test && npm run build)
+
+# Deploy-script logic (no network; a stub railway on PATH is enough)
+bash scripts/test_deploy_logic.sh
 ```
+
+## Database migrations
+
+Alembic is the only way the schema changes. Check the head before adding a
+migration (never hard-code a revision): `cd backend && .venv/bin/python -m alembic heads`
+must print exactly one head. The demo database created by the run script is
+built by `seed_all` (SQLAlchemy `create_all`), so it has no `alembic_version`
+table and `alembic current` prints nothing; run `alembic stamp head` once if you
+need it. Rehearse a new migration on a disposable database:
+`DATABASE_URL=sqlite:////tmp/mig.db .venv/bin/python -m alembic upgrade head`
+then `downgrade -1` and `upgrade head` again.
 
 Browser tests (Playwright) need the servers running; CI runs them on Chromium,
 Firefox and WebKit (`.github/workflows/e2e-tests.yml` shows the exact setup).
@@ -101,7 +123,10 @@ Firefox and WebKit (`.github/workflows/e2e-tests.yml` shows the exact setup).
 | Stabilisation programme: status, evidence, exit criteria | `docs/stabilisation/README.md` |
 | Permission model and the remaining role checks | `docs/stabilisation/role-check-classification.md`, `AAFC_TMS_Access_And_Scope_Model.md` |
 | Backups, restore verification, key handling | `docs/backup_and_restore.md` |
-| Staging deployment | `deployment/README-staging.md` |
+| How a request flows (screen → JS → router → permission → model) | `docs/stabilisation/request-trace.md`, `.claude/rules/architecture.md`, `docs/product-review/current-system-map.md` |
+| Staging deployment (Railway) | `scripts/deploy-staging.sh` (read its header: it needs Railway CLI auth and a staging System Admin code even with `DRY_RUN=1`; `scripts/test_deploy_logic.sh` is the credential-free self-test) |
+| Rollback | `docs/release/rollback_runbook.md` |
+| Release evidence for this release candidate | `docs/release/production_readiness_20261009/` |
 | Production deployment (a separate release decision) | `scripts/deploy-production.sh` |
 | National-scale load qualification | `docs/stabilisation/national-qualification.md` |
 | Working rules for contributors and coding agents | `CLAUDE.md`, `AGENTS.md`, `.claude/rules/` |

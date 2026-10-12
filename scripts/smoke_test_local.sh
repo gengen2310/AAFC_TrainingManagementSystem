@@ -9,8 +9,8 @@
 
 set -euo pipefail
 
-BASE="http://localhost:8000"
-FRONTEND="http://localhost:8080"
+BASE="${BASE:-http://localhost:8000}"
+FRONTEND="${FRONTEND:-http://localhost:8080}"
 PASS=0
 FAIL=0
 

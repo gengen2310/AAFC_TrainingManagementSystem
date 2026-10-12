@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$SCRIPT_DIR/connected-frontend"
 SERVE_DIR="$SRC_DIR/.local-dev"
 API_BASE="${AAFC_API_BASE:-http://localhost:8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-8080}"   # if 8080 is taken; add the origin to CORS_ALLOWED_ORIGINS
 
 rm -rf "$SERVE_DIR"
 mkdir -p "$SERVE_DIR"
@@ -30,7 +31,7 @@ sed -i.bak \
   "$SERVE_DIR/index.html"
 rm -f "$SERVE_DIR/index.html.bak"
 
-echo "Connected client: http://localhost:8080   (login code: ADMIN703)"
+echo "Connected client: http://localhost:${FRONTEND_PORT}   (login code: ADMIN703)"
 echo "API base patched to ${API_BASE} for this local run only (source file untouched)."
 cd "$SERVE_DIR"
-exec python3 -m http.server 8080
+exec python3 -m http.server "${FRONTEND_PORT}"

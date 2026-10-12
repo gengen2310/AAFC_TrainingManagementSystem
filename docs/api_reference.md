@@ -1,7 +1,15 @@
 # API reference
 
-Full interactive docs at `/docs` (Swagger) and `/redoc`; machine schema at `/openapi.json`
-(77 routes — 32 new in V11 TRGO Planning). Highlights:
+Interactive docs (`/docs`, `/redoc`, `/openapi.json`) are **disabled** on purpose (since v25).
+The backend has about 357 routes under `/api` (2026-10-12); the router files in
+`backend/app/routers/` are the authoritative list. Highlights:
+
+- Sign-in is two calls. `POST /api/auth/lookup` with
+  `{"unit_type": "squadron"|"wing"|"national", "identifier": "<squadron or Wing code; omit for national>", "role": "<role>"}`
+  returns `{"user_id", "display_name"}`; then `POST /api/auth/login` with
+  `{"user_id": "...", "code": "<access code>"}` returns `{"token", "session"}`. Send the token
+  as `Authorization: Bearer <token>`. Roles: `sqn_admin`, `sqn_general`, `wing_admin`,
+  `wing_viewer`, `national_admin`, `national_viewer`, `auditor`, `system_admin`.
 
 - Auth: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/change-code`
 - Orgs: `GET /api/national/overview`, `GET|POST /api/wings`, `GET|POST /api/squadrons`, `PATCH /api/squadrons/{id}`
