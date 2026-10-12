@@ -81,7 +81,7 @@ cleanup() {
   if [ -n "${COOKIE_JAR:-}" ] && [ -f "${COOKIE_JAR:-}" ] && [ -s "${COOKIE_JAR:-}" ]; then
     curl -s -X POST \
       --connect-timeout 5 --max-time 10 \
-      --cookie "$COOKIE_JAR" \
+      -H "Origin: https://$EXPECTED_PRODUCTION_FRONTEND_DOMAIN" --cookie "$COOKIE_JAR" \
       "https://$EXPECTED_PRODUCTION_BACKEND_DOMAIN/api/auth/logout" \
       >/dev/null 2>&1 || true
     info "Production logout called."
@@ -334,6 +334,8 @@ prod_reauth_if_needed() {
 
 # ── Authenticated production API call ──────────────────────────────────────────
 prod_api_call() {
+  # Cookie-authenticated writes must carry a TMS Origin (D13); this script acts
+  # for the Main TMS page, so it sends that origin on every call (D24).
   local method="$1" path="$2" body="${3:-}"
   local url="https://$EXPECTED_PRODUCTION_BACKEND_DOMAIN$path"
   local raw
@@ -341,13 +343,13 @@ prod_api_call() {
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" -H "Content-Type: application/json" \
-      --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
       -d "$body" "$url" 2>/dev/null)
   else
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
-      --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
       "$url" 2>/dev/null)
   fi
   PROD_API_CODE=$(echo "$raw" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")

@@ -104,7 +104,7 @@ cleanup() {
   if [ -n "${COOKIE_JAR:-}" ] && [ -f "${COOKIE_JAR:-}" ] && [ -s "${COOKIE_JAR:-}" ]; then
     curl -s -X POST \
       --connect-timeout 5 --max-time 10 \
-      --cookie "$COOKIE_JAR" \
+      -H "Origin: https://$EXPECTED_STAGING_FRONTEND_DOMAIN" --cookie "$COOKIE_JAR" \
       "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/auth/logout" \
       >/dev/null 2>&1 || true
     info "Staging logout called."
@@ -416,6 +416,8 @@ staging_reauth_if_needed() {
 # Uses session cookie. Refreshes cookie on sliding-window tokens.
 # Never prints COOKIE_JAR contents or Authorization header.
 staging_api_call() {
+  # Cookie-authenticated writes must carry a TMS Origin (D13); this script acts
+  # for the Main TMS page, so it sends that origin on every call (D24).
   local method="$1" path="$2" body="${3:-}"
   local url="https://$EXPECTED_STAGING_BACKEND_DOMAIN$path"
   local raw
@@ -424,14 +426,14 @@ staging_api_call() {
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
       -H "Content-Type: application/json" \
-      --cookie "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_STAGING_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" \
       --cookie-jar "$COOKIE_JAR" \
       -d "$body" "$url" 2>/dev/null)
   else
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
-      --cookie "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_STAGING_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" \
       --cookie-jar "$COOKIE_JAR" \
       "$url" 2>/dev/null)
   fi
