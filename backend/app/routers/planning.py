@@ -90,6 +90,10 @@ from ..services_planning_io import (  # moved verbatim from this router (C5)
     _neutralise_cell,
     _normalise_cea_row,
     cea_row_problems,
+    cea_row_is_blank,
+    cea_row_error_entries,
+    _parse_json_list,
+    _validate_iso_date,
 )
 
 
@@ -273,21 +277,6 @@ def _check_version(obj, client_version: int | None) -> None:
         })
 
 
-def _parse_json_list(val) -> list:
-    """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
-    if not val:
-        return []
-    if isinstance(val, list):
-        return val
-    if isinstance(val, str):
-        try:
-            result = _json.loads(val)
-            return result if isinstance(result, list) else []
-        except (_json.JSONDecodeError, TypeError):
-            return []
-    return []
-
-
 # ─────────────────────────────────────────────────────────────
 # RBAC helpers
 # ─────────────────────────────────────────────────────────────
@@ -324,7 +313,6 @@ def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
     if not py:
         raise HTTPException(404, detail={"error": "planning_year_not_found"})
     return py
-
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1222,13 +1210,6 @@ def delete_parade_date(
 # ─────────────────────────────────────────────────────────────
 # Holidays
 # ─────────────────────────────────────────────────────────────
-
-def _validate_iso_date(v: str, field_name: str) -> str:
-    try:
-        date.fromisoformat(v)
-    except ValueError:
-        raise ValueError(f"{field_name} must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
-    return v
 
 
 class HolidayIn(BaseModel):
@@ -4247,8 +4228,7 @@ def export_annual_program_xlsx(
     for cell in ws3[1]:
         cell.fill = hdr_fill; cell.font = hdr_font
     for a in db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id, AnchorEvent.is_archived == False).order_by(AnchorEvent.start_date).all():  # noqa: E712
-        # AnchorEvent has event_name/notes and no location column (D15); the
-        # Location column stays so the sheet layout is unchanged.
+        # AnchorEvent has event_name/notes, no location (D15); column kept blank.
         ws3.append([_neutralise_cell(a.event_name), a.start_date, a.end_date or "",
                     a.event_type or "", a.importance_level or "",
                     "", _neutralise_cell(a.notes or "")])
@@ -5507,8 +5487,8 @@ async def import_cea_csv(
 
     row_errors: list[dict] = []
     for row_number, row in enumerate(rows, start=2):        # row 1 is the header
-        if not any((v or "").strip() for v in row.values() if isinstance(v, str)):
-            skipped += 1                # an all-empty line (Excel pads CSVs with them)
+        if cea_row_is_blank(row):
+            skipped += 1
             continue
         try:
             parsed = _normalise_cea_row(row)
@@ -5517,9 +5497,7 @@ async def import_cea_csv(
             # never half-applied to an existing activity (D18).
             problems = cea_row_problems(row, parsed)
             if problems:
-                for field, message in problems:
-                    row_errors.append({"row": row_number, "field": field,
-                                       "message": f"Row {row_number}: {field} {message} — row not imported."})
+                row_errors.extend(cea_row_error_entries(row_number, problems))
                 if not name:
                     skipped += 1
                 else:

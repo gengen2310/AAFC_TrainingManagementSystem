@@ -8,6 +8,8 @@ parsing over bytes, strings and already-loaded rows: no HTTP, no authorization.
 from __future__ import annotations
 
 import csv as _csv, io, re
+import json as _json
+from datetime import date
 
 from .models import Squadron
 
@@ -198,3 +200,39 @@ def _normalise_cea_row(row: dict) -> dict:
         "activity_poc": g("POC"),
         "notes": g("ActivityNotes", "Activity Notes", "SupportRequestTypeCode"),
     }
+
+
+def cea_row_is_blank(row: dict) -> bool:
+    """An all-empty CSV line (Excel pads exports with them): skipped silently (D18)."""
+    return not any((v or "").strip() for v in row.values() if isinstance(v, str))
+
+
+def cea_row_error_entries(row_number: int, problems: list[tuple[str, str]]) -> list[dict]:
+    """The response's row_errors entries for one refused row (D18)."""
+    return [{"row": row_number, "field": field,
+             "message": f"Row {row_number}: {field} {message} — row not imported."}
+            for field, message in problems]
+
+
+# Moved verbatim from routers/planning.py (2026-10-12, router line ratchet).
+def _parse_json_list(val) -> list:
+    """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
+    if not val:
+        return []
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            result = _json.loads(val)
+            return result if isinstance(result, list) else []
+        except (_json.JSONDecodeError, TypeError):
+            return []
+    return []
+
+
+def _validate_iso_date(v: str, field_name: str) -> str:
+    try:
+        date.fromisoformat(v)
+    except ValueError:
+        raise ValueError(f"{field_name} must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
+    return v

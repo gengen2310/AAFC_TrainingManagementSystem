@@ -65,6 +65,7 @@ from ..services_training_activities import (  # moved verbatim from this router 
     _generate_dates,
 )
 from ..services_training_imports import (  # moved verbatim from this router (C5)
+    _CSV_CURR_COL_MAP,
     _lh_last_segment,
     _normalise_rank,
     _fac_csv_get,
@@ -531,7 +532,6 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
           new={"date": body.date}, ip=meta["ip"], ua=meta["ua"])
     return {"ok": True, "parade_night_id": pn.id}
-
 
 
 class ParadeNightUpdateIn(BaseModel):
@@ -2690,8 +2690,6 @@ class TrainingAreaUpdateIn(BaseModel):
     capabilities: list[str] | None = None
 
 
-
-
 @router.post("/training-areas")
 def create_room(body: TrainingAreaIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_write_role(p)
@@ -4832,8 +4830,6 @@ class CurriculumImportIn(BaseModel):
     preview: bool = False
 
 
-
-
 def _find_existing_curriculum(db: DBSession, body: CurriculumIn,
                               owning_level: str,
                               wing_id: str | None = None,
@@ -5418,40 +5414,6 @@ def _parse_program_backend_sheet(ws) -> list[CurriculumImportItem]:
 
 
 # ── CSV CURRICULUM IMPORT ─────────────────────────────────────────────────────
-
-_CSV_CURR_COL_MAP = {
-    # CSV header (lower-stripped) → CurriculumImportItem field
-    "training phase": "phase",
-    "phase": "phase",
-    "experiential code": "code",
-    "code": "code",
-    "module code": "code",
-    "module_code": "code",
-    "title": "title",
-    "module title": "title",
-    "module_title": "title",
-    "elements": "element",
-    "element": "element",
-    "foundation or extension": "core_status",
-    "foundation/extension": "core_status",     # the field's name in the TRGO brief (D17)
-    # The Main TMS export's own headers, so export -> CSV -> import is a no-op (D17).
-    "identifier": "identifier",
-    "part": "part_number",
-    "part number": "part_number",
-    "core status": "core_status",
-    "duration (min)": "duration_minutes",
-    "foundation / extension": "core_status",
-    "type": "core_status",
-    "instructor suitability": "instructor_suitability",
-    "instructor_suitability": "instructor_suitability",
-    "timing": "duration_minutes",
-    "duration": "duration_minutes",
-    "duration_min": "duration_minutes",
-    "location": "location",
-    "learning hub link": "learning_hub_url",
-    "learning hub url": "learning_hub_url",
-    "url": "learning_hub_url",
-}
 
 
 @router.post("/curriculum/import-csv")
