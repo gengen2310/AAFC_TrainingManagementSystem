@@ -107,7 +107,9 @@ function promptText(title,label,{context='',defaultValue='',okLabel='OK',validat
     const okBtn=document.getElementById('ti-ok-btn');
     okBtn.textContent=okLabel; okBtn.className='btn '+(danger?'btn-red':'btn-dk');
     openModal('m-text-input');
-    setTimeout(()=>{inp.focus();inp.select();},40);
+    // Focus and select the default only if the user is not already typing in
+    // the box: select() over typed text made the next keystroke replace it (D26).
+    setTimeout(()=>{if(document.activeElement!==inp){inp.focus();inp.select();}},40);
   });
 }
 function _tiSave(){

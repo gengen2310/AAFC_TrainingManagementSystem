@@ -421,7 +421,14 @@ function collectOutcomeReason(status){
     document.getElementById('or-note').value='';
     document.getElementById('or-err').textContent='';
     openModal('m-outcome-reason');
-    setTimeout(()=>document.getElementById('or-reason').focus(),30);
+    // Never pull focus out of a dialog opened on top of this one (D26): on a
+    // slow machine this fired after the "New reason" prompt had opened, and
+    // the user's typing went to the select instead of the prompt.
+    setTimeout(()=>{
+      const host=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.modal-bg.active');
+      if(host&&host.id!=='m-outcome-reason')return;
+      document.getElementById('or-reason').focus();
+    },30);
   });
 }
 function _orSave(){
