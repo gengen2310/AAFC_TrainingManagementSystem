@@ -60,4 +60,3 @@ def test_no_raw_json_interpolated_into_markup():
                  for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
                  if "${JSON.stringify(" in line]
     assert offenders == [], "\n".join(offenders)
-
