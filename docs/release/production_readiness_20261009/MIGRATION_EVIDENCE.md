@@ -38,3 +38,28 @@ production revision `a4e9507a9c51` -> head (the rollback-then-redeploy path).
 
 `alembic heads`: single head `63c110addb63`. To repeat at the final SHA if any
 migration is added after `8ecd2cd` (none planned).
+
+## 2026-10-12 rehearsal at `24be3e1` (code identical to freeze `ea12454`)
+
+`alembic heads` → **one head**, `63c110addb63` (v76). Script: empty DB → `upgrade head` →
+`downgrade a4e9507a9c51` (production's v64) → `upgrade head`.
+
+| Engine | upgrade head | downgrade → v64 | upgrade head |
+|---|---|---|---|
+| PostgreSQL 16 (throwaway local cluster) | ok | ok | ok |
+| SQLite | ok | ok | ok |
+
+Proves the schema path both ways; the data path v64 → head is proven separately on restored
+production data by the restore workflow (runs 37909713246, 37910351762; to be repeated at the
+final SHA).
+
+**Downgrade is lossy below v70/v71 — rollback must not rely on it:**
+- v70 `downgrade` drops `service_tickets.assigned_to_user_id` (account-backed assignments).
+- v71 drops `users.must_change_code` (pending forced first-login rotations would be lost,
+  re-exposing administrator-issued initial codes).
+- v73/v74 drop transient tables (idempotency keys, rate-limit buckets): harmless.
+- v76 converts naive UTC ↔ timestamptz without loss.
+
+Rollback policy for the release runbook: roll back **application code only** (redeploy the
+prior image; additive schema stays), or restore the pre-deploy backup; never `alembic
+downgrade` production below v72 except with an owner-approved data-loss acceptance.
