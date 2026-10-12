@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import DisconnectionError, OperationalError
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
@@ -109,6 +110,12 @@ def _safe_chart(chart_id: str, builder, *args, **kwargs) -> dict:
     the frontend can render "this chart failed" for just this one chart."""
     try:
         return builder(*args, **kwargs)
+    except (OperationalError, DisconnectionError):
+        # A database outage is not one broken chart: swallowing it left the
+        # session in a failed transaction, the next chart raised
+        # PendingRollbackError and the request ended 500 (D20). Let the
+        # outage handler answer 503 database_unavailable.
+        raise
     except Exception:
         _logger.exception("Dashboard chart builder failed: %s", chart_id)
         return {
