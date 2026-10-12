@@ -63,3 +63,26 @@ decision recorded).
 | 2. `railway up` of the previous build `431d5f9` (backend, Main TMS, PW) from a clean checkout, staging IDs explicit, build commit stamped | all three serving `431d5f9` within ~1 minute of upload |
 | 3. smoke against the restored database | health ready (commit `431d5f9`, 140 squadrons); `/api/system/migrations` = `7f61608fa538`; system_admin: me, accounts (40), service-desk tickets 200; sqn_admin: parade-nights, cadets, dashboard charts, planning years 200; Main TMS and PW 200 |
 | 4. roll forward with `deploy-staging.sh` at `2ed9b12` | **all hard gates passed**: preflight (3,350 passed), DB re-migrated v69 → `63c110addb63`, CRUD, Main TMS + PW fingerprints = `2ed9b12`, Playwright smokes, new deployments active (backend `c1df7f25`, Main TMS `109a5233`, PW `9c9b013a`) |
+
+## Load against staging (beta gate 7) — PARTIAL; 100-user run BLOCKED on accounts
+
+The gate's tool (`tools/stress/load_test_staging.py`, local-only) cycles 36 seeded accounts.
+On staging only the codes of 5 accounts are known to work (system_admin, national_admin,
+703 sqn_admin, 703 sqn_general, 7WG wing_admin); a sample of the others (`ADMIN723`,
+`723SQN2026`, `7WG2026`) returned 401. Resetting synthetic accounts' codes would breach the
+project's "do not alter credentials" rule, so a genuine 100-distinct-user run needs the
+owner to supply staging load-test credentials (or authorise creating dedicated accounts).
+
+Run instead (no configuration change), 2026-10-12, staging at `2ed9b12`: **15 users** spread
+over the 5 verified accounts from one IP (inside the 300/60 s per-IP limit), realistic think
+time 8–20 s, 10 minutes, Squadron/Wing/National read mix + idempotent parade-night PATCH.
+
+| Requests | req/s | p50 | p95 | p99 | 5xx | Other |
+|---|---|---|---|---|---|---|
+| 670 | 1.1 | 652 ms | 1,272 ms | 1,482 ms | 0 | 2 × 409 (optimistic-version conflicts, correct) |
+
+Per-endpoint p95 is nearly flat (`/api/auth/me` 672 ms vs National overview 805 ms, parade
+nights 1,339 ms): latency is dominated by the network/TLS round trip from this client
+(the driver opens a new connection per request), not by server time. Within the thresholds
+(read p95 < 2 s, write p95 < 3 s, errors < 1%). Server capacity evidence remains the local
+national-scale run (`docs/stabilisation/national-qualification.md`, 250 users, 0 errors).

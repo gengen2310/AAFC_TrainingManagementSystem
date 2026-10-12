@@ -43,3 +43,11 @@ C8 work found unpushed in an orphaned worktree and pushed as `wt/c8-paging`). Ba
   rehearsal → national scale 50/100/250 + drills → restore run → clean-clone (C13).
 - Open owner decisions: S-A lockout semantics, S-B forgot-code timing, sqn_general record policy,
   Service Desk admin-note visibility, XLSM per-session Location/Room, merge of the final PR.
+
+## Containment proof for the final PR (2026-10-12, at `12db2b7`)
+
+`git merge-base --is-ancestor <head> HEAD`: #67 `8dbd740` CONTAINED, #69 `f8a5dca` CONTAINED,
+#71 `34b1d4b` CONTAINED, #72 `56ac1af` CONTAINED, `origin/main` `15b0d29` CONTAINED (285 ahead,
+0 behind). #68 `704c1dc` is not an ancestor, but `git cherry` shows 96 of its 97 commits
+patch-identical in HEAD and the 97th (`704c1dc`, "ci: qualify … against main") is an **empty
+commit** (no files) — content fully contained.
