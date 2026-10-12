@@ -60,3 +60,39 @@ def test_an_over_long_location_is_reported_not_truncated(client):
     r = client.post("/api/curriculum/import-csv?preview=true", headers=hdr, files=files)
     assert r.status_code == 400, r.text           # the only row was skipped -> no valid rows
     assert "Row 2: Location is longer than 60 characters" in r.json()["detail"]["message"]
+
+
+def _xlsx_to_csv(content: bytes) -> str:
+    import csv, io
+    from openpyxl import load_workbook
+    ws = load_workbook(io.BytesIO(content)).active
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    for row in ws.iter_rows(values_only=True):
+        w.writerow(["" if v is None else v for v in row])
+    return buf.getvalue()
+
+
+def test_export_then_reimport_changes_nothing(client):
+    """The Main TMS export, saved as CSV and imported again, is a no-op: every
+    column the export writes is one the import reads (two parts of one module
+    stay two items; duration, status and location survive)."""
+    hdr = login(client, "SYSADMIN2026")
+    seed = _csv(["Identifier", "Code", "Part", "Title", "Timing", "Foundation/Extension", "Location"],
+                ["RT-CSV-10(1)", "RT-CSV-10", "1", "Two Part Module", "45", "Extension", "Hangar"])
+    seed += ",".join(['"RT-CSV-10(2)"', '"RT-CSV-10"', '"2"', '"Two Part Module"', '"75"',
+                      '"Extension"', '"Hangar"']) + "\r\n"
+    r = client.post("/api/curriculum/import-csv", headers=hdr,
+                    files={"file": ("seed.csv", seed, "text/csv")})
+    assert r.status_code == 200 and r.json()["created"] == 2, r.text
+    exported = client.get("/api/curriculum/export.xlsx", headers=hdr)
+    assert exported.status_code == 200, exported.text
+    again = client.post("/api/curriculum/import-csv?preview=true", headers=hdr,
+                        files={"file": ("again.csv", _xlsx_to_csv(exported.content), "text/csv")})
+    assert again.status_code == 200, again.text
+    body = again.json()
+    mine = [x for x in body.get("results", []) if x.get("code") == "RT-CSV-10"]
+    assert len(mine) == 2, body
+    assert {x["status"] for x in mine} <= {"unchanged", "skipped"}, mine
+    assert body["created"] == 0, body
+    assert "Core Status" not in body["ignored_columns"] and "Part" not in body["ignored_columns"]

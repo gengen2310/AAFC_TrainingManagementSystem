@@ -12,6 +12,8 @@ with PARITY_REGEN=1 and diffed so only the named entries moved):
   principals, 500 -> 200 xlsx (the export read AnchorEvent.name).
 - D17 (2026-10-11): GET /curriculum, all 8 principals: each item gains a
   "location" key (status and content type unchanged; additive).
+- D17 (2026-10-11): GET /curriculum/export.xlsx, all 8 principals: two
+  columns appended (Part, Location) so export -> CSV -> import is a no-op.
 
 The harness runs in a SUBPROCESS against its own freshly seeded SQLite file.
 The suite's shared DB is mutated by hundreds of other tests (and by test order),

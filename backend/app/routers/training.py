@@ -260,7 +260,9 @@ def export_curriculum_xlsx(db: DBSession = Depends(get_db), p: Principal = Depen
     hdr_font = Font(color="FFFFFF", bold=True)
     headers = ["Code", "Identifier", "Title", "Phase", "Element", "Duration (min)",
                "Core Status", "Instructor Suitability", "Recommended Term",
-               "Owning Level", "Learning Hub URL"]
+               "Owning Level", "Learning Hub URL",
+               # Appended (D17) so existing column positions are unchanged.
+               "Part", "Location"]
     ws.append(headers)
     for cell in ws[1]:
         cell.fill = hdr_fill; cell.font = hdr_font
@@ -274,7 +276,7 @@ def export_curriculum_xlsx(db: DBSession = Depends(get_db), p: Principal = Depen
                    _n(i.element), i.duration_minutes or "",
                    _n(i.core_status or ""), _n(i.instructor_suitability or ""),
                    _n(i.recommended_term or ""), _n(i.owning_level),
-                   _n(i.learning_hub_url or "")])
+                   _n(i.learning_hub_url or ""), i.part_number or 1, _n(i.location_type or "")])
 
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     _audit(db, p, object_type="export", object_id=None, action="export",
@@ -5432,6 +5434,12 @@ _CSV_CURR_COL_MAP = {
     "element": "element",
     "foundation or extension": "core_status",
     "foundation/extension": "core_status",     # the field's name in the TRGO brief (D17)
+    # The Main TMS export's own headers, so export -> CSV -> import is a no-op (D17).
+    "identifier": "identifier",
+    "part": "part_number",
+    "part number": "part_number",
+    "core status": "core_status",
+    "duration (min)": "duration_minutes",
     "foundation / extension": "core_status",
     "type": "core_status",
     "instructor suitability": "instructor_suitability",
@@ -5504,6 +5512,10 @@ async def import_curriculum_csv(
         if not code or not title:
             parse_errors.append(f"Row {i}: missing code or title — skipped.")
             continue
+        part_raw = mapped.get("part_number", "1")
+        if not part_raw.isdigit() or int(part_raw) < 1:
+            parse_errors.append(f"Row {i}: Part must be a whole number from 1 — skipped.")
+            continue
         if len(mapped.get("location", "")) > 60:
             parse_errors.append(f"Row {i}: Location is longer than 60 characters — skipped.")
             continue
@@ -5517,7 +5529,9 @@ async def import_curriculum_csv(
         core_status = "core" if "foundation" in cs_raw or cs_raw in ("core", "f") else "additional"
 
         items.append(CurriculumImportItem(
+            identifier=mapped.get("identifier") or None,
             code=code,
+            part_number=int(part_raw),
             title=title,
             phase=mapped.get("phase", "B. Initial"),
             element=mapped.get("element") or None,
