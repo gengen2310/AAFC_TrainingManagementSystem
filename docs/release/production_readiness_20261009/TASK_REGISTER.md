@@ -29,7 +29,7 @@ C8 work found unpushed in an orphaned worktree and pushed as `wt/c8-paging`). Ba
 | C9 | N+1 evidence after C5 | P2 | lead | C5 | VERIFIED | `6f38374` | 80/82 GETs constant under growth; plan-review/schedule export linear per night (bounded), pinned; optimise only if staging p95 breaches |
 | C10/C12 | National scale + drills | P1 | lead | staging deploy | PARTIAL | `214055b` docs, `c120472`/`276a0b5` (D19/D20) | local national scale 50/100/250 PASS + drills PASS (national-qualification.md); staging 15-user PASS; **100-user staging run BLOCKED** (R8) |
 | C13 | Clean clone → deploy by another developer | P1 | fresh agent | code done | VERIFIED | `40dbb07`, `c9d660d` (D22) | 3,347 tests passed from the docs alone; 14 gaps fixed |
-| C1/C2 | Containment + final PR + CI on exact SHA | P0 | lead | all | DONE (merge pending owner) | PR #73 (draft) | 28/28 checks pass on `56f8001`; containment proven; merge = owner (B8) |
+| C1/C2 | Containment + final PR + CI on exact SHA | P0 | lead | all | DONE (merge pending owner) | PR #73 (draft) | 28/28 checks pass on `ce4a928` (after D26 and two test fixes); containment proven; merge = owner (B8) |
 | P6 | Adversarial release review | P0 | independent agent | P5 | DONE | — | NO-GO with 12 findings; fixes and dispositions in RELEASE_DECISION.md |
 
 ## Checkpoint 2026-10-11 (end of Phase 3), HEAD `0335cf8`
