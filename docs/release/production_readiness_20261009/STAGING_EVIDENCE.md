@@ -54,3 +54,12 @@ Every test therefore passed in every project; the only failures were the accurat
 refusing one fast automated client (see "Rate limiting" above). **PASS** (with the capacity
 decision recorded).
 
+## Rollback rehearsal (beta gate 8), 2026-10-12 — runbook §1a option 2
+
+| Step | Result |
+|---|---|
+| 1. restore pre-deploy backup with `pg_restore --clean` | **half-restored** (11 errors; `wings`/`users` not dropped; v70–v76 objects survived while `alembic_version` read v69) → **D25**, runbook corrected |
+| 1'. restore into an empty schema (`DROP SCHEMA public CASCADE; CREATE SCHEMA public;` + `pg_restore`) | exit 0, 0 errors; `7f61608fa538`; 140 squadrons, 1,249 users; 0 v70–v76 objects |
+| 2. `railway up` of the previous build `431d5f9` (backend, Main TMS, PW) from a clean checkout, staging IDs explicit, build commit stamped | all three serving `431d5f9` within ~1 minute of upload |
+| 3. smoke against the restored database | health ready (commit `431d5f9`, 140 squadrons); `/api/system/migrations` = `7f61608fa538`; system_admin: me, accounts (40), service-desk tickets 200; sqn_admin: parade-nights, cadets, dashboard charts, planning years 200; Main TMS and PW 200 |
+| 4. roll forward with `deploy-staging.sh` at `2ed9b12` | **all hard gates passed**: preflight (3,350 passed), DB re-migrated v69 → `63c110addb63`, CRUD, Main TMS + PW fingerprints = `2ed9b12`, Playwright smokes, new deployments active (backend `c1df7f25`, Main TMS `109a5233`, PW `9c9b013a`) |

@@ -33,8 +33,16 @@ options are, in order:
 
 1. **Forward-fix** on this release (preferred for anything not data-threatening).
 2. **Restore + redeploy:** restore the backup taken immediately before the deploy
-   (`docs/backup_and_restore.md`), confirm it is at `a4e9507a9c51`, then redeploy the previous
-   build. Everything written after the deploy is lost — export it first if it matters.
+   (`docs/backup_and_restore.md`) **into an empty schema** — `DROP SCHEMA public CASCADE;
+   CREATE SCHEMA public;` then `pg_restore --no-owner --no-privileges` (or a fresh database).
+   **Do not use `pg_restore --clean` over the migrated database**: it only drops objects that
+   are in the backup, and objects the new migrations added (e.g. foreign keys onto `users` and
+   `wings`) block the drops, leaving a half-restored database that claims the old revision
+   (D25, found in the staging rehearsal). Confirm it is at `a4e9507a9c51` and that no
+   v70–v76 objects remain (e.g. `service_tickets.assigned_to_user_id`), then redeploy the
+   previous build. Everything written after the deploy is lost — export it first if it matters.
+   **Rehearsed on staging 2026-10-12** (v76 → restore → previous build `431d5f9` serving in
+   ~1 minute after upload; all smoke reads 200) — see `STAGING_EVIDENCE.md`.
    Therefore a **fresh, restore-verified backup immediately before the production deploy is
    mandatory** for this release, not just "recent".
 3. Overriding the previous build's start command to skip migrations is possible in Railway
