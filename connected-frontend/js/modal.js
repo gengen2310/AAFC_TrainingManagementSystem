@@ -40,6 +40,10 @@ function closeModal(id){
   const bg=document.getElementById(id);
   if(!bg)return;
   bg.classList.remove('active');
+  // A text prompt closed any other way (backdrop click, Escape) is a cancel:
+  // settle its caller, or promptText's one-at-a-time guard (D21) would refuse
+  // every later prompt. _tiSave/_tiCancel take the callback before closing.
+  if(id==='m-text-input'&&_tiResolve){const cb=_tiResolve;_tiResolve=null;_tiValidate=null;cb(null);}
   const el=_modalReturnFocusById.get(id)||_modalReturnFocus;
   _modalReturnFocusById.delete(id);
   _modalReturnFocus=null;
@@ -85,6 +89,12 @@ function _confirmNo(){
 // validate(val)->errorString|null, danger }. danger=true renders the confirm button red.
 let _tiResolve=null, _tiValidate=null;
 function promptText(title,label,{context='',defaultValue='',okLabel='OK',validate=null,danger=false}={}){
+  // One prompt at a time (D21). A second call while one is open is never a
+  // real request -- it came from a spurious event (WebKit fires 'change' on an
+  // "+ Add new..." select as focus moves into the prompt). It used to reset the
+  // input, wiping what the user had typed, and orphan the first caller. Now it
+  // resolves as cancelled and leaves the open prompt untouched.
+  if(_tiResolve)return Promise.resolve(null);
   return new Promise(resolve=>{
     _tiResolve=resolve; _tiValidate=validate;
     document.getElementById('ti-title').textContent=title;
@@ -104,12 +114,12 @@ function _tiSave(){
   const val=document.getElementById('ti-input').value.trim();
   if(!val){document.getElementById('ti-err').textContent='This field is required.';return;}
   if(_tiValidate){const err=_tiValidate(val);if(err){document.getElementById('ti-err').textContent=err;return;}}
-  closeModal('m-text-input');
   const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
+  closeModal('m-text-input');
   if(cb)cb(val);
 }
 function _tiCancel(){
-  closeModal('m-text-input');
   const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
+  closeModal('m-text-input');
   if(cb)cb(null);
 }
