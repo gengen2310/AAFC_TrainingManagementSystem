@@ -12,3 +12,7 @@ per-run temporary SQLite DB (`tests/conftest.py`), isolated from other checkouts
 
 Pending: full backend + frontend (typecheck/test/build) + 3-browser matrix at the
 final SHA (Phase 5). No full-suite claim is made for intermediate SHAs.
+| 2026-10-12 | `ea12454` | Planning Workspace `npm test` / `lint` / `build` | 146/146 passed; lint 0 errors (35 warnings); build clean |
+| 2026-10-12 | `ea12454` | `tools/architecture/frontend_parity.mjs b93bc12` | 40 functions changed, each a deliberate edit inside a diff hunk (D11 jsq, C8, D10 can_edit, D18); none lost (each defined once, except `_apShowDateDetail` ×2, pre-existing at b93bc12 and in the monolith); 2 new (`jsq`, `_ceaRowErrorsHtml`); top-level statement order unchanged |
+| 2026-10-12 | `ea12454` | `node --check` all 28 `connected-frontend/js` modules | 28/28 parse |
+| 2026-10-12 | `ea12454` (code freeze; later commits docs-only until noted) | backend full `pytest tests/ -q` | **3343 passed, 12 skipped, 0 failed** (12m44s) |

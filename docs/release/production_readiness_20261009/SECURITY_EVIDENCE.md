@@ -107,6 +107,25 @@ was re-checked by reading the code and, where possible, reproducing it.
 | S-D | `staging_seed` recreates a System Admin from `STAGING_BOOTSTRAP_SYSADMIN_CODE` whenever none exists, without an audit row | code reading (seeds/staging_seed.py:32–91) | **Hardened** (`system_admin_bootstrapped` audit row, `test_staging_seed_bootstrap_audit.py`, red before); residual: re-run needs every System Admin row deleted at DB level; operators must unset the bootstrap variables after first boot (already printed by the seed) |
 | S-E | Weak tests: recovery JWT replay, recovery recipient, 6th forgot-code request, SMTP failure paths, audit PATCH/PUT absence, overview/migrations redaction | coverage map | **Done**: `test_security_path_closure.py` (10 tests, all pass; replay test mutation-checked) — no defect |
 
+## Code-level security review of the full branch diff (`security-review` skill, 2026-10-12, at `ea12454`)
+
+Scope: `origin/main...HEAD` (253+ commits), reviewed file by file by an independent
+read-only agent: dependencies/auth/permissions/accounts/service_desk/system/setup/
+custom_phases/planning/training/export_import, all new `services_*`, migrations v70–v76,
+seeds, every `connected-frontend/js` module (esc/jsq/_jsAttr contexts, `_rtSanitize`),
+`frontend/src` sinks, workflows. Each candidate was refuted or confirmed against its callers.
+
+**Result: no finding at confidence ≥ 8.** Below threshold (product policy, not a breach):
+`GET /api/system/audit-summary` is now reachable by sqn_admin/sqn_general/wing_admin
+(matching `/api/audit`'s role list) and returns `ip_address`/`user_id` for actions inside
+the caller's own Squadron/Wing — **owner decision**: should read-only Squadron users see
+their administrators' IP addresses?
+
+Packaging greps (`.claude/rules/security.md`, `-E`) at `ea12454`: wording 0; code exposure 0;
+seeded codes 0 (3 reviewed matches: `localStorage` nav-collapsed UI preference ×2,
+`access_code_reset` audit-filter label); frontend secrets 0 (1 reviewed match: `pg_restore`
+help text placeholder). Same false positives as 2026-10-09.
+
 ## Not yet run (Phase 5)
 
 `security-review` skill over the full branch diff (after C3/C4/C6 integrate).
