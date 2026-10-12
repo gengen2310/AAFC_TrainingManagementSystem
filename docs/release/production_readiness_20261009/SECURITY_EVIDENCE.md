@@ -145,3 +145,14 @@ help text placeholder). Same false positives as 2026-10-09.
 - **Scope of the code-level security review:** the review at `ea12454` covered the branch up
   to that commit. Code changed afterwards (D17–D25, D10 follow-up, deploy scripts) was
   re-reviewed separately — see the next section.
+
+## Security review of code changed after `ea12454` (2026-10-12)
+
+Independent read-only review of `git diff ea12454 HEAD` over backend/app, backend/scripts,
+connected-frontend, scripts, frontend/src (14 files: D10 create follow-up, D17/D18 moves,
+D19/D20, D21 `modal.js`, `migrate_or_hold.py`, both deploy scripts). **No finding ≥ 8.**
+Checked: custom-phase create is strictly tighter; moved import helpers byte-identical; no new
+HTML sink; deploy scripts never shell-evaluate gh/railway JSON and print no secret (only the
+two configuration values are extracted); the computed Alembic head fails closed. One
+non-security correctness hazard (holding against an unknown revision could also start a
+*diverged* build) was **fixed** in `a20b892`: holding now requires `ALLOW_SCHEMA_AHEAD=1`.
