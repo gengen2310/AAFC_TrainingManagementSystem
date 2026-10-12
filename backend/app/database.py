@@ -3,11 +3,13 @@
 UUID primary keys are stored as 36-char strings so the same models run on
 SQLite (local demo) and PostgreSQL (production) without change.
 """
+import logging
 import uuid
 from datetime import datetime, timezone
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, String, DateTime, Boolean
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
 
@@ -141,7 +143,16 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield db
     finally:
-        db.close()
+        try:
+            db.close()
+        except DBAPIError:
+            # The database went away mid-request (D19): close()'s rollback fails
+            # after the response may already have started, and raising here makes
+            # Starlette drop the connection instead of answering. The connection
+            # is unusable anyway; invalidate it so the pool discards it.
+            logging.getLogger("capacity").warning(
+                '{"event":"db_teardown_failed","action":"connection_invalidated"}')
+            db.invalidate()
 
 
 def init_db() -> None:
