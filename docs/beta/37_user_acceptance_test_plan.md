@@ -209,3 +209,22 @@ Testers use the template in `38_user_acceptance_results.md`. For each task recor
 UAT must be completed before the final production deployment is approved. Results must be reviewed and any new blockers or high defects assessed before the GO/NO-GO decision is finalised.
 
 Actual completion date: PENDING — MANUAL USER ACTIONS required.
+
+## Addendum — production-readiness release (2026-10-12)
+
+Run on staging (`https://aafc-tms-frontend-staging.up.railway.app`) with a real user per role.
+Record pass / fail / comment per row in `38_user_acceptance_results.md`; do not tick on behalf of a
+tester.
+
+| # | Role | Task | Expected |
+|---|---|---|---|
+| U1 | Squadron Admin | Settings → Custom Training Phases: look at a Wing or National phase | No Edit/Delete on phases you do not own; your Squadron's phases editable |
+| U2 | Squadron Admin | Parade night → Quick Edit a session → tick a Training Class already used in the same period → Save → click **Override** | The override applies and the dialog closes |
+| U3 | Squadron Admin | Outcome "Not delivered" → reason → "+ Add new reason…" → type a name → Create | The typed name is kept and selected |
+| U4 | National Admin | Curriculum → import a CSV with Location, Foundation/Extension, two parts of one module, and an extra column | Location and Foundation kept, both parts created, the extra column listed as ignored |
+| U5 | National Admin | Export curriculum, save as CSV, import it again (preview) | Nothing to create or change |
+| U6 | Wing Admin | Annual planning → import a CEA file with one bad date | Good rows imported; the bad row listed with its row number and reason |
+| U7 | National / System Admin | Service Desk with > 100 tickets: filters, "Load more", open/assign/save | Counts match the filters; Load more adds the next page; saving refreshes the list |
+| U8 | System Admin | Accounts list and the Service Desk "Assigned to" picker | All accounts listed; the picker offers only active admins |
+| U9 | Squadron Admin | Planning → export the Annual Program with anchor events | The workbook downloads (no error) with an Anchor Events sheet |
+| U10 | any | Use the app for 15 minutes at a normal pace on your usual network | No "Too many requests" messages (report if seen: rate-limit decision R1) |
