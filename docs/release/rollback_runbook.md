@@ -48,10 +48,13 @@ options are, in order:
 3. Overriding the previous build's start command to skip migrations is possible in Railway
    but **unrehearsed**; do not use it without a staging rehearsal and owner approval.
 
-From this release on, the entrypoint runs `scripts/migrate_or_hold.py`, which starts a build
-whose code is *older* than the database without migrating (and says so in the log). A later
-release can therefore be rolled back to this one application-only, provided its migrations
-were additive (Section 3).
+From this release on, the entrypoint runs `scripts/migrate_or_hold.py`. When the database is at
+a revision the build does not know, it refuses to start **unless the operator has set
+`ALLOW_SCHEMA_AHEAD=1` on the backend service** — then it starts without migrating and says so
+in the log. (The flag distinguishes a deliberate rollback from a build on a diverged branch.)
+A later release can therefore be rolled back to this one application-only, provided its
+migrations were additive (Section 3): set the flag, redeploy this build, remove the flag after
+rolling forward again.
 
 ## 2. Application rollback (no migration involved)
 

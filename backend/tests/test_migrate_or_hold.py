@@ -21,8 +21,9 @@ BACKEND = Path(__file__).resolve().parents[1]
 PY = sys.executable
 
 
-def _run(db, *args):
-    env = {**os.environ, "DATABASE_URL": f"sqlite:///{db}", "ENVIRONMENT": "test"}
+def _run(db, *args, extra_env=None):
+    env = {k: v for k, v in os.environ.items() if k != "ALLOW_SCHEMA_AHEAD"}
+    env.update({"DATABASE_URL": f"sqlite:///{db}", "ENVIRONMENT": "test", **(extra_env or {})})
     return subprocess.run([PY, *args], cwd=BACKEND, env=env, capture_output=True, text=True, timeout=300)
 
 
@@ -56,15 +57,34 @@ def test_an_older_database_is_upgraded_to_head():
         assert _rev(db) == [_head()]
 
 
-def test_a_database_ahead_of_this_code_is_left_alone_and_start_up_continues():
+def _ahead_db(tmp):
+    db = f"{tmp}/ahead.db"
+    assert _run(db, "-m", "alembic", "upgrade", "head").returncode == 0
+    con = sqlite3.connect(db)
+    con.execute("UPDATE alembic_version SET version_num = 'f0f0f0f0f0f0'")   # a later (or diverged) head
+    con.commit()
+    con.close()
+    return db
+
+
+def test_a_database_ahead_of_this_code_is_held_only_when_a_rollback_is_declared():
+    """ALLOW_SCHEMA_AHEAD=1 (set by the operator on a rollback deploy) holds:
+    no migration, start-up continues."""
     with tempfile.TemporaryDirectory() as tmp:
-        db = f"{tmp}/ahead.db"
-        assert _run(db, "-m", "alembic", "upgrade", "head").returncode == 0
-        con = sqlite3.connect(db)
-        con.execute("UPDATE alembic_version SET version_num = 'f0f0f0f0f0f0'")   # a later release's head
-        con.commit()
-        con.close()
-        r = _run(db, "-m", "scripts.migrate_or_hold")
+        db = _ahead_db(tmp)
+        r = _run(db, "-m", "scripts.migrate_or_hold", extra_env={"ALLOW_SCHEMA_AHEAD": "1"})
         assert r.returncode == 0, r.stdout + r.stderr
         assert "AHEAD" in (r.stdout + r.stderr)
         assert _rev(db) == ["f0f0f0f0f0f0"]                    # untouched
+
+
+def test_an_unknown_revision_without_a_declared_rollback_fails_start_up():
+    """Without the flag an unknown revision may be a diverged branch rather than
+    a rollback; starting against a schema missing this build's own migrations
+    would be worse than not starting (security review, 2026-10-12)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        db = _ahead_db(tmp)
+        r = _run(db, "-m", "scripts.migrate_or_hold")
+        assert r.returncode != 0
+        assert "ALLOW_SCHEMA_AHEAD" in (r.stdout + r.stderr)
+        assert _rev(db) == ["f0f0f0f0f0f0"]

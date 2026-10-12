@@ -7,16 +7,19 @@ container crash-looped, so an application-only rollback was impossible.
 
 - No alembic_version yet, or a revision this code knows: upgrade to head,
   exactly as before. A migration failure exits non-zero and stops start-up.
-- A revision this code does NOT know: the database is ahead of the code,
-  i.e. this build was deployed as a rollback. Do not migrate (there is
-  nothing this code could do), say so loudly, and let start-up continue.
-  Whether this build's code is safe against the newer schema is the rollback
-  runbook's question (additive migrations are; see MIGRATION_EVIDENCE.md).
+- A revision this code does NOT know: either the database is ahead of the
+  code (this build was deployed as a rollback) or it is on a diverged branch.
+  Only the operator knows which, so holding requires ALLOW_SCHEMA_AHEAD=1 on
+  the service (set for the rollback deploy, removed afterwards). With it: do
+  not migrate, say so loudly, start. Without it: fail start-up, as before --
+  starting a diverged build against a schema missing its own migrations would
+  be worse than not starting (security review, 2026-10-12).
 
 Run from backend/: `python -m scripts.migrate_or_hold`.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -45,9 +48,15 @@ def main() -> int:
     known = {rev.revision for rev in script.walk_revisions()}
     unknown = sorted(current - known)
     if unknown:
+        if os.environ.get("ALLOW_SCHEMA_AHEAD") != "1":
+            print(f"[migrate] REFUSING TO START: database revision(s) {unknown} are not in this build's "
+                  f"migrations (head {script.get_current_head()}). If this is a deliberate rollback to an "
+                  "older build, set ALLOW_SCHEMA_AHEAD=1 on this service; otherwise this build is on a "
+                  "diverged branch.", flush=True)
+            return 1
         print(f"[migrate] DATABASE IS AHEAD OF THIS CODE: revision(s) {unknown} are not in this "
-              f"build's migrations (head {script.get_current_head()}). This build was deployed as a "
-              "rollback. NOT migrating; starting against the newer schema.", flush=True)
+              f"build's migrations (head {script.get_current_head()}). ALLOW_SCHEMA_AHEAD=1: rollback "
+              "declared. NOT migrating; starting against the newer schema.", flush=True)
         return 0
 
     print(f"[migrate] database at {sorted(current) or 'no revision'}; upgrading to "
