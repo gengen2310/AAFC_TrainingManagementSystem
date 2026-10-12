@@ -27,7 +27,7 @@ def ctx(client):
                                         "timezone": "Australia/Perth"}, headers=sys_hdr)
     assert w.status_code in (200, 201), w.text
     other_wing = w.json()["wing_id"]
-    s = client.post("/api/squadrons", json={"wing_id": other_wing, "code": f"6{tag[:3]}",
+    s = client.post("/api/squadrons", json={"wing_id": other_wing, "code": f"6{tag}",
                                             "name": f"Isolation Sqn {tag}"}, headers=sys_hdr)
     assert s.status_code == 200, s.text
     return dict(client=client, sys=sys_hdr, wing=wing_hdr, own_wing=me["wing_id"],

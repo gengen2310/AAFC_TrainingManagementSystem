@@ -50,7 +50,7 @@ def phases(client):
     db = SessionLocal()
     sqn703, sqn704, wing = _org(db)
     tag = uuid.uuid4().hex[:6]
-    other_wing = Wing(code=f"Z{tag[:4].upper()}", name=f"D10 Wing {tag}", short_name=f"D10{tag[:3]}",
+    other_wing = Wing(code=f"Z{tag.upper()}", name=f"D10 Wing {tag}", short_name=f"D10{tag[:3]}",
                       national_id=wing.national_id, timezone="Australia/Perth")
     db.add(other_wing)
     db.commit()
