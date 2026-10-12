@@ -583,6 +583,8 @@ export interface CeaImportResult {
   duplicates: number;
   skipped: number;
   errors: number;
+  /** Rows not imported, with the reason (D18). Absent on older servers. */
+  row_errors?: Array<{ row: number; field: string | null; message: string }>;
   preview: Array<{
     action: "create" | "update" | "duplicate";
     cea_activity_id: string | null;

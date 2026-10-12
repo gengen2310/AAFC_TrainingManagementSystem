@@ -457,7 +457,8 @@ async function ceaConfirm(){
     const created=result.created||0, updated=result.updated||0, skipped=result.skipped||result.kept||0;
     document.getElementById('ceaResultBody').innerHTML=
       '<div style="font-size:var(--fs-md);font-weight:700;color:var(--ok,#1a7f4b);margin-bottom:8px">Import complete</div>'
-      +'<p style="font-size:var(--fs-base)">'+created+' added &nbsp;·&nbsp; '+updated+' updated &nbsp;·&nbsp; '+skipped+' kept existing</p>';
+      +'<p style="font-size:var(--fs-base)">'+created+' added &nbsp;·&nbsp; '+updated+' updated &nbsp;·&nbsp; '+skipped+' kept existing</p>'
+      +_ceaRowErrorsHtml(result.row_errors||[]);
     document.getElementById('ceaStep2').style.display='none';
     document.getElementById('ceaStep3').style.display='';
   } catch(e){
@@ -465,6 +466,17 @@ async function ceaConfirm(){
     const errEl=document.getElementById('ceaPreviewBody');
     errEl.insertAdjacentHTML('afterbegin','<div style="color:#c01530;font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Import failed: '+esc(apiErr(e))+'</div>');
   }
+}
+
+// Rows the server refused (bad date/time, no name). Listed so a partly bad
+// file never reads as a clean import (D18).
+function _ceaRowErrorsHtml(errs){
+  if(!errs.length)return '';
+  const shown=errs.slice(0,20).map(function(e){return '<li>'+esc(e.message)+'</li>';}).join('');
+  const more=errs.length>20?'<li>…and '+(errs.length-20)+' more</li>':'';
+  return '<div role="alert" style="margin-top:var(--sp-sm);color:var(--warn-text,#7a4a00);font-size:var(--fs-sm)">'
+    +'<strong>'+errs.length+' row'+(errs.length===1?'':'s')+' not imported</strong> — fix them in the file and import again:'
+    +'<ul style="margin:4px 0 0 18px">'+shown+more+'</ul></div>';
 }
 
 function renderActs(){

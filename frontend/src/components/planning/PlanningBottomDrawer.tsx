@@ -1898,6 +1898,18 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
           <button onClick={() => setImportResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 'var(--fs-md)', color: "var(--muted-text)" }}>×</button>
         </div>
       )}
+      {/* Rows the server refused, with the reason, so a partly bad file never
+          reads as a clean import (D18). */}
+      {importResult?.row_errors && importResult.row_errors.length > 0 && (
+        <div role="alert" style={{ padding: "6px 14px", background: "#fff8e6", borderBottom: "1px solid var(--border)", fontSize: 'var(--fs-xs)' }}>
+          <strong>{importResult.row_errors.length} row{importResult.row_errors.length === 1 ? "" : "s"} not imported</strong>
+          {" "}— fix them in the file and import again:
+          <ul style={{ margin: "4px 0 0 18px" }}>
+            {importResult.row_errors.slice(0, 20).map(e => <li key={`${e.row}-${e.field}`}>{e.message}</li>)}
+            {importResult.row_errors.length > 20 && <li>…and {importResult.row_errors.length - 20} more</li>}
+          </ul>
+        </div>
+      )}
       {importErr && (
         <div style={{ padding: "6px 14px", background: "#fff0f0", borderBottom: "1px solid var(--border)", fontSize: 'var(--fs-xs)', color: "var(--aafc-red)", display: "flex", alignItems: "center", gap: 8 }}>
           Import failed: {importErr}

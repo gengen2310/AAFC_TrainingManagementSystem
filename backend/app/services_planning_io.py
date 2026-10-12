@@ -116,12 +116,60 @@ def _parse_cea_date(raw: str | None) -> str | None:
 
 
 def _parse_cea_time(raw: str | None) -> str | None:
+    """HH:MM (24 h) from '9:30', '09:30', '09:30:00' or '9:30 AM'; None when
+    absent or not a real time (the import reports that row, D18). The old
+    rule kept the first five characters of anything with a colon, so '25:99'
+    was stored and '9:30' was dropped."""
     if not raw:
         return None
+    from datetime import datetime as _dt
     raw = raw.strip()
-    if len(raw) >= 5 and ":" in raw:
-        return raw[:5]
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p", "%I:%M%p", "%I:%M:%S %p"):
+        try:
+            return _dt.strptime(raw.upper(), fmt).strftime("%H:%M")
+        except ValueError:
+            continue
     return None
+
+
+_CEA_DATE_FIELDS = (("activity_start_date", ("StartDate", "Start date"), "StartDate"),
+                    ("activity_end_date", ("EndDate", "End date"), "EndDate"),
+                    ("nomination_start_date", ("NominationStartDate",), "NominationStartDate"),
+                    ("nomination_end_date", ("NominationEndDate",), "NominationEndDate"))
+_CEA_TIME_FIELDS = (("start_time", ("StartTime", "Start time"), "StartTime"),
+                    ("end_time", ("EndTime", "End time"), "EndTime"))
+
+
+def cea_row_problems(row: dict, parsed: dict) -> list[tuple[str, str]]:
+    """(field, message) for each value in a CEA row that cannot be stored as
+    given (D18). A present value that does not parse is a problem; an absent
+    optional value is not. Pure: no database access."""
+    from datetime import date as _date
+
+    def raw(keys):
+        for k in keys:
+            v = (row.get(k) or "").strip()
+            if v:
+                return v
+        return None
+
+    problems = []
+    if not parsed.get("activity_name"):
+        problems.append(("Name", "has no activity name"))
+    for field, keys, label in _CEA_DATE_FIELDS:
+        value = raw(keys)
+        if value is None:
+            continue
+        iso = parsed.get(field) or ""
+        try:
+            _date.fromisoformat(iso)
+        except ValueError:
+            problems.append((label, f"'{value}' is not a date (use DD/MM/YYYY)"))
+    for field, keys, label in _CEA_TIME_FIELDS:
+        value = raw(keys)
+        if value is not None and not parsed.get(field):
+            problems.append((label, f"'{value}' is not a time (use HH:MM, 24-hour)"))
+    return problems
 
 
 def _normalise_cea_row(row: dict) -> dict:

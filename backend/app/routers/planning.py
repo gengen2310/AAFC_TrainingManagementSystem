@@ -89,6 +89,7 @@ from ..services_planning_io import (  # moved verbatim from this router (C5)
     _parse_program_file,
     _neutralise_cell,
     _normalise_cea_row,
+    cea_row_problems,
 )
 
 
@@ -5504,12 +5505,25 @@ async def import_cea_csv(
         key = (act.activity_name or "", act.activity_start_date or "")
         existing_by_name_date.setdefault(key, []).append(act)
 
-    for row in rows:
+    row_errors: list[dict] = []
+    for row_number, row in enumerate(rows, start=2):        # row 1 is the header
+        if not any((v or "").strip() for v in row.values() if isinstance(v, str)):
+            skipped += 1                # an all-empty line (Excel pads CSVs with them)
+            continue
         try:
             parsed = _normalise_cea_row(row)
             name = parsed.get("activity_name") or ""
-            if not name:
-                skipped += 1
+            # Validate the whole row before touching anything, so a bad row is
+            # never half-applied to an existing activity (D18).
+            problems = cea_row_problems(row, parsed)
+            if problems:
+                for field, message in problems:
+                    row_errors.append({"row": row_number, "field": field,
+                                       "message": f"Row {row_number}: {field} {message} — row not imported."})
+                if not name:
+                    skipped += 1
+                else:
+                    errors += 1
                 continue
 
             cea_id = parsed.get("cea_activity_id")
@@ -5566,6 +5580,8 @@ async def import_cea_csv(
 
         except Exception:
             errors += 1
+            row_errors.append({"row": row_number, "field": None,
+                               "message": f"Row {row_number}: could not be imported."})
 
     # Mark activities no longer present in the import
     current_cea_ids = {
@@ -5595,6 +5611,7 @@ async def import_cea_csv(
         "duplicates": duplicates,
         "skipped": skipped,
         "errors": errors,
+        "row_errors": row_errors,
         "preview": previews[:50],
     }
 
