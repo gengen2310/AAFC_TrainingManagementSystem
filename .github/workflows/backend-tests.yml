@@ -127,7 +127,9 @@ jobs:
           echo "Frontend security hygiene checks passed"
 
       - name: Verify deploy control logic
-        run: bash scripts/test_deploy_logic.sh
+        run: |
+          bash scripts/test_deploy_logic.sh
+          bash scripts/test_deploy_production_gates.sh
 
   migration-rehearsal:
     name: PostgreSQL migration rehearsal
