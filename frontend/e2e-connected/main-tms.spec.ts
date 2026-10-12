@@ -328,22 +328,33 @@ test.describe("Facilitator statistics", () => {
       for (const key of CHART_KEYS) expect(c, `charts payload must include ${key}`).toHaveProperty(key);
     }
     // The first charts GET after a listener attaches can be a refresh that was
-    // already in flight before the write committed (seen in CI as a stale
-    // pre-merge total, 2026-10-12). For the merge, use the first charts GET whose
-    // request STARTED after the merge's own POST response arrived.
-    async function chartsRequestedAfter(triggerPath: string, action: () => Promise<void>,
+    // already in flight before the write committed (seen in CI as stale totals
+    // on the merge step and, 2026-10-13, on the baseline read before it). Every
+    // step therefore reads the first charts GET whose request STARTED after that
+    // step's own write request (method + path) had finished.
+    async function chartsRequestedAfter(trigger: { method: string; path: RegExp },
+                                        action: () => Promise<void>,
                                         timeout = 45000): Promise<Charts> {
       const seen: { start: number; resp: import("@playwright/test").Response }[] = [];
       let triggerDone = Infinity;
+      // The trigger's end time must come from 'requestfinished': in the
+      // 'response' event timing().responseEnd is still -1 (Playwright fills it
+      // in when the body is done), which made "after the merge" mean "after the
+      // merge STARTED" and let an in-flight refresh through (CI, 2026-10-12).
+      const onFinished = async (req: import("@playwright/test").Request) => {
+        if (req.method() !== trigger.method || !trigger.path.test(new URL(req.url()).pathname)) return;
+        const resp = await req.response();
+        if (!resp || !resp.ok()) return;
+        const t = req.timing();
+        triggerDone = Math.min(triggerDone, t.startTime + t.responseEnd);
+      };
       const onResponse = (r: import("@playwright/test").Response) => {
         const req = r.request();
-        const t = req.timing();
-        if (r.url().includes(triggerPath) && req.method() === "POST" && r.ok()) {
-          triggerDone = Math.min(triggerDone, t.startTime + Math.max(t.responseEnd, 0));
-        } else if (r.url().includes("/api/dashboard/charts") && req.method() === "GET") {
-          seen.push({ start: t.startTime, resp: r });
+        if (r.url().includes("/api/dashboard/charts") && req.method() === "GET") {
+          seen.push({ start: req.timing().startTime, resp: r });
         }
       };
+      page.on("requestfinished", onFinished);
       page.on("response", onResponse);
       try {
         await action();
@@ -352,24 +363,20 @@ test.describe("Facilitator statistics", () => {
           const hit = seen.find((x) => x.start >= triggerDone);
           if (hit) return ((await hit.resp.json()) as { charts: Charts }).charts;
           if (Date.now() > deadline) {
-            throw new Error(`no charts refresh was requested after ${triggerPath} completed`);
+            throw new Error(`no charts refresh was requested after ${trigger.method} ${trigger.path} completed`);
           }
           await page.waitForTimeout(100);
         }
       } finally {
         page.off("response", onResponse);
+        page.off("requestfinished", onFinished);
       }
     }
-    async function waitForFreshCharts(action: () => Promise<void>, responseTimeout = 15000): Promise<Charts> {
-      const respPromise = page.waitForResponse(
-        (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
-        { timeout: responseTimeout }
-      );
-      await action();
-      const resp = await respPromise; // times out (fails) if the refresh call never fires
-      const body = (await resp.json()) as { charts: Charts };
-      return body.charts;
-    }
+
+    const CREATE = { method: "POST", path: /\/api\/facilitators$/ };
+    const UPDATE = { method: "PATCH", path: /\/api\/facilitators\/[^/]+$/ };
+    const ARCHIVE = { method: "DELETE", path: /\/api\/facilitators\/[^/]+$/ };
+    const MERGE = { method: "POST", path: /\/api\/facilitators\/[^/]+\/absorb$/ };
 
     const stamp = Date.now().toString(36);
     const alphaName = `ZZRem111A${stamp}`;
@@ -405,7 +412,7 @@ test.describe("Facilitator statistics", () => {
     const baselineCivilian = typeCount(baseline, "Civilian");
 
     // ── CREATE: roster + count + status + type must all update, no reload ──
-    const afterCreateAlpha = await waitForFreshCharts(() => addFacilitatorViaForm(alphaName, "Staff"));
+    const afterCreateAlpha = await chartsRequestedAfter(CREATE, () => addFacilitatorViaForm(alphaName, "Staff"));
     await expect(page.locator("#fac-tbody")).toContainText(alphaName); // roster
     assertAllChartsFresh(afterCreateAlpha);
     expect(statusTotal(afterCreateAlpha), "Facilitator Status total must increment on create").toBe(baselineTotal + 1);
@@ -414,7 +421,7 @@ test.describe("Facilitator statistics", () => {
     const alphaId = await facIdByName(alphaName);
 
     // ── EDIT: changing type must move the facilitator between type buckets ──
-    const afterEdit = await waitForFreshCharts(async () => {
+    const afterEdit = await chartsRequestedAfter(UPDATE, async () => {
       await page.evaluate((id) => (window as any).editFac(id), alphaId);
       await page.locator("#fac-type").selectOption("Civilian");
       await page.locator("#fac-save-btn").click();
@@ -427,12 +434,9 @@ test.describe("Facilitator statistics", () => {
     await expect(page.locator("#fac-tbody")).toContainText(alphaName);
 
     // ── ARCHIVE: a dedicated facilitator, so Alpha's edit result above is undisturbed ──
-    // Use waitForFreshCharts for the bravo add so its loadFacilitatorStats response is
-    // captured in-flight (the modal now closes AFTER the chart GET, so this is reliable).
-    // This avoids a separate fetchCharts() call and reduces total HTTP requests.
-    const beforeArchive = await waitForFreshCharts(() => addFacilitatorViaForm(bravoName, "Staff"));
+    const beforeArchive = await chartsRequestedAfter(CREATE, () => addFacilitatorViaForm(bravoName, "Staff"));
     const bravoId = await facIdByName(bravoName);
-    const afterArchive = await waitForFreshCharts(async () => {
+    const afterArchive = await chartsRequestedAfter(ARCHIVE, async () => {
       await page.evaluate((id) => (window as any).delFac(id), bravoId);
       await page.locator("#confirm-yes-btn").click(); // confirmAction uses custom modal, not native confirm()
     });
@@ -443,13 +447,8 @@ test.describe("Facilitator statistics", () => {
 
     // ── MERGE: a dedicated, genuinely-safe pair (no real session/assignment
     // history on either side — both created fresh by this test seconds ago) ──
-    // Use waitForFreshCharts for both additions so their fire-and-forget
-    // loadFacilitatorStats() responses are drained before we set up the merge
-    // listener. Without this drain, the merge's waitForFreshCharts can capture
-    // a charts GET from a Charlie/Delta addition that is still in-flight,
-    // returning a stale pre-merge total ("Expected: 7, Received: 8").
-    await waitForFreshCharts(() => addFacilitatorViaForm(charlieName, "Staff"));
-    const afterDeltaAdd = await waitForFreshCharts(() => addFacilitatorViaForm(deltaName, "Staff"));
+    await chartsRequestedAfter(CREATE, () => addFacilitatorViaForm(charlieName, "Staff"));
+    const afterDeltaAdd = await chartsRequestedAfter(CREATE, () => addFacilitatorViaForm(deltaName, "Staff"));
     // Use the real chart value rather than arithmetic so any CI-fixture debris
     // doesn't silently shift the baseline.
     const beforeMergeStatusTotal = statusTotal(afterDeltaAdd);
@@ -462,7 +461,7 @@ test.describe("Facilitator statistics", () => {
         return rows.some((facilitator) => facilitator.facilitator_id === id && facilitator.is_archived);
       }, deltaId);
     }
-    const afterMerge = await chartsRequestedAfter("/absorb", async () => {
+    const afterMerge = await chartsRequestedAfter(MERGE, async () => {
       await page.evaluate((id) => (window as any).openMergeFac(id), deltaId);
       await page.locator("#fac-merge-target").selectOption(charlieId);
       // A network error is ambiguous: the server may have committed the merge
