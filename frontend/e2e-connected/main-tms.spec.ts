@@ -327,6 +327,39 @@ test.describe("Facilitator statistics", () => {
     function assertAllChartsFresh(c: Charts) {
       for (const key of CHART_KEYS) expect(c, `charts payload must include ${key}`).toHaveProperty(key);
     }
+    // The first charts GET after a listener attaches can be a refresh that was
+    // already in flight before the write committed (seen in CI as a stale
+    // pre-merge total, 2026-10-12). For the merge, use the first charts GET whose
+    // request STARTED after the merge's own POST response arrived.
+    async function chartsRequestedAfter(triggerPath: string, action: () => Promise<void>,
+                                        timeout = 45000): Promise<Charts> {
+      const seen: { start: number; resp: import("@playwright/test").Response }[] = [];
+      let triggerDone = Infinity;
+      const onResponse = (r: import("@playwright/test").Response) => {
+        const req = r.request();
+        const t = req.timing();
+        if (r.url().includes(triggerPath) && req.method() === "POST" && r.ok()) {
+          triggerDone = Math.min(triggerDone, t.startTime + Math.max(t.responseEnd, 0));
+        } else if (r.url().includes("/api/dashboard/charts") && req.method() === "GET") {
+          seen.push({ start: t.startTime, resp: r });
+        }
+      };
+      page.on("response", onResponse);
+      try {
+        await action();
+        const deadline = Date.now() + timeout;
+        for (;;) {
+          const hit = seen.find((x) => x.start >= triggerDone);
+          if (hit) return ((await hit.resp.json()) as { charts: Charts }).charts;
+          if (Date.now() > deadline) {
+            throw new Error(`no charts refresh was requested after ${triggerPath} completed`);
+          }
+          await page.waitForTimeout(100);
+        }
+      } finally {
+        page.off("response", onResponse);
+      }
+    }
     async function waitForFreshCharts(action: () => Promise<void>, responseTimeout = 15000): Promise<Charts> {
       const respPromise = page.waitForResponse(
         (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
@@ -429,7 +462,7 @@ test.describe("Facilitator statistics", () => {
         return rows.some((facilitator) => facilitator.facilitator_id === id && facilitator.is_archived);
       }, deltaId);
     }
-    const afterMerge = await waitForFreshCharts(async () => {
+    const afterMerge = await chartsRequestedAfter("/absorb", async () => {
       await page.evaluate((id) => (window as any).openMergeFac(id), deltaId);
       await page.locator("#fac-merge-target").selectOption(charlieId);
       // A network error is ambiguous: the server may have committed the merge
