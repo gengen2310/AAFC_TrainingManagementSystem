@@ -126,6 +126,22 @@ seeded codes 0 (3 reviewed matches: `localStorage` nav-collapsed UI preference �
 `access_code_reset` audit-filter label); frontend secrets 0 (1 reviewed match: `pg_restore`
 help text placeholder). Same false positives as 2026-10-09.
 
-## Not yet run (Phase 5)
+## Corrections and additions after the adversarial review (2026-10-12)
 
-`security-review` skill over the full branch diff (after C3/C4/C6 integrate).
+- **D13 placement:** the origin check is in `dependencies.get_principal`
+  (`_require_trusted_origin_for_cookie_write`), not a middleware (an earlier middleware draft
+  was replaced so the check applies exactly when the cookie is the credential);
+  `test_cookie_write_origin_check.py` has **9** tests.
+- **D14 on PostgreSQL** (production's engine): 16 threads × 25 requests against a local
+  PostgreSQL 16 database — pre-fix code (`89edc1d`) recorded **90/400** and raised
+  `IntegrityError` (the first-insert race); fixed code recorded **400/400**, no errors.
+- **X-Forwarded-For spoofing (review finding 5): refuted on staging.** A request carrying
+  `X-Forwarded-For: 203.0.113.77` was recorded under the real client IP in
+  `ip_api_requests`; Railway's edge sets the header, so the per-IP limiter and login lockout
+  cannot be bypassed by a forged header. The lockout-policy question (S-A) remains open:
+  `RISK_REGISTER.md` R2.
+- **D10 create path (review finding 9):** fixed in `9bc4041` (Wing must exist and belong to
+  the National Admin's national).
+- **Scope of the code-level security review:** the review at `ea12454` covered the branch up
+  to that commit. Code changed afterwards (D17–D25, D10 follow-up, deploy scripts) was
+  re-reviewed separately — see the next section.
