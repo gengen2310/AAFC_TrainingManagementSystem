@@ -10,6 +10,8 @@ Deliberate snapshot changes since (each a reviewed defect fix, regenerated
 with PARITY_REGEN=1 and diffed so only the named entries moved):
 - D15 (2026-10-11): GET /planning/years/{year_id}/export.xlsx, all 8
   principals, 500 -> 200 xlsx (the export read AnchorEvent.name).
+- D17 (2026-10-11): GET /curriculum, all 8 principals: each item gains a
+  "location" key (status and content type unchanged; additive).
 
 The harness runs in a SUBPROCESS against its own freshly seeded SQLite file.
 The suite's shared DB is mutated by hundreds of other tests (and by test order),

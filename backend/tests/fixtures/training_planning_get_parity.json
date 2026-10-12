@@ -72,8 +72,8 @@
    "status": 403
   },
   "703SQN2026 GET /curriculum": {
-   "body_len": 6682,
-   "body_sha256": "cf6616f252f41dd0c2808d501c479854b4e85fdf17b22702b653e6c53d54bfce",
+   "body_len": 6890,
+   "body_sha256": "dd4d060b8aaede906f55f2bc4e71faf19a9e6a9648065243e276c77a04edd381",
    "content_type": "application/json",
    "status": 200
   },
@@ -564,8 +564,8 @@
    "status": 200
   },
   "7WG2026 GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },
@@ -1056,8 +1056,8 @@
    "status": 200
   },
   "ADMIN703 GET /curriculum": {
-   "body_len": 6682,
-   "body_sha256": "cf6616f252f41dd0c2808d501c479854b4e85fdf17b22702b653e6c53d54bfce",
+   "body_len": 6890,
+   "body_sha256": "dd4d060b8aaede906f55f2bc4e71faf19a9e6a9648065243e276c77a04edd381",
    "content_type": "application/json",
    "status": 200
   },
@@ -1548,8 +1548,8 @@
    "status": 200
   },
   "ADMIN7WG GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },
@@ -2040,8 +2040,8 @@
    "status": 200
   },
   "ADMINNATIONAL GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },
@@ -2532,8 +2532,8 @@
    "status": 200
   },
   "AUDITOR2026 GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },
@@ -3024,8 +3024,8 @@
    "status": 200
   },
   "NATIONAL2026 GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },
@@ -3516,8 +3516,8 @@
    "status": 200
   },
   "SYSADMIN2026 GET /curriculum": {
-   "body_len": 6695,
-   "body_sha256": "96b1fefc48b339973251e9605e59acfbc6572518d7e21bb6dd965e41c90e44f2",
+   "body_len": 6903,
+   "body_sha256": "161eac614e1c8c19f71b80188fcf53dab4d7adc738be9596e8993377775584d2",
    "content_type": "application/json",
    "status": 200
   },

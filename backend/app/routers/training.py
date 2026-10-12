@@ -173,6 +173,7 @@ def list_curriculum(squadron_id: str | None = None, include_archived: bool = Fal
                     "part_count": i.part_count, "instructor_suitability": i.instructor_suitability,
                     "core_status": i.core_status, "is_optional": i.is_optional, "learning_hub_url": i.learning_hub_url,
                     "recommended_term": i.recommended_term, "owning_level": i.owning_level,
+                    "location": i.location_type,
                     "wing_id": i.wing_id, "squadron_id": i.squadron_id,
                     "session_count": len(statuses), "progress": _progress(statuses),
                     "is_archived": i.is_archived})
@@ -4801,6 +4802,10 @@ class CurriculumImportItem(BaseModel):
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
     recommended_term: str | None = Field(default=None, max_length=10)
+    # The curriculum CSV's documented Location column (stored in
+    # CurriculumItem.location_type). Distinct from the XLSM workbook's per-session
+    # Location/Room, which is scheduling context and still not stored here (D17).
+    curriculum_location: str | None = Field(default=None, max_length=60)
 
     @field_validator("learning_hub_url")
     @classmethod
@@ -5168,6 +5173,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                     instructor_suitability=item.instructor_suitability,
                     learning_hub_url=item.learning_hub_url,
                     recommended_term=item.recommended_term,
+                    location_type=item.curriculum_location,
                     core_status=item.core_status or ("core" if owning_level == "national" else "additional"),
                     active_status=True,
                 )
@@ -5192,6 +5198,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                     ("identifier", item.identifier),
                     ("part_number", item.part_number),
                     ("core_status", item.core_status),
+                    ("location_type", item.curriculum_location),
                 ]:
                     if val is not None and getattr(ci, field) != val:
                         setattr(ci, field, val)
@@ -5424,6 +5431,8 @@ _CSV_CURR_COL_MAP = {
     "elements": "element",
     "element": "element",
     "foundation or extension": "core_status",
+    "foundation/extension": "core_status",     # the field's name in the TRGO brief (D17)
+    "foundation / extension": "core_status",
     "type": "core_status",
     "instructor suitability": "instructor_suitability",
     "instructor_suitability": "instructor_suitability",
@@ -5478,6 +5487,9 @@ async def import_curriculum_csv(
     reader = csv.DictReader(io.StringIO(text))
     items: list[CurriculumImportItem] = []
     parse_errors: list[str] = []
+    # Columns no field maps to are reported, never dropped silently (D17).
+    ignored_columns = [h.strip() for h in (reader.fieldnames or [])
+                       if h and h.strip() and h.strip().lower() not in _CSV_CURR_COL_MAP]
 
     for i, row in enumerate(reader, start=2):
         # Normalise headers to lower-stripped
@@ -5491,6 +5503,9 @@ async def import_curriculum_csv(
         title = mapped.get("title", "")
         if not code or not title:
             parse_errors.append(f"Row {i}: missing code or title — skipped.")
+            continue
+        if len(mapped.get("location", "")) > 60:
+            parse_errors.append(f"Row {i}: Location is longer than 60 characters — skipped.")
             continue
 
         # duration: parse "60 min", "1 hr", bare integer
@@ -5509,7 +5524,7 @@ async def import_curriculum_csv(
             duration_minutes=duration,
             instructor_suitability=mapped.get("instructor_suitability") or None,
             learning_hub_url=mapped.get("learning_hub_url") or None,
-            location=mapped.get("location") or None,
+            curriculum_location=mapped.get("location") or None,
             core_status=core_status,
         ))
 
@@ -5521,6 +5536,7 @@ async def import_curriculum_csv(
                                      wing_id=wing_id, squadron_id=squadron_id)
     result = import_curriculum(import_body, db, p)
     result["parse_errors"] = parse_errors
+    result["ignored_columns"] = ignored_columns
     return result
 
 
