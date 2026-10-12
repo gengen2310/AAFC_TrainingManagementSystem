@@ -63,3 +63,15 @@ final SHA).
 Rollback policy for the release runbook: roll back **application code only** (redeploy the
 prior image; additive schema stays), or restore the pre-deploy backup; never `alembic
 downgrade` production below v72 except with an owner-approved data-loss acceptance.
+
+## Restore drill at `0c0aadb` (2026-10-12, run 38221096962, `workflow_dispatch`)
+
+Latest encrypted production backup → decrypted → restored into an ephemeral PostgreSQL 18
+→ restored revision `a4e9507a9c51` (v64) → `alembic upgrade head` ran all 15 pending
+migrations to `63c110addb63` (v76) → **23/23 database checks passed** (row counts incl.
+users 22, parade_nights 154, sessions 86, facilitators 97), **all 77 model tables present**,
+**9/9 authenticated application reads** against restored data (health 18 squadrons;
+`/api/facilitators?unit_id=<busiest>` 23 items = 23 restored rows). The last scheduled run on
+`main` (38181254881, 2026-10-11) failed only at verification, by construction (D6): main's
+workflow compares the restored v64 with main's head instead of upgrading first. It clears when
+this branch merges.
