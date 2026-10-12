@@ -29,7 +29,7 @@ C8 work found unpushed in an orphaned worktree and pushed as `wt/c8-paging`). Ba
 | C9 | N+1 evidence after C5 | P2 | lead | C5 | VERIFIED | `6f38374` | 80/82 GETs constant under growth; plan-review/schedule export linear per night (bounded), pinned; optimise only if staging p95 breaches |
 | C10/C12 | National scale + drills | P1 | lead | staging deploy | PARTIAL | `214055b` docs, `c120472`/`276a0b5` (D19/D20) | local national scale 50/100/250 PASS + drills PASS (national-qualification.md); staging 15-user PASS; **100-user staging run BLOCKED** (R8) |
 | C13 | Clean clone → deploy by another developer | P1 | fresh agent | code done | VERIFIED | `40dbb07`, `c9d660d` (D22) | 3,347 tests passed from the docs alone; 14 gaps fixed |
-| C1/C2 | Containment + final PR + CI on exact SHA | P0 | lead | all | IN PROGRESS | containment proven (see below) | PR to main to be opened; merge needs the owner |
+| C1/C2 | Containment + final PR + CI on exact SHA | P0 | lead | all | DONE (merge pending owner) | PR #73 (draft) | 28/28 checks pass on `56f8001`; containment proven; merge = owner (B8) |
 | P6 | Adversarial release review | P0 | independent agent | P5 | DONE | — | NO-GO with 12 findings; fixes and dispositions in RELEASE_DECISION.md |
 
 ## Checkpoint 2026-10-11 (end of Phase 3), HEAD `0335cf8`
@@ -51,3 +51,12 @@ C8 work found unpushed in an orphaned worktree and pushed as `wt/c8-paging`). Ba
 0 behind). #68 `704c1dc` is not an ancestor, but `git cherry` shows 96 of its 97 commits
 patch-identical in HEAD and the 97th (`704c1dc`, "ci: qualify … against main") is an **empty
 commit** (no files) — content fully contained.
+
+## Checkpoint 2026-10-12 (end of Phase 5)
+
+- Release PR **#73** (draft, base `main`): 28/28 checks green on `56f8001`; containment notes on #69/#71/#72.
+- Decision: **NO-GO** pending owner actions B1–B8 (`RELEASE_DECISION.md`); risks in `RISK_REGISTER.md`.
+- Staging runs the release candidate (`2ed9b12`, v76) after deploy → rollback → roll-forward rehearsal.
+- Production: untouched; reports stale commit `0cf2e8d` against a v64 database (R6).
+- Next action (owner): B1–B8; then re-run beta-release gate 11 and request production approval for the
+  exact merge commit.
