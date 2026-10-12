@@ -23,6 +23,28 @@ operator provides at execution time. Do not proceed on a partial match.
 Default to redeploying the previous build unless there's a specific, articulable reason
 forward-fixing is safer in this instance.
 
+## 1a. This release (production v64 → v76): application-only rollback is NOT available
+
+Proven 2026-10-12 (D23): every build up to and including production's current one starts
+with `alembic upgrade head` under `set -e`. Once this release's migrations have run, the
+previous build cannot find revision `63c110addb63` and its container exits at start-up, so
+**redeploying the previous build (Section 2) crash-loops**. For this release the rollback
+options are, in order:
+
+1. **Forward-fix** on this release (preferred for anything not data-threatening).
+2. **Restore + redeploy:** restore the backup taken immediately before the deploy
+   (`docs/backup_and_restore.md`), confirm it is at `a4e9507a9c51`, then redeploy the previous
+   build. Everything written after the deploy is lost — export it first if it matters.
+   Therefore a **fresh, restore-verified backup immediately before the production deploy is
+   mandatory** for this release, not just "recent".
+3. Overriding the previous build's start command to skip migrations is possible in Railway
+   but **unrehearsed**; do not use it without a staging rehearsal and owner approval.
+
+From this release on, the entrypoint runs `scripts/migrate_or_hold.py`, which starts a build
+whose code is *older* than the database without migrating (and says so in the log). A later
+release can therefore be rolled back to this one application-only, provided its migrations
+were additive (Section 3).
+
 ## 2. Application rollback (no migration involved)
 
 If the deployed backend migration is unchanged from the previous release (i.e. this
