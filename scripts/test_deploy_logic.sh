@@ -689,12 +689,29 @@ else
 fi
 TESTS_RUN=$((TESTS_RUN+1))
 
+# ── B1–B2: branch allow-list and computed Alembic head (2026-10-12) ─────────
+b_ok=1
+for br in main release/production-readiness-20261009 release/x.1; do
+  [[ "$br" =~ $STAGING_ALLOWED_BRANCH_RE ]] || { b_ok=0; echo "    should allow: $br"; }
+done
+for br in feature/x production release/ myrelease/x main2 "release/a b"; do
+  [[ "$br" =~ $STAGING_ALLOWED_BRANCH_RE ]] && { b_ok=0; echo "    should refuse: $br"; }
+done
+[ "$b_ok" -eq 1 ] && _pass "B1: staging branch allow-list = main | release/*" \
+                  || _fail "B1: staging branch allow-list wrong"
+TESTS_RUN=$((TESTS_RUN+1))
+expected_head=$(python3 "$SCRIPT_DIR/../backend/scripts/compute_alembic_head.py" "$SCRIPT_DIR/../backend/alembic/versions")
+[ -n "$REQUIRED_ALEMBIC_HEAD" ] && [ "$REQUIRED_ALEMBIC_HEAD" = "$expected_head" ] \
+  && _pass "B2: REQUIRED_ALEMBIC_HEAD computed from migrations ($REQUIRED_ALEMBIC_HEAD)" \
+  || _fail "B2: REQUIRED_ALEMBIC_HEAD='$REQUIRED_ALEMBIC_HEAD', migrations say '$expected_head'"
+TESTS_RUN=$((TESTS_RUN+1))
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo
 echo "════════════════════════════════════════════════════════════════════"
 printf "  Tests run: %d   \033[0;32mPASS: %d\033[0m   \033[0;31mFAIL: %d\033[0m\n" \
   "$TESTS_RUN" "$TESTS_PASSED" "$TESTS_FAILED"
-echo "  (A–G: deployment tracking · T1–T13: auth/cookie/cleanup)"
+echo "  (A–G: deployment tracking · T1–T13: auth/cookie/cleanup · B1–B2: branch/head)"
 echo "════════════════════════════════════════════════════════════════════"
 echo
 [ "$TESTS_FAILED" -eq 0 ] || exit 1

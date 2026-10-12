@@ -60,8 +60,14 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 # the RC branch would now ship LESS than what was reviewed and merged.
 # The guard below explicitly allows main when it is the declared expectation.
 EXPECTED_BRANCH="main"
+# Staging may also qualify a pushed release candidate BEFORE it merges (beta
+# gate 8: deployment + rollback rehearsal on staging). Only main or release/*;
+# production (deploy-production.sh) stays main-only. (2026-10-12)
+STAGING_ALLOWED_BRANCH_RE='^(main|release/[A-Za-z0-9._-]+)$'
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="7f61608fa538"
+# Computed from the migration files (single head required), never hand-pinned:
+# a pinned value went stale at v69 while the code reached v76 (2026-10-12).
+REQUIRED_ALEMBIC_HEAD="$(python3 backend/scripts/compute_alembic_head.py backend/alembic/versions 2>/dev/null || echo "UNRESOLVED")"
 
 # Railway's builder can sit in INITIALIZING for 8-9 minutes when its queue is
 # busy, against builds that normally take ~30s. Two staging deploys aborted at
@@ -675,8 +681,9 @@ echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_PW_DOMAIN"       && ok "PW
 echo
 echo "  [7/12] Git state…"
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "UNKNOWN")
-[ "$CURRENT_BRANCH" = "$EXPECTED_BRANCH" ] \
-  && ok "Branch: $CURRENT_BRANCH" || die "Branch '$CURRENT_BRANCH' ≠ '$EXPECTED_BRANCH'."
+[[ "$CURRENT_BRANCH" =~ $STAGING_ALLOWED_BRANCH_RE ]] \
+  && ok "Branch: $CURRENT_BRANCH" || die "Branch '$CURRENT_BRANCH' is not main or release/*."
+EXPECTED_BRANCH="$CURRENT_BRANCH"   # the push check below is against this branch
 # Block protected branches only when they differ from the explicit expected branch.
 # If EXPECTED_BRANCH is 'main' (intentional), this check is satisfied by the match above.
 [[ "$CURRENT_BRANCH" =~ ^(main|master)$|production ]] \
@@ -745,8 +752,8 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v69 correct timestamp column types)" \
-  || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD."
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (single head, computed from the migration files)" \
+  || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD (UNRESOLVED = not exactly one head)."
 
 # ── Migration rehearsal on real PostgreSQL ───────────────────────────────────
 # The head check above proves the code AGREES about which revision is last. It
@@ -894,7 +901,7 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "               --environment $ACTUAL_STAGING_ENV_ID --detach"
   echo "    Gate 1: poll /api/health/ready HTTP 200 (${BACKEND_GATE_TIMEOUT}s)"
   echo "    Gate 2: wait for NEW deployment (newer than PRE_BACKEND_LATEST=$PRE_BACKEND_LATEST)"
-  echo "    Gate 3: /api/system/migrations revision == $REQUIRED_ALEMBIC_HEAD (v44)"
+  echo "    Gate 3: /api/system/migrations revision == $REQUIRED_ALEMBIC_HEAD (code head)"
   echo "    Gate 4: [reauth if session expired] → subject-area-tags CRUD (POST→GET→DELETE→GET)"
   echo "    [DRY RUN: gates 3-4 skipped; staging DB unchanged]"
   echo

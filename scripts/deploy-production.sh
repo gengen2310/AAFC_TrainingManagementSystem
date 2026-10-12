@@ -50,7 +50,9 @@ EXPECTED_PRODUCTION_PW_DOMAIN="aafc-tms-planning-workspace-preview-production.up
 
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="7f61608fa538"
+# Computed from the migration files (single head required), never hand-pinned:
+# a pinned value went stale at v69 while the code reached v76 (2026-10-12).
+REQUIRED_ALEMBIC_HEAD="$(python3 backend/scripts/compute_alembic_head.py backend/alembic/versions 2>/dev/null || echo "UNRESOLVED")"
 
 BACKEND_GATE_TIMEOUT=600
 FRONTEND_GATE_TIMEOUT=600
@@ -580,7 +582,7 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v51)" \
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (single head, computed from the migration files)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD — ABORT."
 deactivate 2>/dev/null || true
 popd > /dev/null
