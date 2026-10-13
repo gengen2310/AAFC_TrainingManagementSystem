@@ -1,6 +1,7 @@
-"""R10 (owner decision 2026-10-13): read-only Squadron users (sqn_general) see
-audit actions in /api/system/audit-summary but not who made them by user id or
-from which IP address. Administrators of the same Squadron still see both."""
+"""R10 (owner decisions 2026-10-13): the read-only roles sqn_general and
+national_viewer see audit actions in /api/system/audit-summary but not who made
+them by user id or from which IP address. Administrators (and the auditor) still
+see both."""
 import uuid
 
 from app.database import SessionLocal
@@ -33,9 +34,13 @@ def _probe_rows(client, code):
     return rows
 
 
-def test_sqn_general_sees_actions_without_ip_or_user_id(client):
+import pytest
+
+
+@pytest.mark.parametrize("code", ["703SQN2026", "NATIONAL2026"])   # sqn_general, national_viewer
+def test_read_only_roles_see_actions_without_ip_or_user_id(client, code):
     _seed_row()
-    for row in _probe_rows(client, "703SQN2026"):
+    for row in _probe_rows(client, code):
         assert row["action"] == "r10_probe"
         assert row["ip_address"] is None
         assert row["user_id"] is None
@@ -43,6 +48,6 @@ def test_sqn_general_sees_actions_without_ip_or_user_id(client):
 
 def test_sqn_admin_and_system_admin_still_see_ip_and_user_id(client):
     actor = _seed_row()
-    for code in ("ADMIN703", "SYSADMIN2026"):
+    for code in ("ADMIN703", "SYSADMIN2026", "AUDITOR2026"):
         rows = _probe_rows(client, code)
         assert any(r["ip_address"] == IP and r["user_id"] == actor for r in rows), code

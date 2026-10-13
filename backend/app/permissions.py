@@ -555,11 +555,11 @@ AUDIT_READ_ROLES = frozenset({
 def may_see_audit_actor(p: Principal) -> bool:
     """Whether audit output may show who acted (user id) and from where (IP).
 
-    R10 (owner decision 2026-10-13): read-only Squadron users see audit actions
-    but not other people's user ids or IP addresses. Every other audit reader
-    keeps both.
+    R10 (owner decisions 2026-10-13): the read-only roles sqn_general and
+    national_viewer see audit actions but not other people's user ids or IP
+    addresses. Every other audit reader (administrators, auditor) keeps both.
     """
-    return p.role != "sqn_general"
+    return p.role not in ("sqn_general", "national_viewer")
 
 
 def require_audit_access(p: Principal):
