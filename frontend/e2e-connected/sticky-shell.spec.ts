@@ -50,3 +50,60 @@ test("the left navigation and top bar stay on screen however far the page scroll
   const hScroll = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(hScroll, "no horizontal page scroll (what overflow-x:hidden was for)").toBeLessThanOrEqual(0);
 });
+
+// Owner decision 2026-10-13: while Proxy Mode / Delegated Intervention is
+// active its warning banner stays pinned under the top bar, and the
+// navigation sits below it (never hidden behind it). The plain scope banner
+// still scrolls away.
+test("the Proxy Mode warning stays pinned under the top bar, with the navigation below it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  if (LOCAL_API_BASE) await page.addInitScript((b) => { (window as any).AAFC_API_BASE = b; }, LOCAL_API_BASE);
+  await page.goto("/");
+  await page.locator("#auth-type").selectOption("wing");
+  await page.locator("#auth-wing-select").selectOption("7WG");
+  await page.locator("#auth-role").selectOption("wing_admin");
+  await page.locator("#auth-continue-btn").click();
+  await page.locator("#auth-code").fill("ADMIN7WG");
+  await page.locator("#auth-btn").click();
+  await expect(page.locator("#cmd-dash-wing .ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
+
+  // eslint-disable-next-line no-undef
+  await page.waitForFunction(() => ((S.squadrons || []) as { code: string }[]).some((s) => s.code === "703"));
+  const sqnId = await page.evaluate(() => {
+    // eslint-disable-next-line no-undef
+    return ((S.squadrons || []) as { squadron_id: string; code: string }[]).find((s) => s.code === "703")!.squadron_id;
+  });
+  await page.evaluate((id) => { (window as any).enterMode(id, "703 SQN"); }, sqnId);
+  await page.locator("#ti-input").fill("E2E sticky banner check");
+  await page.locator("#ti-ok-btn").click();
+  const banner = page.locator("#mode-banner.show");
+  await expect(banner).toBeVisible({ timeout: 10000 });
+  try {
+    await page.evaluate(() => {
+      const spacer = document.createElement("div");
+      spacer.style.height = "6000px";
+      spacer.id = "e2e-spacer";
+      document.querySelector(".main")!.appendChild(spacer);
+    });
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await page.waitForTimeout(200);
+    const geo = await page.evaluate(() => {
+      const r = (s: string) => (document.querySelector(s) as HTMLElement).getBoundingClientRect();
+      return { scrolled: window.scrollY, topbarBottom: r(".topbar").bottom, bannerTop: r("#mode-banner").top,
+               bannerBottom: r("#mode-banner").bottom, navTop: r(".sidenav").top, navBottom: r(".sidenav").bottom,
+               viewport: window.innerHeight };
+    });
+    expect(geo.scrolled).toBeGreaterThan(1000);
+    expect(geo.bannerTop, "warning pinned directly under the top bar").toBeCloseTo(geo.topbarBottom, 0);
+    expect(geo.navTop, "navigation starts below the warning, not behind it").toBeCloseTo(geo.bannerBottom, 0);
+    expect(geo.navBottom, "navigation still reaches the bottom of the window").toBeCloseTo(geo.viewport, 0);
+    await expect(page.locator("#mode-banner button", { hasText: "Exit mode" })).toBeInViewport();
+  } finally {
+    await page.evaluate(() => (window as any).exitMode());
+  }
+  await expect(page.locator(".mode-banner.show")).toHaveCount(0, { timeout: 10000 });
+  await page.evaluate(() => window.scrollTo(0, 3000));
+  await page.waitForTimeout(200);
+  const navTop = await page.evaluate(() => (document.querySelector(".sidenav") as HTMLElement).getBoundingClientRect().top);
+  expect(navTop, "after leaving the mode the navigation returns to just below the top bar").toBeCloseTo(52, 0);
+});

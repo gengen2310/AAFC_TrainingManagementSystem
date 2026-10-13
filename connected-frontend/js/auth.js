@@ -568,7 +568,26 @@ function updateModeBanner(){
     const reason=S.proxyReason?(' · reason: '+S.proxyReason):'';
     document.getElementById('mode-text').textContent=`${label} — ${who} viewing ${where}${reason}`;
   } else { mb.className='mode-banner'; }
+  _syncShellOffsets();
 }
+// Owner decision 2026-10-13: while Proxy Mode / Delegated Intervention is
+// active its warning stays pinned under the (sticky) top bar, and the sticky
+// navigation starts below it instead of being covered by it. Offsets are
+// measured because the top bar and the warning both wrap on narrow screens.
+// Set here rather than in index.html, which may not grow (architecture guard).
+function _syncShellOffsets(){
+  const tb=document.querySelector('.topbar'), mb=document.getElementById('mode-banner'), nav=document.querySelector('.sidenav');
+  if(!tb||!mb||!nav)return;
+  const pinned=mb.classList.contains('show');
+  mb.style.position=pinned?'sticky':'';
+  mb.style.top=pinned?tb.offsetHeight+'px':'';
+  mb.style.zIndex=pinned?'190':'';
+  const top=tb.offsetHeight+(pinned?mb.offsetHeight:0);
+  nav.style.top=top+'px';
+  // Phones: the navigation is a fixed drawer (bottom:0), so only its top moves.
+  nav.style.height=window.matchMedia('(max-width:768px)').matches?'':`calc(100vh - ${top}px)`;
+}
+window.addEventListener('resize',_syncShellOffsets);
 
 
 // ═══ PROXY / DELEGATED INTERVENTION ═══
