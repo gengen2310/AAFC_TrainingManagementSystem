@@ -41,7 +41,7 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | B4 | Owner chose **`API_RATE_LIMIT=1200`** per IP (2026-10-13; staging set and load-tested). Remaining: set it on production and confirm `CORS_ALLOWED_ORIGINS` holds both production frontends (the deploy script refuses otherwise) | R1, D13 | production_release_runbook §1 |
 | B5 | Identify the build production really runs (Railway dashboard) and record it as the rollback target | R6 | production_release_runbook §1 |
 | B6 | ~~Staging load-test accounts~~ — **DONE** 2026-10-13: owner authorised dedicated accounts; 100-user run PASSED; accounts archived | gate 7, R8 | STAGING_EVIDENCE |
-| B7 | Policy items: **R2 accepted for this release** and **R10 changed (fixed, `7d5808c`)** by the owner 2026-10-13; still to decide: R3, R9, R11 | security/product policy | RISK_REGISTER |
+| B7 | ~~Policy items~~ — **DONE** 2026-10-13: owner accepted R2 and R3, confirmed R9, changed R10 (fixed for sqn_general and national_viewer), confirmed R11 (UI note added) | security/product policy | RISK_REGISTER |
 | B8 | Merge the release PR (merge commit), confirm CI green on the merge commit and the next scheduled restore test passes on `main` | containment, D6 | the release PR |
 
 When B1–B8 are done and recorded, re-run the beta-release gate 11 consolidation; only then may
