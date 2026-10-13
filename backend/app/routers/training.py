@@ -692,7 +692,7 @@ class TemplateChangeIn(BaseModel):
 
 
 @router.patch("/parade-nights/{night_id}/template")
-def apply_parade_night_template(
+def change_parade_night_timing_template(
     night_id: str,
     body: TemplateChangeIn,
     db: DBSession = Depends(get_db),
