@@ -80,7 +80,7 @@ function renderCurr(){
         <td style="font-weight:700">${esc(e.code)} <span class="badge b-grey">Archived</span></td>
         <td>${esc(e.title)}</td>
         <td>${phBadge(e.phase)}</td>
-        <td style="text-align:right">${canEditCurr(e)?`<button class="btn btn-xs btn-ok" onclick="doRestoreCurrItem('${e.id}','${_jsAttr(e.title)}')">Restore</button>`:''}</td>
+        <td style="text-align:right">${canEditCurr(e)?`<button class="btn btn-xs btn-ok" onclick="doRestoreCurrItem('${e.id}',${jsq(e.title)})">Restore</button>`:''}</td>
       </tr>`).join('')
     }</tbody></table></div>`:`<div class="empty"><div class="et">No archived curriculum items</div><div class="es">${q?'No archived items match your search.':'Nothing archived yet.'}</div></div>`;
     return;

@@ -445,7 +445,7 @@ function _wizRenderCurrList(q){
   if(!items.length){list.innerHTML='<span class="muted" style="font-size:var(--fs-sm)">No matching items.</span>';return;}
   list.innerHTML=items.map(c=>{
     const sel=_wizState.currId===c.id;
-    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr(${jsq(c.id)},'${_jsAttr(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
+    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr(${jsq(c.id)},${jsq(c.title)})">${esc(c.code)} — ${esc(c.title)}</div>`;
   }).join('');
 }
 

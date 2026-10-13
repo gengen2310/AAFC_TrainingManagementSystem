@@ -53,7 +53,7 @@ function renderRooms(){
     <td style="text-align:center">${r.capacity||'—'}</td>
     <td>${r.type?`<span class="badge b-blue" style="font-size:var(--fs-2xs)">${esc(r.type)}</span>`:'—'}</td>
     <td class="no-print">${showRooms
-      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}','${_jsAttr(r.name)}')">Restore</button>`:'')
+      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}',${jsq(r.name)})">Restore</button>`:'')
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive training area" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
   </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showRooms?'archived ':''}training areas.</td></tr>`;
   const showEquip=(document.getElementById('equip-show-archived')||{}).checked;
@@ -63,7 +63,7 @@ function renderRooms(){
     <td style="text-align:center">${eq.qty||'—'}</td>
     <td style="font-size:var(--fs-xs);color:var(--muted)">${esc(eq.notes||'')}</td>
     <td class="no-print">${showEquip
-      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreEquip('${eq.id}','${_jsAttr(eq.name)}')">Restore</button>`:'')
+      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreEquip('${eq.id}',${jsq(eq.name)})">Restore</button>`:'')
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive equipment" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
   </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showEquip?'archived ':''}equipment.</td></tr>`;
 }
