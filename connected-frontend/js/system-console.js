@@ -468,7 +468,9 @@ async function scPreviewCurriculum(){
   try{
     const d=await _scCurriculumXlsmRequest(true);
     _scCurriculumPreviewReady=true;
-    msg.textContent='Preview ready. Review the counts below before committing.';
+    // R11 (owner decision 2026-10-13): Location/Room are scheduling detail set
+    // per parade night, so the import deliberately does not store them.
+    msg.textContent='Preview ready. Review the counts below before committing. Location and Room columns are not imported: rooms are set on each parade night.';
     msg.style.color=Number(d.failed||0)>0?'var(--amber)':'var(--ok)';
     _scRenderCurriculumSummary(d,true);
   }catch(e){
