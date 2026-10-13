@@ -38,6 +38,8 @@ except ImportError:
     raise
 
 BASE = os.environ.get("BASE_URL", "https://aafc-tms-backend-staging.up.railway.app")
+# Cookie-authenticated writes (here: logout) need a trusted Origin since D13.
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "https://aafc-tms-frontend-staging.up.railway.app")
 
 # Wing 1 (7WG) — 16 squadrons with deterministic codes from seed_all.py
 _7WG_CODES = []
@@ -133,6 +135,7 @@ def _worker(user_spec: dict, ramp_delay_s: float):
     time.sleep(ramp_delay_s)
 
     session = requests.Session()
+    session.headers['Origin'] = FRONTEND_ORIGIN
     code = user_spec["code"]
     wing = user_spec["wing"]
     sqn = user_spec["sqn"]
@@ -196,6 +199,7 @@ def _worker(user_spec: dict, ramp_delay_s: float):
         except Exception:
             pass
         session = requests.Session()
+        session.headers['Origin'] = FRONTEND_ORIGIN
         time.sleep(random.uniform(2, 8))
 
 
