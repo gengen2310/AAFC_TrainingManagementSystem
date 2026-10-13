@@ -27,7 +27,7 @@ from ..models import (
     PlanningYear, Session, CurriculumItem, NationalEntity, JobStatus,
     # ParadeDate removed (Phase B migration a1c68e84caf5) — T5 handles router updates
 )
-from ..permissions import Principal, require_system_admin, require_audit_access, level_scope_clause
+from ..permissions import Principal, require_system_admin, require_audit_access, level_scope_clause, may_see_audit_actor
 from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db
 from ..services import audit
 from ..services_year import timezone_for_new_wing
@@ -323,12 +323,13 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
         except ValueError:
             raise HTTPException(400, detail={"error": "invalid_since_format"})
     logs = q.order_by(AuditLog.timestamp.desc()).limit(min(limit, 500)).all()
+    show_actor = may_see_audit_actor(p)
     # Never return access-code hashes, JWT secrets, or plaintext secrets in audit output
     return {"count": len(logs), "logs": [
         {
             "id": e.id,
             "timestamp": iso_z(e.timestamp) if e.timestamp else None,
-            "user_id": e.user_id,
+            "user_id": e.user_id if show_actor else None,
             "role": e.role,
             "scope": e.scope,
             "wing_id": e.wing_id,
@@ -336,7 +337,7 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
             "object_type": e.object_type,
             "object_id": e.object_id,
             "action": e.action,
-            "ip_address": e.ip_address,
+            "ip_address": e.ip_address if show_actor else None,
         }
         for e in logs
     ]}
