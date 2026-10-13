@@ -64,7 +64,7 @@ decision recorded).
 | 3. smoke against the restored database | health ready (commit `431d5f9`, 140 squadrons); `/api/system/migrations` = `7f61608fa538`; system_admin: me, accounts (40), service-desk tickets 200; sqn_admin: parade-nights, cadets, dashboard charts, planning years 200; Main TMS and PW 200 |
 | 4. roll forward with `deploy-staging.sh` at `2ed9b12` | **all hard gates passed**: preflight (3,350 passed), DB re-migrated v69 → `63c110addb63`, CRUD, Main TMS + PW fingerprints = `2ed9b12`, Playwright smokes, new deployments active (backend `c1df7f25`, Main TMS `109a5233`, PW `9c9b013a`) |
 
-## Load against staging (beta gate 7) — PARTIAL; 100-user run BLOCKED on accounts
+## Load against staging (beta gate 7) — 15-user run (the 100-user run is below)
 
 The gate's tool (`tools/stress/load_test_staging.py`, local-only) cycles 36 seeded accounts.
 On staging only the codes of 5 accounts are known to work (system_admin, national_admin,
@@ -86,3 +86,27 @@ nights 1,339 ms): latency is dominated by the network/TLS round trip from this c
 (the driver opens a new connection per request), not by server time. Within the thresholds
 (read p95 < 2 s, write p95 < 3 s, errors < 1%). Server capacity evidence remains the local
 national-scale run (`docs/stabilisation/national-qualification.md`, 250 users, 0 errors).
+
+## 100-user load on staging (beta gate 7 / B6) — PASS, 2026-10-13
+
+- **Build:** `7d5808c`, deployed with `deploy-staging.sh`. Every gate passed: preflight suite 3,354 passed, module sha256 checks, fingerprints, Playwright gates and a new active deployment on all 3 services.
+- **Configuration:** staging `API_RATE_LIMIT=1200`, matching the owner's production decision R1. The per-account limit uses the same setting.
+- **Accounts (owner-authorised):** 95 dedicated accounts named "Load Test <sqn>-<nn>":
+  - spread over the 15 squadrons that no automation signs in to (701, 702, 704, 705, 707–715, 721, 723); 32 are `sqn_admin`, 63 `sqn_general`;
+  - each code was random and rotated through the forced first change, and held only in a local file readable by the operator alone;
+  - 703, 7WG and the national roles were left alone, because lookup returns the newest account for a unit and role, which would have hijacked the deploy gates' and suites' sign-ins;
+  - 3 Wing and 2 National virtual users used the real `ADMIN7WG` and `ADMINNATIONAL` accounts;
+  - all 95 were archived afterwards, the code file was deleted, and the 701 lookup was confirmed to return the real "701 Admin" again.
+- **Workload:** the same per-role read mix and 8–20 s think time as the 15-user run, plus an idempotent parade-night notes PATCH for Squadron Admins. Ramp-up was 60 s, followed by 15 minutes, all from one client IP.
+- **Thresholds**, fixed in the execution plan before any run: error rate < 1 %, read p95 < 2 s, write p95 < 3 s.
+
+| Users | Logins | Requests | Error rate | Read p95 | Write p95 | p50 | p99 | 429 / 5xx |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 100/100 | 6,316 | **0.13 %** | **1.18 s** | **1.05 s** (55 writes) | 0.88 s | 2.20 s | 0 / 0 |
+
+- **The 8 non-200 responses:**
+  - 2 × 409: two load users in the same squadron saved the same parade night together, and optimistic locking correctly refused the second save;
+  - 6 client-side connection failures (status 0): the client recorded no response, and the script didn't record the endpoint, so these are unexplained.
+- **Slowest endpoints at p95:** `/api/accounts` 1.69 s, `/api/dashboard/charts` 1.22 s.
+- **Comparison with the 15-user run:** overall p95 was 1.27 s there and 1.18 s here, so 6.7 times the users caused no visible slowdown. Most of the p50 is network round trip from the client to Railway.
+- **R10 on the deployed build:** over 200 audit-summary rows, `sqn_general` saw 0 IP addresses and 0 user ids, while `sqn_admin` saw 182 and 200.

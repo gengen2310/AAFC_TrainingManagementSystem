@@ -1,6 +1,6 @@
 # Release decision — AAFC TMS production readiness
 
-**Decision: NO-GO** (2026-10-12). Every engineering gate that can be run without the owner has
+**Decision: NO-GO** (2026-10-12; updated 2026-10-13 after owner decisions R1, R2, R10 and the 100-user staging run). Every engineering gate that can be run without the owner has
 been run and passes. The release is blocked only by owner actions and sign-offs (B1–B8), each
 named below with the exact next step. **Production deployment is not authorised.**
 
@@ -25,7 +25,7 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | Database | **PASS** | single head; up/down/up on PostgreSQL 16 and SQLite; full chain on PostgreSQL in deploy preflight; lossy-downgrade policy documented |
 | Disaster recovery | **PASS with risk** | restore drill on real production data at `0c0aadb` (run 38221096962: 23/23 checks, 9/9 app reads); staging restore → previous build → roll-forward rehearsed (D25 fixed); **R7**: not yet on PG 17 with an operator-held key |
 | Reliability | **PASS** | drills under 100 users: worker kill, maintenance on/off, PostgreSQL outage — 0 × 500 after D19/D20 |
-| National scale | **BLOCKED (partial)** | local 10,200-cadet dataset: 50/100/250 users, 0 errors, p95 43–73 ms; staging 15 users within thresholds; **100-user staging run blocked on credentials (B6)** |
+| National scale | **PASS** | local 10,200-cadet dataset: 50/100/250 users, 0 errors, p95 43–73 ms; **staging, 100 users on `7d5808c` (2026-10-13): 0.13 % errors, read p95 1.18 s, write p95 1.05 s, 0 × 429/5xx** — STAGING_EVIDENCE |
 | Documentation | **PASS** | clean-clone walkthrough by a fresh agent (3,347 tests from the docs alone), 14 gaps fixed; request trace; production and rollback runbooks rewritten for v64 → v76 |
 | CI | **PASS on the PR head** (re-check on the merge commit) | 28/28 checks green on `ce4a928` (2026-10-13). The previous head `8e5b833` had 3 failures; each was root-caused rather than re-run: product defect D26, a stale-baseline flaw in the REM-111 test, a fixture code collision |
 | Reviews | **PASS** | independent adversarial review (NO-GO, 12 findings): 7 fixed or refuted, 5 are the owner items below |
@@ -38,10 +38,10 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | B1 | Run UAT with real Training Officers per role; sign `docs/beta/38`, `46` (data governance), `47` (known limitations) | beta-release gate 10 | `docs/beta/37_user_acceptance_test_plan.md` |
 | B2 | Decide backup custody: separate production key held outside GitHub, private artifact storage, an off-GitHub copy; sign `docs/beta/36` | R4 | RISK_REGISTER R4 |
 | B3 | Rehearse decrypt → empty-schema restore → previous build on PostgreSQL 17 with the operator-held key | rollback for this release = restore (R5, R7) | rollback_runbook §1a |
-| B4 | Set production `API_RATE_LIMIT` explicitly and confirm `CORS_ALLOWED_ORIGINS` holds both production frontends (the deploy script refuses otherwise) | R1, D13 | production_release_runbook §1 |
+| B4 | Owner chose **`API_RATE_LIMIT=1200`** per IP (2026-10-13; staging set and load-tested). Remaining: set it on production and confirm `CORS_ALLOWED_ORIGINS` holds both production frontends (the deploy script refuses otherwise) | R1, D13 | production_release_runbook §1 |
 | B5 | Identify the build production really runs (Railway dashboard) and record it as the rollback target | R6 | production_release_runbook §1 |
-| B6 | Provide staging load-test credentials (or authorise dedicated accounts) so the 100-user staging run can complete | gate 7, R8 | STAGING_EVIDENCE |
-| B7 | Decide the policy items R2 (lockout), R3, R9, R10, R11 — accept or change | security/product policy | RISK_REGISTER |
+| B6 | ~~Staging load-test accounts~~ — **DONE** 2026-10-13: owner authorised dedicated accounts; 100-user run PASSED; accounts archived | gate 7, R8 | STAGING_EVIDENCE |
+| B7 | Policy items: **R2 accepted for this release** and **R10 changed (fixed, `7d5808c`)** by the owner 2026-10-13; still to decide: R3, R9, R11 | security/product policy | RISK_REGISTER |
 | B8 | Merge the release PR (merge commit), confirm CI green on the merge commit and the next scheduled restore test passes on `main` | containment, D6 | the release PR |
 
 When B1–B8 are done and recorded, re-run the beta-release gate 11 consolidation; only then may
