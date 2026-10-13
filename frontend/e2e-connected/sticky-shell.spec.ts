@@ -14,6 +14,23 @@ test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
+// Make the page tall and scroll it, robustly: the app may re-render .main
+// (e.g. after entering Proxy Mode), which would drop a spacer added earlier,
+// and html has scroll-behavior:smooth, so scroll instantly and wait until the
+// page has really moved (CI webkit, 2026-10-13).
+async function scrollPageTo(page: import("@playwright/test").Page, y: number) {
+  await expect.poll(async () => page.evaluate((to) => {
+    if (!document.getElementById("e2e-spacer")) {
+      const spacer = document.createElement("div");
+      spacer.id = "e2e-spacer";
+      spacer.style.height = "8000px";
+      document.querySelector(".main")!.appendChild(spacer);
+    }
+    window.scrollTo({ top: to, behavior: "instant" as ScrollBehavior });
+    return window.scrollY;
+  }, y), { timeout: 10000 }).toBeGreaterThan(y - 50);
+}
+
 test("the left navigation and top bar stay on screen however far the page scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 800 });
   if (LOCAL_API_BASE) await page.addInitScript((b) => { (window as any).AAFC_API_BASE = b; }, LOCAL_API_BASE);
@@ -27,15 +44,8 @@ test("the left navigation and top bar stay on screen however far the page scroll
   await page.locator("#auth-btn").click();
   await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
-  await page.evaluate(() => {
-    const spacer = document.createElement("div");
-    spacer.style.height = "6000px";
-    document.querySelector(".main")!.appendChild(spacer);
-  });
   for (const y of [1500, 5000]) {
-    await page.mouse.move(800, 400);
-    await page.evaluate((to) => window.scrollTo(0, to), y);
-    await page.waitForTimeout(200);
+    await scrollPageTo(page, y);
     const geo = await page.evaluate(() => {
       const r = (s: string) => (document.querySelector(s) as HTMLElement).getBoundingClientRect();
       return { scrolled: window.scrollY, topbar: r(".topbar").top, navTop: r(".sidenav").top,
@@ -79,14 +89,7 @@ test("the Proxy Mode warning stays pinned under the top bar, with the navigation
   const banner = page.locator("#mode-banner.show");
   await expect(banner).toBeVisible({ timeout: 10000 });
   try {
-    await page.evaluate(() => {
-      const spacer = document.createElement("div");
-      spacer.style.height = "6000px";
-      spacer.id = "e2e-spacer";
-      document.querySelector(".main")!.appendChild(spacer);
-    });
-    await page.evaluate(() => window.scrollTo(0, 3000));
-    await page.waitForTimeout(200);
+    await scrollPageTo(page, 3000);
     const geo = await page.evaluate(() => {
       const r = (s: string) => (document.querySelector(s) as HTMLElement).getBoundingClientRect();
       return { scrolled: window.scrollY, topbarBottom: r(".topbar").bottom, bannerTop: r("#mode-banner").top,
@@ -102,8 +105,7 @@ test("the Proxy Mode warning stays pinned under the top bar, with the navigation
     await page.evaluate(() => (window as any).exitMode());
   }
   await expect(page.locator(".mode-banner.show")).toHaveCount(0, { timeout: 10000 });
-  await page.evaluate(() => window.scrollTo(0, 3000));
-  await page.waitForTimeout(200);
+  await scrollPageTo(page, 3000);
   const navTop = await page.evaluate(() => (document.querySelector(".sidenav") as HTMLElement).getBoundingClientRect().top);
   expect(navTop, "after leaving the mode the navigation returns to just below the top bar").toBeCloseTo(52, 0);
 });
