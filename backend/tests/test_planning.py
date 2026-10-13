@@ -3358,3 +3358,18 @@ def test_session_created_from_planner_has_timing_block_id(client):
         )
     finally:
         db.close()
+
+
+def test_planning_notices_carry_version_like_the_training_notice_endpoint(client):
+    """R13 (2026-10-13): one notice serialiser for both routers. The planning
+    copy omitted the optimistic-concurrency `version` the training copy has."""
+    hdr = login(client, "ADMIN703")
+    date_id, notice_id = _make_parade_date_and_notice(client, hdr, "2099-05-06")
+    r = client.get(f"/api/planning/parade-nights/{date_id}/notices", headers=hdr)
+    assert r.status_code == 200, r.text
+    row = next(n for n in r.json() if n["notice_id"] == notice_id)
+    assert isinstance(row.get("version"), int), row
+    t = client.get(f"/api/parade-nights/{date_id}/notices", headers=hdr)
+    assert t.status_code == 200, t.text
+    trow = next(n for n in t.json() if n["notice_id"] == notice_id)
+    assert trow == row, "both routers must serialise a notice identically"

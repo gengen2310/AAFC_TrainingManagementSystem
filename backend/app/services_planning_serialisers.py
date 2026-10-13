@@ -11,11 +11,14 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 
 from .database import iso_z
+# One notice serialiser for both routers (R13, 2026-10-13); the planning copy
+# lacked `version`, which the training copy (and optimistic locking) uses.
+from .services_training_serialisers import _notice_out  # noqa: F401  (re-exported for routers/planning.py)
 from .models import CurriculumItem, Facilitator, ParadeNight, SessionAudience, TrainingArea
 from .models import Session as TrainingSession
 from .models.custom_phases import CustomTrainingPhase
 from .models.planning import (
-    AnchorEvent, CeaActivity, HolidayPeriod, PlanningConflict, PlanningNotice, PlanningYear,
+    AnchorEvent, CeaActivity, HolidayPeriod, PlanningConflict, PlanningYear,
 )
 from .models.training import SessionCustomPhaseAudience
 
@@ -259,20 +262,6 @@ def _conflict_out(c: PlanningConflict) -> dict:
         "message": c.message, "is_resolved": c.is_resolved,
         "override_reason": c.override_reason,
         "created_at": iso_z(c.created_at) if c.created_at else None,
-    }
-
-
-def _notice_out(n: PlanningNotice) -> dict:
-    return {
-        "notice_id": n.id,
-        "parade_night_id": n.parade_night_id,
-        "notice_text": n.notice_text,
-        "audience": n.audience,
-        "priority": n.priority,
-        "created_by": n.created_by,
-        "is_archived": n.is_archived,
-        "created_at": iso_z(n.created_at) if n.created_at else None,
-        "updated_at": iso_z(n.updated_at) if n.updated_at else None,
     }
 
 
