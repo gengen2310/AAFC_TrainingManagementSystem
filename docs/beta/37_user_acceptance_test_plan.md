@@ -228,3 +228,4 @@ tester.
 | U8 | System Admin | Accounts list and the Service Desk "Assigned to" picker | All accounts listed; the picker offers only active admins |
 | U9 | Squadron Admin | Planning → export the Annual Program with anchor events | The workbook downloads (no error) with an Anchor Events sheet |
 | U10 | any | Use the app for 15 minutes at a normal pace on your usual network | No "Too many requests" messages (report if seen: rate-limit decision R1) |
+| U11 | any | Scroll to the bottom of a long page (Dashboard, Curriculum); as Wing Admin also enter Proxy Mode and scroll | The left navigation and top bar never scroll away; in Proxy Mode the yellow warning (with Exit mode) stays under the top bar |
