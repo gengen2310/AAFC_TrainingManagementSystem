@@ -13,7 +13,7 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | Category | Result | Evidence |
 |---|---|---|
 | Repository integrity | **PASS** | #67/#69/#71/#72 heads and `main` are ancestors; #68 content-contained (its only non-ancestor commit is empty) — TASK_REGISTER "Containment proof" |
-| Functional completeness | **PASS** | full backend suite 3,350 passed / 0 failed; Main TMS E2E 202 × 3 browsers; PW E2E 42 × 3; workflow defects D12, D15–D18, D21, D26 fixed with regression tests |
+| Functional completeness | **PASS** | full backend suite 3,350 passed / 0 failed; Main TMS E2E 202 × 3 browsers; PW E2E 42 × 3; workflow defects D12, D15–D18, D21, D26, D27 fixed with regression tests |
 | Role permissions | **PASS** | role/scope matrices incl. 112-case custom-phase matrix (D10 + create follow-up), scope parity 1,344/1,344, cross-Wing isolation suites |
 | Security | **PASS** (open policy items in RISK_REGISTER) | D10, D11 (stored XSS), D13 (CSRF), D14 (limiter, proven on PostgreSQL) fixed; code security review: no finding ≥ 8 (to `ea12454`) + post-`ea12454` review; X-Forwarded-For spoofing refuted on staging |
 | Main TMS | **PASS** | E2E chromium/firefox/webkit in CI; extraction parity (40 deliberate changes, none lost); staging browser suite |
@@ -27,7 +27,7 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | Reliability | **PASS** | drills under 100 users: worker kill, maintenance on/off, PostgreSQL outage — 0 × 500 after D19/D20 |
 | National scale | **PASS** | local 10,200-cadet dataset: 50/100/250 users, 0 errors, p95 43–73 ms; **staging, 100 users on `7d5808c` (2026-10-13): 0.13 % errors, read p95 1.18 s, write p95 1.05 s, 0 × 429/5xx** — STAGING_EVIDENCE |
 | Documentation | **PASS** | clean-clone walkthrough by a fresh agent (3,347 tests from the docs alone), 14 gaps fixed; request trace; production and rollback runbooks rewritten for v64 → v76 |
-| CI | **PASS on the PR head** (re-check on the merge commit) | 28/28 checks green on `ce4a928` (2026-10-13). The previous head `8e5b833` had 3 failures; each was root-caused rather than re-run: product defect D26, a stale-baseline flaw in the REM-111 test, a fixture code collision |
+| CI | **PASS on the PR head** (re-check on the merge commit) | 28/28 checks green on `df5f182` (2026-10-13; includes R10, D27 and the pinned mode warning; staging runs `71fcd77`, test-only difference). The previous head `8e5b833` had 3 failures; each was root-caused rather than re-run: product defect D26, a stale-baseline flaw in the REM-111 test, a fixture code collision |
 | Reviews | **PASS** | independent adversarial review (NO-GO, 12 findings): 7 fixed or refuted, 5 are the owner items below |
 | Governance / UAT | **BLOCKED** | `docs/beta/38` UAT not run; `46`, `47`, `36` unsigned |
 
