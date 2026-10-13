@@ -33,6 +33,8 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 
 ## Blockers (owner actions), in order
 
+Step-by-step for each remaining item, and what to send back: [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md).
+
 | # | Action | Why | Where |
 |---|---|---|---|
 | B1 | Run UAT with real Training Officers per role; sign `docs/beta/38`, `46` (data governance), `47` (known limitations) | beta-release gate 10 | `docs/beta/37_user_acceptance_test_plan.md` |
