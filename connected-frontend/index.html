@@ -137,8 +137,8 @@
 }
 /* shared/tokens.css sync end */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{scroll-behavior:smooth;overflow-x:hidden;}
-body{overflow-x:hidden;}
+html{scroll-behavior:smooth;overflow-x:clip;}
+body{overflow-x:clip;}
 body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:var(--fs-md);line-height:1.6;}
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--lgrey);border-radius:3px;}
 
@@ -1155,7 +1155,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   /* Compact topbar: hide redundant unit name (shown in scope-banner below) and print-only action */
   .tb-sep,.tb-unit{display:none;}
   #btn-print-program{display:none!important;}
-  html,body{overflow-x:hidden;}
+  html,body{overflow-x:clip;}
   .main{padding:14px;overflow-x:hidden;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}

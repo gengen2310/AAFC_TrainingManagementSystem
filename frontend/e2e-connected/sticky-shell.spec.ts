@@ -1,0 +1,52 @@
+import { test, expect } from "../e2e-fixtures";
+import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+
+// D27 (2026-10-13): the left navigation and the top bar scrolled away with the
+// page although both are position:sticky. html AND body had overflow-x:hidden,
+// which stops body's overflow propagating to the viewport, so body became a
+// scroll container that never scrolls and sticky never engaged. The page is
+// made tall here so the check does not depend on how much seed data exists.
+const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
+
+// Two logins per run, after a long suite: reset the backend's per-IP limiter
+// first, as the other connected specs do.
+test.beforeEach(async () => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test("the left navigation and top bar stay on screen however far the page scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  if (LOCAL_API_BASE) await page.addInitScript((b) => { (window as any).AAFC_API_BASE = b; }, LOCAL_API_BASE);
+  await page.goto("/");
+  await page.locator("#auth-type").selectOption("squadron");
+  await page.locator("#auth-wing-select").selectOption("7WG");
+  await page.locator("#auth-sqn-select").selectOption("703");
+  await page.locator("#auth-role").selectOption("sqn_admin");
+  await page.locator("#auth-continue-btn").click();
+  await page.locator("#auth-code").fill("ADMIN703");
+  await page.locator("#auth-btn").click();
+  await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
+
+  await page.evaluate(() => {
+    const spacer = document.createElement("div");
+    spacer.style.height = "6000px";
+    document.querySelector(".main")!.appendChild(spacer);
+  });
+  for (const y of [1500, 5000]) {
+    await page.mouse.move(800, 400);
+    await page.evaluate((to) => window.scrollTo(0, to), y);
+    await page.waitForTimeout(200);
+    const geo = await page.evaluate(() => {
+      const r = (s: string) => (document.querySelector(s) as HTMLElement).getBoundingClientRect();
+      return { scrolled: window.scrollY, topbar: r(".topbar").top, navTop: r(".sidenav").top,
+               navBottom: r(".sidenav").bottom, viewport: window.innerHeight };
+    });
+    expect(geo.scrolled, "the page must actually have scrolled").toBeGreaterThan(1000);
+    expect(geo.topbar, "top bar pinned to the top").toBe(0);
+    expect(geo.navTop, "navigation starts just below the top bar").toBeCloseTo(52, 0);
+    expect(geo.navBottom, "navigation reaches the bottom of the window").toBeCloseTo(geo.viewport, 0);
+  }
+  await expect(page.locator(".sidenav .nav-item").first()).toBeInViewport();
+  const hScroll = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(hScroll, "no horizontal page scroll (what overflow-x:hidden was for)").toBeLessThanOrEqual(0);
+});
