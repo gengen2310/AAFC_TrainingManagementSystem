@@ -60,3 +60,13 @@ def test_no_raw_json_interpolated_into_markup():
                  for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
                  if "${JSON.stringify(" in line]
     assert offenders == [], "\n".join(offenders)
+
+
+def test_one_js_in_attribute_helper_jsAttr_is_gone():
+    """R13 (2026-10-13): _jsAttr() returned the inside of a single-quoted JS
+    literal ('${_jsAttr(v)}') and escaped only backslash and quote, so a value
+    with a newline or U+2028 broke the handler. jsq() covers every character
+    and is now the only helper for a value inside inline-handler JavaScript."""
+    users = [f"{p.name}:{i}" for p in _sources()
+             for i, line in enumerate(p.read_text().splitlines(), 1) if "_jsAttr" in line]
+    assert users == [], "use ${jsq(value)} instead of '${_jsAttr(value)}':\n" + "\n".join(users)

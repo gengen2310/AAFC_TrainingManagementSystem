@@ -209,7 +209,7 @@ function _refDataRowHtml(t,counts){
       <div style="font-size:var(--fs-xs);font-weight:700;color:var(--text)">${esc(t.label)}</div>
       <div id="refdata-count-${t.key}">${detail}</div>
     </div>
-    <button class="btn btn-out btn-sm" onclick="openRefDataManager('${_jsAttr(t.key)}')" aria-label="Manage ${esc(t.label)}">Manage</button>
+    <button class="btn btn-out btn-sm" onclick="openRefDataManager(${jsq(t.key)})" aria-label="Manage ${esc(t.label)}">Manage</button>
   </div>`;
 }
 
@@ -255,10 +255,10 @@ function openRefDataManager(key){
     <div id="refdata-list-${t.key}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"><span class="muted" style="font-size:var(--fs-xs)">Loading…</span></div>
     <div style="display:flex;gap:6px">
       <input id="refdata-new-${t.key}" placeholder="New ${esc(t.label.replace(/s$/,''))} name…" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:var(--fs-xs)">
-      <button id="refdata-add-${t.key}" class="btn btn-sky btn-sm" onclick="_addRefItem('${_jsAttr(t.key)}')">+ Add</button>
+      <button id="refdata-add-${t.key}" class="btn btn-sky btn-sm" onclick="_addRefItem(${jsq(t.key)})">+ Add</button>
     </div>
     <p id="refdata-msg-${t.key}" style="color:var(--error);font-size:var(--fs-xs);margin:6px 0 0"></p>
-    ${t.restoreUrl?`<label style="display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-2xs);font-weight:400;text-transform:none;letter-spacing:0;margin-top:10px;color:var(--muted)"><input type="checkbox" id="refdata-show-archived-${t.key}" onchange="_loadRefByKey('${_jsAttr(t.key)}')"> Show archived</label>`:''}
+    ${t.restoreUrl?`<label style="display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-2xs);font-weight:400;text-transform:none;letter-spacing:0;margin-top:10px;color:var(--muted)"><input type="checkbox" id="refdata-show-archived-${t.key}" onchange="_loadRefByKey(${jsq(t.key)})"> Show archived</label>`:''}
   `;
   openModal('m-refdata');
   _loadRefList(t);
@@ -414,16 +414,16 @@ function _renderAccountTable(){
 
   const actions=u=>{
     if(!canWrite) return '';
-    const dn=_jsAttr(u.display_name||'');
+    const dn=jsq(u.display_name||'');
     if(u.is_archived){
-      return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button> `+
-        `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteAccount('${u.user_id}','${dn}')">Delete Permanently…</button>`;
+      return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}',${dn})">Restore</button> `+
+        `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteAccount('${u.user_id}',${dn})">Delete Permanently…</button>`;
     }
-    const resetBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
-    const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
+    const resetBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}',${dn})" title="Reset access code">Reset access code</button>`;
+    const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}',${dn})">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
-      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
-      : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${dn}')">Reactivate</button>`;
+      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}',${dn})">Disable</button>`
+      : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}',${dn})">Reactivate</button>`;
     const editBtn=`<button class="btn btn-xs" onclick="openEditAccountModal('${u.user_id}')">Edit</button>`;
     // REM-05: only Squadron/Wing-scoped accounts have a scope to move (National-
     // scope accounts 422 scope_change_not_applicable server-side). Hidden for
@@ -436,7 +436,7 @@ function _renderAccountTable(){
     // carry a separate "Delete Permanently…" -- so calling this one "Delete"
     // made the same word mean two different things depending on the row, which
     // is precisely the archive/delete confusion the design rules out.
-    const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-out" onclick="doArchiveAccount('${u.user_id}','${dn}')" title="Revokes access; reversible via Show archived → Restore">Archive</button>`;
+    const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-out" onclick="doArchiveAccount('${u.user_id}',${dn})" title="Revokes access; reversible via Show archived → Restore">Archive</button>`;
     return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${changeScopeBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
   };
 
@@ -525,9 +525,9 @@ function _renderFlightTable(){
   const flights=showArchived?(_archivedFlightList||[]):(S.flightList||[]);
   if(!flights.length){ el.innerHTML=`<div style="color:var(--muted);font-size:var(--fs-xs);padding:8px 0">No ${showArchived?'archived ':''}flights${showArchived?'':' defined'}.</div>`; return; }
 
-  const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${_jsAttr(f.name||'')}')">Rename</button>`;
-  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
-  const restoreBtn=f=>`<button class="btn btn-xs btn-ok" onclick="doRestoreFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Restore</button>`;
+  const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}',${jsq(f.name||'')})">Rename</button>`;
+  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doArchiveFlight('${f.flight_id}',${jsq(f.name||'')})">Archive</button>`;
+  const restoreBtn=f=>`<button class="btn btn-xs btn-ok" onclick="doRestoreFlight('${f.flight_id}',${jsq(f.name||'')})">Restore</button>`;
   const actionsCell=f=>f.is_archived?restoreBtn(f):(renameBtn(f)+archiveBtn(f));
 
   el.innerHTML='<div class="tw"><table><thead><tr><th>Flight Name</th><th>Squadron</th><th>Members</th>'+(canWrite?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
@@ -561,10 +561,10 @@ function _renderWingsTable(){
   const sqnCount=wid=>(S.squadrons||[]).filter(s=>s.wing_id===wid).length;
   const actionsCell=w=>{
     if(!isNatAdmin) return '';
-    if(w.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreWing('${w.wing_id}','${_jsAttr(w.code)}')">Restore</button> `+
-      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteWing('${w.wing_id}','${_jsAttr(w.code)}')">Delete Permanently…</button>`;
-    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('wing','${w.wing_id}','${_jsAttr(w.name||w.code)}','${_jsAttr(w.short_name||'')}')">Rename</button> `+
-      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')" title="Archives the Wing — reversible">Delete</button>`;
+    if(w.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreWing('${w.wing_id}',${jsq(w.code)})">Restore</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteWing('${w.wing_id}',${jsq(w.code)})">Delete Permanently…</button>`;
+    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('wing','${w.wing_id}',${jsq(w.name||w.code)},${jsq(w.short_name||'')})">Rename</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('wing','${w.wing_id}',${jsq(w.code)})" title="Archives the Wing — reversible">Delete</button>`;
   };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Squadrons</th>'+(isNatAdmin?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     wings.map(w=>`<tr${w.is_archived?' style="opacity:.6"':''}>
@@ -593,11 +593,11 @@ function _renderUnitsTable(){
   if(!sqns.length){ el.innerHTML='<div style="color:var(--muted);font-size:var(--fs-xs);padding:8px 0">No units found.</div>'; return; }
   const actionsCell=s=>{
     if(!canArchive(s)) return '';
-    if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Restore</button> `+
-      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Delete Permanently…</button>`;
-    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('squadron','${s.squadron_id}','${_jsAttr(s.name||s.code)}','${_jsAttr(s.short_name||'')}')">Rename</button> `+
-      `<button class="btn btn-xs btn-dk" onclick="_openEditUnitTypeModal('${s.squadron_id}','${_jsAttr(s.unit_type||'standard_squadron')}','${_jsAttr(s.name||s.code)}')">Edit Type</button> `+
-      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')" title="Archives the unit — reversible">Delete</button>`;
+    if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}',${jsq(s.code)})">Restore</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteSquadron('${s.squadron_id}',${jsq(s.code)})">Delete Permanently…</button>`;
+    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('squadron','${s.squadron_id}',${jsq(s.name||s.code)},${jsq(s.short_name||'')})">Rename</button> `+
+      `<button class="btn btn-xs btn-dk" onclick="_openEditUnitTypeModal('${s.squadron_id}',${jsq(s.unit_type||'standard_squadron')},${jsq(s.name||s.code)})">Edit Type</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}',${jsq(s.code)})" title="Archives the unit — reversible">Delete</button>`;
   };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>

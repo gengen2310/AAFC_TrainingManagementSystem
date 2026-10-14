@@ -77,7 +77,7 @@ function renderUserDir(){
     rows.map(u=>`<tr><td style="font-weight:700">${esc(u.display_name)}</td>
       <td><span class="badge ${ROLE_CLS[u.role]||'b-grey'}">${ROLE_L[u.role]||u.role}</span></td>
       <td style="font-size:var(--fs-xs);color:var(--muted)">${esc(unit(u))}</td>
-      <td><button class="btn btn-xs btn-sky" onclick="openResetCodeModal('${u.user_id}','${_jsAttr(u.display_name||'')}','${u.role}','${_jsAttr(unit(u))}')">Reset code</button></td>
+      <td><button class="btn btn-xs btn-sky" onclick="openResetCodeModal('${u.user_id}',${jsq(u.display_name||'')},'${u.role}',${jsq(unit(u))})">Reset code</button></td>
     </tr>`).join('')+
     '</tbody></table></div>';
 }

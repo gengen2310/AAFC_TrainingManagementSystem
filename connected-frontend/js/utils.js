@@ -7,17 +7,6 @@
 // effects stay in index.html in their original order. Parity is proven by
 // tools/architecture/frontend_parity.mjs.
 
-// Safe for embedding free-text (Wing/Squadron code -- no server-side charset
-// restriction beyond strip+uppercase) inside a double-quoted inline onclick
-// attribute: JS-escape first so the string decodes to a valid single-quoted
-// JS literal, then HTML-escape so a literal " in the source can never break
-// out of the onclick="..." attribute before the browser gets to decode it
-// (that break-out, e.g. code = 'X" onmouseover="...', is exactly what plain
-// .replace(/'/g,...)-only escaping elsewhere in this file does not stop).
-function _jsAttr(str){
-  return esc(String(str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
-}
-
 // ═══════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════

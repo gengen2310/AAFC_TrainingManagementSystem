@@ -9,7 +9,7 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 // The refactor is presentational. _loadRefList, _addRefItem, _archiveRefItem,
 // _restoreRefItem, _naturalRefScope and the canWrite gate are untouched -- the
 // modal body carries the same refdata-*-${key} ids the inline block used, so
-// those handlers keep working, including their esc()/_jsAttr escaping.
+// those handlers keep working, including their esc()/jsq() escaping.
 //
 // These tests exist because that claim is only true while the ids match. If
 // someone renames one, the summary card still renders and only the editing

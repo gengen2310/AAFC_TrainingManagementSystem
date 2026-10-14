@@ -240,7 +240,7 @@ function renderWingCalendar(){
       <td style="font-size:var(--fs-2xs)">${esc(aud)}</td>
       <td>${(!isAct&&!isArchived&&e.requires_squadron_action)?'<span class="badge b-amber">Action needed</span>':''}</td>
       ${isWingWrite?`<td>${isAct?'':(isArchived
-        ?`<button class="btn-xs btn-ok" onclick="event.stopPropagation();doRestoreWingEvent(${jsq(e.id)},'${_jsAttr(e.title||'')}')">Restore</button>`
+        ?`<button class="btn-xs btn-ok" onclick="event.stopPropagation();doRestoreWingEvent(${jsq(e.id)},${jsq(e.title||'')})">Restore</button>`
         :`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent(${jsq(e.id)})">Edit</button>
         <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent(${jsq(e.id)})">Archive</button>`)}</td>`:''}
     </tr>`;

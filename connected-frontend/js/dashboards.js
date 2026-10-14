@@ -1124,7 +1124,7 @@ function renderWing(){
   html+=`<div class="card"><h2 class="ctitle">Squadron Comparison</h2><div class="tw"><table>
     <thead><tr><th>Squadron</th><th>Parade Day</th><th style="text-align:center">Nights</th><th style="text-align:center">Pub.</th><th style="text-align:center">Sessions</th><th>Delivered</th><th>Coverage</th><th style="text-align:center">Not Del.</th><th style="text-align:center">Readiness</th><th>Status</th>${canProxy?'<th class="no-print"></th>':''}</tr></thead><tbody>`;
   rows.forEach(r=>{
-    html+=`<tr class="drow" onclick="wingDrill('${_jsAttr(r.squadron_id)}')">
+    html+=`<tr class="drow" onclick="wingDrill(${jsq(r.squadron_id)})">
       <td style="font-weight:800">${esc(r.short_name||r.code)}</td>
       <td style="font-size:var(--fs-xs)">${esc(r.parade_day||'—')}</td>
       <td style="text-align:center;font-weight:700">${r.nights||0}</td>
@@ -1135,7 +1135,7 @@ function renderWing(){
       <td style="text-align:center"><span class="badge ${(+r.not_delivered||0)===0?'b-ok':(+r.not_delivered<=2?'b-amber':'b-red')}">${r.not_delivered||0}</span></td>
       <td style="text-align:center;font-weight:700">${readinessDot(r.readiness)}</td>
       <td>${statusBadge(r)}</td>
-      ${canProxy?`<td class="no-print"><button class="btn btn-out btn-sm" onclick="event.stopPropagation();enterMode('${_jsAttr(r.squadron_id)}','${_jsAttr(r.short_name||r.code)}')">Proxy</button></td>`:''}
+      ${canProxy?`<td class="no-print"><button class="btn btn-out btn-sm" onclick="event.stopPropagation();enterMode(${jsq(r.squadron_id)},${jsq(r.short_name||r.code)})">Proxy</button></td>`:''}
     </tr>`;
   });
   html+=`</tbody></table></div></div>`;

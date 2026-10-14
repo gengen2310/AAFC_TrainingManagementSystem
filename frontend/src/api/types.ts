@@ -415,6 +415,7 @@ export interface ParadeNotice {
   priority: string;
   created_by: string | null;
   is_archived: boolean;
+  version: number;
   created_at: string | null;
   updated_at: string | null;
 }

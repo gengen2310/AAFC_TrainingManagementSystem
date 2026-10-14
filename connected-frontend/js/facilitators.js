@@ -85,7 +85,7 @@ function renderFacs(){
       <td style="text-align:center">${showArchived?'—':`<button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button>`}</td>
       <td class="no-print" onclick="event.stopPropagation()">
         ${showArchived
-          ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreFacilitator('${f.id}','${_jsAttr(nameFor)}')">Restore</button>`:'')
+          ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreFacilitator('${f.id}',${jsq(nameFor)})">Restore</button>`:'')
           :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" aria-label="Archive facilitator" onclick="delFac('${f.id}')">×</button>`:'')}
       </td>
     </tr>`;
@@ -108,7 +108,7 @@ function tagFac(id){
   el.innerHTML=allVocab.map(v=>{
     const on=cur.includes(v);
     const isApiTag=apiTagNames.includes(v)&&!FAC_TAG_VOCAB.includes(v);
-    return `<button type="button" onclick="toggleTagVocab(this,'${_jsAttr(v)}',${on?'false':'true'})"
+    return `<button type="button" onclick="toggleTagVocab(this,${jsq(v)},${on?'false':'true'})"
       style="padding:4px 12px;border-radius:20px;font-size:var(--fs-xs);font-weight:700;cursor:pointer;
              border:1.5px solid var(--royal);background:${on?'var(--royal)':'white'};color:${on?'white':'var(--royal)'}${isApiTag?';border-style:dashed':''}"
       data-active="${on}" title="${isApiTag?'Unit-created tag':''}">${esc(v)}</button>`;
@@ -140,7 +140,9 @@ async function createAndAddTag(){
 }
 function toggleTagVocab(btn,val,makeActive){
   const active=makeActive==='true'||makeActive===true;
-  btn.setAttribute('onclick',`toggleTagVocab(this,'${_jsAttr(val)}',${active?'false':'true'})`);
+  // setAttribute() is not HTML-decoded, so the value is a bare JSON literal
+  // here -- jsq()'s HTML escaping would reach the handler as &amp;, &#39;, ...
+  btn.setAttribute('onclick','toggleTagVocab(this,'+JSON.stringify(String(val||''))+','+(active?'false':'true')+')');
   btn.dataset.active=active?'true':'false';
   btn.style.background=active?'var(--royal)':'white';
   btn.style.color=active?'white':'var(--royal)';

@@ -6,7 +6,7 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 // injection patterns in connected-frontend/index.html:
 //   1. Attribute-context: free-text fields embedded in double-quoted onclick="...('${x}')"
 //      handlers, escaped only for single quotes -- a double quote breaks out of the
-//      attribute and installs an attacker-controlled handler (fixed via _jsAttr()).
+//      attribute and installs an attacker-controlled handler (fixed via _jsAttr(), now jsq()).
 //   2. Plain-text-content: free-text fields interpolated into innerHTML template
 //      literals with no escaping at all (fixed via esc()).
 // This test reproduces the exact payload shape from the fix's own code comment
