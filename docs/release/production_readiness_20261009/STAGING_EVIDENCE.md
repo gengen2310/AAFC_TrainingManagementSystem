@@ -110,3 +110,16 @@ national-scale run (`docs/stabilisation/national-qualification.md`, 250 users, 0
 - **Slowest endpoints at p95:** `/api/accounts` 1.69 s, `/api/dashboard/charts` 1.22 s.
 - **Comparison with the 15-user run:** overall p95 was 1.27 s there and 1.18 s here, so 6.7 times the users caused no visible slowdown. Most of the p50 is network round trip from the client to Railway.
 - **R10 on the deployed build:** over 200 audit-summary rows, `sqn_general` saw 0 IP addresses and 0 user ids, while `sqn_admin` saw 182 and 200.
+
+## Release candidate with R13 folded in — `d3d88c5`, 2026-10-14
+
+#74 (R13 cleanup) was merged into the release branch with a merge commit, at the owner's request.
+- `deploy-staging.sh` passed every gate:
+  - preflight suite: 3,358 passed, 12 skipped;
+  - Main TMS and Planning Workspace fingerprints match `d3d88c5`;
+  - new active deployments: backend `cea7d7c7`, frontend `1979cac1`, Planning Workspace `b7e6e747`.
+- Browser check of the deployed build (sqn_admin 703):
+  - after scrolling 4,164 px to the page bottom, the top bar sits at 0 and the navigation spans 52 → 800 px (D27);
+  - the "Air & Space" subject-area chip passes its exact name on 3 consecutive clicks, then the modal was closed without saving (R13);
+  - `_jsAttr` is gone and `jsq` is present;
+  - no console errors.

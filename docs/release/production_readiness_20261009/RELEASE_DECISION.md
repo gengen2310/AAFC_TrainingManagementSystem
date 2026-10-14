@@ -27,7 +27,7 @@ PR to `main` (CI must be green on that exact SHA; see the PR). Production today:
 | Reliability | **PASS** | drills under 100 users: worker kill, maintenance on/off, PostgreSQL outage — 0 × 500 after D19/D20 |
 | National scale | **PASS** | local 10,200-cadet dataset: 50/100/250 users, 0 errors, p95 43–73 ms; **staging, 100 users on `7d5808c` (2026-10-13): 0.13 % errors, read p95 1.18 s, write p95 1.05 s, 0 × 429/5xx** — STAGING_EVIDENCE |
 | Documentation | **PASS** | clean-clone walkthrough by a fresh agent (3,347 tests from the docs alone), 14 gaps fixed; request trace; production and rollback runbooks rewritten for v64 → v76 |
-| CI | **PASS on the PR head** (re-check on the merge commit) | 28/28 checks green on `df5f182` (2026-10-13; includes R10, D27 and the pinned mode warning; staging runs `71fcd77`, test-only difference). The previous head `8e5b833` had 3 failures; each was root-caused rather than re-run: product defect D26, a stale-baseline flaw in the REM-111 test, a fixture code collision |
+| CI | **PASS on the PR head** (re-check on the merge commit) | 28/28 checks green on `d3d88c5` (2026-10-14: includes R10, D27, the pinned mode warning and the R13 cleanup merged from #74); staging runs `d3d88c5`. The previous head `8e5b833` had 3 failures; each was root-caused rather than re-run: product defect D26, a stale-baseline flaw in the REM-111 test, a fixture code collision |
 | Reviews | **PASS** | independent adversarial review (NO-GO, 12 findings): 7 fixed or refuted, 5 are the owner items below |
 | Governance / UAT | **BLOCKED** | `docs/beta/38` UAT not run; `46`, `47`, `36` unsigned |
 

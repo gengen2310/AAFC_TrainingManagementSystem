@@ -20,3 +20,4 @@ final SHA (Phase 5). No full-suite claim is made for intermediate SHAs.
 | 2026-10-12 | `a10632f`, `2ed9b12` | `deploy-staging.sh` preflight (full backend suite inside) | 3,350 passed, 12 skipped (both runs) |
 | 2026-10-13 | `8e5b833` (docs-only head) | CI | **3 failures**, none caused by the docs change: webkit D21 test (→ product defect **D26**), chromium REM-111 merge step (→ stale-baseline test-harness flaw, fixed `a8e844c`: 15/15 after vs 3/8 webkit failures before), pytest fixture unit-code collision `6F26` (→ 3-hex-char codes in a session-wide DB, fixed `174b996`). Not re-run to green: each was root-caused |
 | 2026-10-13 | `7d5808c` | backend full `pytest tests/ -q` (local, then again in the `deploy-staging.sh` preflight) | 3,354 passed, 12 skipped, 0 failed (both runs) |
+| 2026-10-14 | `d3d88c5` | CI (#73) + `deploy-staging.sh` preflight | 28/28 checks; backend 3,358 passed, 12 skipped, 0 failed |
