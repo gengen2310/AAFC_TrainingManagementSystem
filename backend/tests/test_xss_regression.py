@@ -91,6 +91,11 @@ def test_frontend_dead_render_functions_removed():
     """
     with open("../connected-frontend/index.html", encoding="utf-8") as f:
         source = f.read()
+    # Script extracted into connected-frontend/js/ counts too.
+    import glob
+    for module in sorted(glob.glob("../connected-frontend/js/*.js")):
+        with open(module, encoding="utf-8") as f:
+            source += "\n" + f.read()
 
     assert "function renderProgramAudit" not in source, (
         "renderProgramAudit() was re-added. This function contained F-001 XSS and "

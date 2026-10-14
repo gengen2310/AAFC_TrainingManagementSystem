@@ -14,14 +14,12 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, iso_z
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role
+from ..permissions import Principal, require_role, is_oversight_role
 from ..models.program import JobStatus
 from ..workers.dispatcher import submit_export, ALLOWED_EXPORT_TYPES, ALLOWED_FORMATS
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
-_OVERSIGHT_ROLES = ("wing_admin", "wing_viewer", "national_admin", "national_viewer",
-                    "system_admin", "auditor")
 
 
 def _scope_for(p: Principal) -> str:
@@ -38,7 +36,7 @@ def get_job(job_id: str, db: DBSession = Depends(get_db), p: Principal = Depends
     job = db.get(JobStatus, job_id)
     if not job:
         raise HTTPException(404, detail={"error": "job_not_found"})
-    if job.requested_by != p.user_id and p.role not in _OVERSIGHT_ROLES:
+    if job.requested_by != p.user_id and not is_oversight_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     return {
         "job_id": job_id,

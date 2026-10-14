@@ -1,8 +1,10 @@
 # Production Release Runbook
 
-Applies to: PR #3 (`feature/restore-planning-workspace` → `main`), Railway project
-`exemplary-emotion`. Do not execute any step in this runbook until
-`general_release_readiness.md` states `READY FOR GENERAL RELEASE`.
+Applies to: the production-readiness release (`release/production-readiness-20261009` →
+`main`; production database v64 `a4e9507a9c51` → v76 `63c110addb63`), Railway project
+`exemplary-emotion`. **Rewritten 2026-10-12**; the July version (PR #3) is superseded.
+Do not execute any step until `docs/release/production_readiness_20261009/RELEASE_DECISION.md`
+reads **GO** and the owner has approved the exact commit, services, order and rollback plan.
 
 ## 0. Fail-closed environment verification (required before every Railway action)
 
@@ -27,47 +29,50 @@ mismatch before proceeding. Do not guess or proceed on a partial match.
 
 ## 1. Pre-deployment checklist
 
-- [ ] `general_release_readiness.md` states `READY FOR GENERAL RELEASE`
-- [ ] PR #3 has been merged to `main` (not before — do not deploy an unmerged branch to
-      production)
-- [ ] Staging soak period completed with no SEV1/SEV2 defects open
-- [ ] `rollback_runbook.md` has been read and the operator understands the rollback path
-      before starting
-- [ ] A recent production backup exists and its restore has been verified (see
-      `deployment/backup-dr.md`) — do not deploy without a fresh, restore-verified backup
-      point to fall back to
-- [ ] No financial-commitment or infrastructure-scaling decision is pending (those are a
-      separate, explicit conversation with the operator, not part of this runbook)
+- [ ] `RELEASE_DECISION.md` reads GO; owner approval names the exact commit (the merge
+      commit on `main`), the three services, the order below, and rollback 1a.
+- [ ] The release PR is merged to `main`; CI is green on the merge commit; you deploy from a
+      clean checkout of `main` at that commit (`deploy-production.sh` refuses anything else).
+- [ ] **Identify the build production is running now** (Railway dashboard → each service →
+      active deployment: ID and source). Production's `/api/health/ready` reports
+      `0cf2e8d` (a v46-era commit) against a v64 database, so that value is stale metadata
+      and must not be used as the rollback target (2026-10-12 finding). Record the real
+      deployment IDs / commit in the change record — they are the rollback target.
+- [ ] **Owner decisions applied in production variables:** `API_RATE_LIMIT` set explicitly
+      (the per-IP limit is now enforced accurately; see `STAGING_EVIDENCE.md`), and
+      `CORS_ALLOWED_ORIGINS` contains exactly `https://aafc-tms-frontend-production.up.railway.app`
+      and `https://aafc-tms-planning-workspace-preview-production.up.railway.app` (cookie writes
+      from any other origin are refused, D13). The script re-checks both and aborts otherwise.
+- [ ] **Fresh, verified backup — mandatory for this release** (the previous build cannot start
+      once v70–v76 have run, D23): run `backup-postgresql.yml` (workflow_dispatch) and then
+      `test-restore-postgresql.yml` on `main`; both must succeed; the backup must be under
+      6 hours old at deploy time. Their run IDs are required by the script
+      (`PRE_DEPLOY_BACKUP_RUN_ID`, `PRE_DEPLOY_RESTORE_RUN_ID`).
+- [ ] An operator can decrypt that backup **outside GitHub** with a key they hold (owner
+      action — key custody, `docs/beta/36_backup_key_custody_checklist.md`); otherwise rollback
+      1a is not executable.
+- [ ] `rollback_runbook.md` §1a has been read; the operator knows the export step for data
+      written after the deploy.
+- [ ] Announce the window; maintenance mode is available (System Console) if wanted.
 
-## 2. Deployment sequence
+## 2. Deployment sequence (`scripts/deploy-production.sh`)
 
-Each step targets exactly one Railway service. Re-run Section 0's verification before
-each step, not just once at the start.
+```bash
+git checkout main && git pull --ff-only     # at the approved merge commit
+PRE_DEPLOY_BACKUP_RUN_ID=<run id> PRE_DEPLOY_RESTORE_RUN_ID=<run id> \
+PRODUCTION_SYSTEM_ADMIN_CODE=<code> bash scripts/deploy-production.sh
+# type: DEPLOY TO PRODUCTION <short sha>
+```
 
-1. **Backend** (service: Main TMS backend, per Section 0's verified service ID)
-   - Confirm the target environment's `DATABASE_URL` points at the production database,
-     not staging (read-only check — never copy a secret value between environments).
-   - Trigger deployment from the merged `main` branch.
-   - Wait for the build to complete; confirm the deployed Git SHA matches `main`'s HEAD.
-   - `alembic upgrade head` runs automatically as part of the container's entrypoint
-     (mirroring `docker-entrypoint-staging.sh`'s pattern) — confirm the post-deploy
-     `alembic heads` shows one head and it matches this backend's expected head.
-   - Hit `GET /api/health/ready` on the production backend URL — must return
-     `{"status": "ready", ...}`.
-2. **Main TMS frontend** (`connected-frontend`, `aafc-tms-frontend` service)
-   - Confirm `AAFC_API_BASE` for this environment is set to the production backend URL
-     from step 1 (the container's `docker-entrypoint.sh` rewrites the
-     `<meta name="aafc-api-base">` tag from this variable at start — do not rely on
-     whatever is checked into `connected-frontend/index.html`'s default, which per
-     `qualification_gap_register.md` GAP-11 currently defaults to production anyway, but
-     this must not be assumed without checking the live environment variable).
-   - Trigger deployment; confirm the deployed Git SHA matches.
-   - Load the production URL in a browser; confirm the login page renders with no
-     console errors.
-3. **Planning Workspace frontend** (`aafc-tms-planning-workspace-preview` service)
-   - Same pattern as step 2, mounted at `/planning`.
-   - Confirm the deployed Git SHA matches.
-   - Load `<production-url>/planning`; confirm it renders with no console errors.
+The script, in order, fails closed at every step: Railway project/environment/service IDs
+against its allow-list → git (branch `main`, clean, pushed) → security greps → backend suite →
+single Alembic head (computed) → login → **backup gate** (fresh backup + later successful
+restore test) → **configuration gate** (CORS origins, explicit `API_RATE_LIMIT`) →
+authorization phrase → backend (`APP_BUILD_COMMIT` stamped, `railway up`, health, new
+deployment ID, database revision = head, CRUD smoke) → Main TMS (stamp, fingerprint, modules)
+→ Planning Workspace (stamp, fingerprint). The backend container runs
+`scripts/migrate_or_hold.py` (upgrades v64 → v76: 15 migrations, rehearsed on restored
+production data, run 38221096962).
 
 ## 3. Post-deployment production smoke tests
 
@@ -110,5 +115,7 @@ the monitoring window:
 - Error rate exceeds a level the operator judges abnormal for current traffic
 - A migration left the database in an inconsistent state
 
-Do not attempt a "fix forward" for a SEV1 under time pressure — roll back first, then
-diagnose calmly against the rolled-back, stable state.
+**For this release, rolling back means restoring the pre-deploy backup** (`rollback_runbook.md`
+§1a) and losing everything written since the deploy: the previous build cannot start against the
+migrated database. Prefer a forward fix unless data integrity or security is at stake; if you
+roll back, export post-deploy changes first and restore into an empty schema (D25).

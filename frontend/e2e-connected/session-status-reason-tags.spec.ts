@@ -190,3 +190,74 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     }
   });
 });
+
+// Intermittent WebKit CI failure (2 of 3 runs, 2026-10-12): the "New reason"
+// prompt stayed open showing "This field is required." with an empty box. The
+// CI snapshot proved the typed text had been wiped: WebKit can fire an extra
+// 'change' on #or-reason after the prompt opened (the select loses focus with
+// its value still "__add_new__"), which re-entered _onReasonChange, called
+// promptText() again and reset the input. Dispatched here deterministically,
+// after the user has typed.
+test("a late 'change' on the reason select does not wipe what the user typed", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
+  const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "r");
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  await openQuickEditForFirstSession(page, marker, fixtureYear);
+  await page.locator("#qe-st").selectOption("not_delivered");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
+
+  const reasonName = `E2E Reentry Reason ${Date.now()}`;
+  await page.locator("#or-reason").selectOption("__add_new__");
+  const textModal = page.locator("#m-text-input");
+  await expect(textModal).toBeVisible({ timeout: 5000 });
+  await page.locator("#ti-input").fill(reasonName);
+  await page.evaluate(() => {           // the spurious event, after typing
+    const sel = document.getElementById("or-reason") as HTMLSelectElement;
+    sel.value = "__add_new__";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("#ti-input")).toHaveValue(reasonName);
+  await page.locator("#ti-ok-btn").click();
+  await expect(textModal).toBeHidden({ timeout: 5000 });
+  await expect(page.locator("#or-reason")).toHaveValue(reasonName, { timeout: 5000 });
+
+  const tags = await (await page.request.get(`${base}/api/session-status-reason-tags`, { headers: hdr })).json();
+  const created = (Array.isArray(tags) ? tags : []).filter((t: any) => t.display_name === reasonName);
+  expect(created).toHaveLength(1);
+  for (const t of created) {
+    await page.request.delete(`${base}/api/session-status-reason-tags/${t.tag_id}`, { headers: hdr });
+  }
+});
+
+// D26 (CI webkit, 2026-10-12): the "New reason" box was empty although the
+// test had filled it. collectOutcomeReason() focused #or-reason from an
+// unguarded setTimeout(30); on a busy runner that timer fired after the
+// prompt had opened over the dialog, so focus jumped back to the select and
+// the text (or a fast user's keystrokes) went nowhere. Here the 30 ms timer is
+// delayed past the point where the user is typing, deterministically.
+test("the outcome dialog's deferred focus never pulls focus out of the New reason prompt", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  const hdr = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` };
+  const { marker, fixtureYear } = await seedSession(page, hdr, String(Date.now()) + "f");
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+  await openQuickEditForFirstSession(page, marker, fixtureYear);
+  await page.locator("#qe-st").selectOption("not_delivered");
+  await page.evaluate(() => {           // a slow runner: 30 ms timers fire 700 ms late
+    const orig = window.setTimeout;
+    (window as any).setTimeout = (fn: any, ms?: number, ...rest: any[]) =>
+      orig(fn, ms === 30 ? 700 : ms, ...rest);
+  });
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
+
+  await page.locator("#or-reason").selectOption("__add_new__");
+  await expect(page.locator("#m-text-input")).toBeVisible({ timeout: 5000 });
+  await page.locator("#ti-input").fill("Late");
+  await page.waitForTimeout(1000);       // the delayed focus timer has now fired
+  await page.keyboard.type(" focus");
+  await expect(page.locator("#ti-input")).toHaveValue("Late focus");
+  await expect(page.locator("#ti-input")).toBeFocused();
+  await page.locator("#ti-cancel-btn, #m-text-input .btn-out").first().click();
+});

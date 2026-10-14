@@ -35,7 +35,7 @@ def test_own_token_revoked_after_change_code(client):
     uid = me.json()["session"]["user_id"]
 
     r = client.post("/api/auth/change-code",
-                    json={"user_id": uid, "new_code": "NEWCODE99"},
+                    json={"user_id": uid, "new_code": "NEWCODE99", "current_code": "ADMIN703"},
                     headers=old_hdr)
     assert r.status_code == 200
 
@@ -49,7 +49,7 @@ def test_own_token_revoked_after_change_code(client):
     me2 = client.get("/api/auth/me", headers=new_hdr)
     uid2 = me2.json()["session"]["user_id"]
     client.post("/api/auth/change-code",
-                json={"user_id": uid2, "new_code": "ADMIN703"},
+                json={"user_id": uid2, "new_code": "ADMIN703", "current_code": "NEWCODE99"},
                 headers=new_hdr)
 
 

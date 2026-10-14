@@ -2,16 +2,18 @@ import io, csv, json, logging
 from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
                       Squadron, Wing, ImportLog, AuditLog, Cadet, CadetMemberImportBatch)
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing, require_can_write_squadron
+from ..permissions import is_read_only_role  # noqa: E402
+from ..permissions import (Principal, resolve_view_squadron_id, require_role,
+                           require_can_view_squadron, require_can_view_wing, require_can_write_squadron)
 from ..services import audit, score_parade
 from ..services_readiness import parade_night_readiness
-from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -56,10 +58,56 @@ def _coverage_for(db, sq_id):
     return {"coverage_pct": overall, "not_delivered": not_delivered, "phase_pct": phase_pct}
 
 
+def _coverage_for_many(db, sq_ids) -> dict:
+    """_coverage_for() for MANY squadrons in a constant number of queries.
+
+    Same definitions: applicable items = national items plus the squadron's
+    own; a squadron's sessions are its non-archived sessions on an existing
+    parade night. Calling _coverage_for() per squadron cost several queries
+    per squadron (national/wing overview: 149 / 325 queries on the national
+    qualification dataset). Pinned equal to _coverage_for() by a parity test."""
+    sq_ids = list(sq_ids)
+    if not sq_ids:
+        return {}
+    national = db.query(CurriculumItem.id, CurriculumItem.phase).filter(
+        CurriculumItem.owning_level == "national", CurriculumItem.is_archived == False).all()  # noqa: E712
+    own: dict[str, list] = {}
+    for iid, phase, sq in db.query(CurriculumItem.id, CurriculumItem.phase, CurriculumItem.squadron_id).filter(
+            CurriculumItem.squadron_id.in_(sq_ids),
+            or_(CurriculumItem.owning_level != "national", CurriculumItem.owning_level.is_(None)),
+            CurriculumItem.is_archived == False).all():  # noqa: E712
+        own.setdefault(sq, []).append((iid, phase))
+    scheduled: dict[str, set] = {sq: set() for sq in sq_ids}
+    not_delivered = dict.fromkeys(sq_ids, 0)
+    for sq, ci, status in (db.query(Session.squadron_id, Session.curriculum_item_id, Session.status)
+                           .join(ParadeNight, ParadeNight.id == Session.parade_night_id)
+                           .filter(Session.squadron_id.in_(sq_ids), Session.is_archived == False).all()):  # noqa: E712
+        if ci:
+            scheduled[sq].add(ci)
+        if status == "not_delivered":
+            not_delivered[sq] += 1
+    out = {}
+    for sq in sq_ids:
+        items = list(national) + own.get(sq, [])
+        total = len(items)
+        sched = sum(1 for iid, _ in items if iid in scheduled[sq])
+        by_phase: dict[str, dict[str, int]] = {}
+        for iid, phase in items:
+            b = by_phase.setdefault(phase or "Unspecified", {"total": 0, "sched": 0})
+            b["total"] += 1
+            if iid in scheduled[sq]:
+                b["sched"] += 1
+        out[sq] = {"coverage_pct": round(sched / total * 100) if total else 0,
+                   "not_delivered": not_delivered[sq],
+                   "phase_pct": {ph: (round(b["sched"] / b["total"] * 100) if b["total"] else 0)
+                                 for ph, b in by_phase.items()}}
+    return out
+
+
 # ── REPORTS ──
 @router.get("/reports/summary")
 def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     sess = _all_sessions(db, sq)
     counts = {}
     for s in sess:
@@ -70,7 +118,7 @@ def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db),
 
 @router.get("/reports/readiness")
 def rep_readiness(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
+    sq = resolve_view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     today = date.today().isoformat()
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq, ParadeNight.date >= today).order_by(ParadeNight.date).all()
     out = []
@@ -91,7 +139,7 @@ def rep_readiness(squadron_id: str | None = None, db: DBSession = Depends(get_db
 
 @router.get("/reports/curriculum-coverage")
 def rep_coverage(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
+    sq = resolve_view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     items = db.query(CurriculumItem).filter(
         (CurriculumItem.owning_level == "national") | (CurriculumItem.squadron_id == sq),
         CurriculumItem.is_archived == False).all()  # noqa: E712
@@ -111,7 +159,7 @@ def rep_coverage(squadron_id: str | None = None, db: DBSession = Depends(get_db)
 
 @router.get("/reports/facilitator-load")
 def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     load = {}
     for s in _all_sessions(db, sq):
         name = s.facilitator_display_name_at_time
@@ -130,7 +178,7 @@ def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p:
 
 @router.get("/reports/not-delivered")
 def rep_nd(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _view_squadron_id(p, squadron_id, db)
+    sq = resolve_view_squadron_id(p, squadron_id, db)
     rows = [s for s in _all_sessions(db, sq) if s.status == "not_delivered"]
     return {"title": "Not delivered", "sessions": [{"id": s.id, "curriculum_code_at_time": s.curriculum_code_at_time,
             "not_delivered_reason": s.not_delivered_reason, "status": s.status} for s in rows],
@@ -157,18 +205,41 @@ def wing_overview(wing_id: str | None = None, db: DBSession = Depends(get_db), p
         q = q.filter(Squadron.wing_id == w_id)
     out = []
     today = date.today().isoformat()
-    for s in q.all():
-        pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == s.id).all()
-        sess = db.query(Session).filter(Session.squadron_id == s.id).all()
-        delivered = sum(1 for x in sess if x.status == "delivered")
+    sqns = q.all()
+    ids = [s.id for s in sqns]
+    # Batched: one query each for parade nights, session status counts, the
+    # next nights' sessions and coverage -- instead of ~4 queries per squadron.
+    pns_by_sq: dict[str, list] = {}
+    for pn in (db.query(ParadeNight).filter(ParadeNight.squadron_id.in_(ids)).all() if ids else []):
+        pns_by_sq.setdefault(pn.squadron_id, []).append(pn)
+    sess_counts: dict[str, dict[str, int]] = {}
+    for sq, status, n in (db.query(Session.squadron_id, Session.status, func.count(Session.id))
+                          .filter(Session.squadron_id.in_(ids))
+                          .group_by(Session.squadron_id, Session.status).all() if ids else []):
+        sess_counts.setdefault(sq, {})[status] = n
+    next_night: dict[str, object] = {}
+    for sid in ids:
+        future_pns = [x for x in pns_by_sq.get(sid, []) if x.date >= today]
+        if future_pns:
+            next_night[sid] = sorted(future_pns, key=lambda x: x.date)[0]
+    next_sessions: dict[str, list] = {}
+    nn_ids = [pn.id for pn in next_night.values()]
+    for z in (db.query(Session).filter(Session.parade_night_id.in_(nn_ids)).all() if nn_ids else []):
+        next_sessions.setdefault(z.parade_night_id, []).append(z)
+    cov_all = _coverage_for_many(db, ids)
+    for s in sqns:
+        pns = pns_by_sq.get(s.id, [])
+        sc = sess_counts.get(s.id, {})
+        n_sess = sum(sc.values())
+        delivered = sc.get("delivered", 0)
         published = sum(1 for x in pns if x.published_status)
         future = [x for x in pns if x.date >= today]
         score = None
         planning_status = None
         if future:
-            nxt = sorted(future, key=lambda x: x.date)[0]
+            nxt = next_night[s.id]
             ns = [{c.name: getattr(z, c.name) for c in z.__table__.columns}
-                  for z in db.query(Session).filter(Session.parade_night_id == nxt.id).all()]
+                  for z in next_sessions.get(nxt.id, [])]
             # Same authoritative computation as the Dashboard and /reports/readiness —
             # a squadron whose next parade night has zero sessions reports
             # planning_status "not_planned", never a numeric "readiness" that reads
@@ -176,11 +247,11 @@ def wing_overview(wing_id: str | None = None, db: DBSession = Depends(get_db), p
             readiness = parade_night_readiness(ns)
             score = readiness["legacy_score"]
             planning_status = readiness["planning_status"]
-        cov = _coverage_for(db, s.id)
+        cov = cov_all[s.id]
         out.append({"squadron_id": s.id, "code": s.code, "short_name": s.short_name,
                     "parade_day": s.default_parade_day, "nights": len(pns), "published": published,
-                    "sessions": len(sess), "delivered": delivered,
-                    "pct": round(delivered / len(sess) * 100) if sess else 0, "readiness": score,
+                    "sessions": n_sess, "delivered": delivered,
+                    "pct": round(delivered / n_sess * 100) if n_sess else 0, "readiness": score,
                     "planning_status": planning_status,
                     "coverage_pct": cov["coverage_pct"], "not_delivered": cov["not_delivered"],
                     "no_future_plan": len(future) == 0, "no_published_plan": published == 0})
@@ -273,8 +344,10 @@ def wing_phase_coverage(wing_id: str | None = None, db: DBSession = Depends(get_
     order = ["A. Orientation", "B. Initial", "C. Junior", "I. Bronze", "D. Intermediate",
              "J. Silver", "E. Senior", "K. Gold"]
     rows, seen = [], set()
-    for s in q.all():
-        cov = _coverage_for(db, s.id)
+    sqns = q.all()
+    cov_all = _coverage_for_many(db, [s.id for s in sqns])
+    for s in sqns:
+        cov = cov_all[s.id]
         seen.update(cov["phase_pct"].keys())
         rows.append({"squadron_id": s.id, "short_name": s.short_name, "phase_pct": cov["phase_pct"]})
     phases = [ph for ph in order if ph in seen] + sorted(seen - set(order))
@@ -396,16 +469,26 @@ def national_capability(db: DBSession = Depends(get_db), p: Principal = Depends(
 def national_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_role(p, "national_viewer", "national_admin", "system_admin", "auditor")
     out = []
-    for w in db.query(Wing).filter(Wing.is_archived == False).all():  # noqa: E712
-        sqns = db.query(Squadron).filter(Squadron.wing_id == w.id, Squadron.is_archived == False).all()  # noqa: E712
-        sess = db.query(Session).join(Squadron, Squadron.id == Session.squadron_id).filter(Squadron.wing_id == w.id).all()
-        delivered = sum(1 for s in sess if s.status == "delivered")
-        nd = sum(1 for s in sess if s.status == "not_delivered")
-        covs = [_coverage_for(db, sq.id)["coverage_pct"] for sq in sqns]
+    wings = db.query(Wing).filter(Wing.is_archived == False).all()  # noqa: E712
+    sqns_by_wing: dict[str, list] = {}
+    for sq in db.query(Squadron).filter(Squadron.is_archived == False).all():  # noqa: E712
+        sqns_by_wing.setdefault(sq.wing_id, []).append(sq)
+    # Status counts per Wing without loading every session (all sessions of the
+    # Wing's squadrons, as before -- archived squadrons and sessions included).
+    counts: dict[str, dict[str, int]] = {}
+    for wid, status, n in (db.query(Squadron.wing_id, Session.status, func.count(Session.id))
+                           .join(Squadron, Squadron.id == Session.squadron_id)
+                           .group_by(Squadron.wing_id, Session.status).all()):
+        counts.setdefault(wid, {})[status] = n
+    cov = _coverage_for_many(db, [sq.id for v in sqns_by_wing.values() for sq in v])
+    for w in wings:
+        sqns = sqns_by_wing.get(w.id, [])
+        c = counts.get(w.id, {})
+        covs = [cov[sq.id]["coverage_pct"] for sq in sqns]
         coverage_pct = round(sum(covs) / len(covs)) if covs else 0
         out.append({"wing_id": w.id, "code": w.code, "name": w.name, "squadrons": len(sqns),
-                    "sessions": len(sess), "delivered": delivered, "not_delivered": nd,
-                    "coverage_pct": coverage_pct})
+                    "sessions": sum(c.values()), "delivered": c.get("delivered", 0),
+                    "not_delivered": c.get("not_delivered", 0), "coverage_pct": coverage_pct})
     return {"wings": out}
 
 
@@ -552,8 +635,11 @@ def import_commit(body: ImportCommitIn, db: DBSession = Depends(get_db), p: Prin
                   phase=g("phase") or None,
                   attendance_percentage=float(att) if att.replace(".", "", 1).isdigit() else None,
                   created_by=p.user_id)
-        # tag for rollback via created_by + import correlation in audit
         db.add(c); accepted += 1
+    # Commit the cadets BEFORE finalising the log, so log.updated_at (set by
+    # this second commit) is later than every cadet this import created. That
+    # gives rollback an upper bound: [log.created_at, log.updated_at].
+    db.commit()
     log.rows_accepted = accepted; log.rows_rejected = rejected
     log.validation_errors = json.dumps(errors[:50]); log.committed = 1
     db.commit()
@@ -562,19 +648,41 @@ def import_commit(body: ImportCommitIn, db: DBSession = Depends(get_db), p: Prin
     return {"ok": True, "import_id": log.id, "accepted": accepted, "rejected": rejected}
 
 
+class ImportRollbackIn(BaseModel):
+    import_id: str | None = None
+
+
 @router.post("/import/rollback")
-def import_rollback(import_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def import_rollback(import_id: str | None = None, body: ImportRollbackIn | None = None,
+                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    # Planning Workspace sends {"import_id"} as a JSON body; older callers use
+    # ?import_id=. Accepting only the query made every PW rollback a 422.
+    import_id = import_id or (body.import_id if body else None)
+    if not import_id:
+        raise HTTPException(422, detail={"error": "import_id_required"})
     from ..models import Cadet, CadetClassMembership
     log = db.get(ImportLog, import_id)
     if not log or not log.committed:
         raise HTTPException(404, detail={"error": "not_found_or_not_committed"})
+    if log.rollback_status == "rolled_back":
+        raise HTTPException(409, detail={"error": "already_rolled_back",
+                                         "message": "This import has already been rolled back."})
     from ..permissions import require_can_write_squadron
     s = db.get(Squadron, log.squadron_id)
     require_can_write_squadron(p, s.id, s.wing_id)
-    # Soft-archive cadets created by this import (correlated by created_by + created_at >= log time).
+    # Soft-archive cadets created by THIS import: same squadron and user, and
+    # created inside the import's own window. There was no upper bound, so a
+    # rollback also archived every cadet that user added by hand or by a later
+    # import. Cadet rows carry no import id; the window is closed by
+    # log.updated_at (see import_commit). No slack on purpose: for an import
+    # committed before that ordering existed, the worst case is archiving FEWER
+    # rows (left for manual archive) -- never someone else's cadets.
+    window_end = log.updated_at or log.created_at
     cadets = db.query(Cadet).filter(Cadet.squadron_id == log.squadron_id,
                                     Cadet.created_by == log.user_id,
-                                    Cadet.created_at >= log.created_at).all()
+                                    Cadet.created_at >= log.created_at,
+                                    Cadet.created_at <= window_end,
+                                    Cadet.is_archived == False).all()  # noqa: E712
     cadet_ids = [c.id for c in cadets]
     for c in cadets:
         c.is_archived = True; c.archived_at = utcnow()
@@ -828,7 +936,7 @@ def cea_member_commit(
     sq_id = _active_squadron(p)
     s = db.get(Squadron, sq_id)
     require_can_write_squadron(p, s.id, s.wing_id)
-    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+    if is_read_only_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
 
     _, rows, errors = _parse_cea_csv(body.csv_text)

@@ -43,6 +43,22 @@ function NotAuthenticated() {
   );
 }
 
+function CodeChangeRequired() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
+      <div style={{ background: "white", border: "1px solid #d1dce8", borderRadius: 10, padding: "36px 40px", maxWidth: 460, textAlign: "center", boxShadow: "0 4px 16px rgba(0,47,101,.10)" }}>
+        <h1 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Access code change required</h1>
+        <p style={{ fontSize: 'var(--fs-base)', color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
+          This account is using an initial or administrator-issued access code. Return to the Training Management System, sign in again with that code, and choose your own code before opening Planning Workspace.
+        </p>
+        <a href={TMS_URL} style={{ display: "inline-block", background: "var(--royal)", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 24px", borderRadius: 6, textDecoration: "none" }}>
+          Return to TMS
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function ModuleLoading() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
@@ -98,6 +114,7 @@ function ModuleEntry() {
   const { session, loading } = useAuth();
   if (loading) return <ModuleLoading />;
   if (!session) return <NotAuthenticated />;
+  if (session.must_change_code) return <CodeChangeRequired />;
   return (
     <ModuleErrorBoundary>
       <SquadronViewProvider>

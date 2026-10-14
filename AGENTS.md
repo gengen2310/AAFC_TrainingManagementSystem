@@ -35,7 +35,7 @@ conftest creates an in-memory SQLite DB; never mock it.
 ```bash
 cd frontend
 npm run build          # Vite production build (dist/)
-npm run build:single   # Inline single-file build → dist-single/ (make connected)
+npm run build:single   # Inline single-file Planning Workspace → dist-single/ (NOT the Main TMS)
 ```
 
 Build must succeed with 0 errors. Chunk-size warnings are pre-existing and

@@ -5,6 +5,7 @@ export interface SessionInfo {
   squadron_id: string | null; squadron_code: string | null;
   national_id: string | null;
   is_wing: boolean; is_national: boolean;
+  must_change_code?: boolean;
   proxy?: { mode: string; acting_squadron_id: string | null; acting_squadron_code: string | null; acting_squadron_name: string | null; acting_wing_id: string | null; proxy_session_id: string } | null;
 }
 export interface Squadron {
@@ -414,6 +415,7 @@ export interface ParadeNotice {
   priority: string;
   created_by: string | null;
   is_archived: boolean;
+  version: number;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -582,6 +584,8 @@ export interface CeaImportResult {
   duplicates: number;
   skipped: number;
   errors: number;
+  /** Rows not imported, with the reason (D18). Absent on older servers. */
+  row_errors?: Array<{ row: number; field: string | null; message: string }>;
   preview: Array<{
     action: "create" | "update" | "duplicate";
     cea_activity_id: string | null;

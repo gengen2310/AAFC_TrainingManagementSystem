@@ -16,6 +16,23 @@ import html from "../../../connected-frontend/index.html?raw";
  */
 const source: string = html as unknown as string;
 
+// Modules extracted out of index.html into connected-frontend/js/ must parse
+// too: a syntax error there breaks the feature the same way.
+const modules = import.meta.glob("../../../connected-frontend/js/*.js",
+  { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+
+// The production image's web root (Dockerfile COPY ... /usr/share/nginx/html/)
+// and the local run script must serve the same files. When #69 extracted js/
+// modules, the Dockerfile gained `COPY js/` but RUN_TMS_CONNECTED_FRONTEND_MAC.sh
+// still copied only index.html, so a local run had openModal/promptText
+// undefined and every dialog failed.
+import dockerfile from "../../../connected-frontend/Dockerfile?raw";
+import runScript from "../../../RUN_TMS_CONNECTED_FRONTEND_MAC.sh?raw";
+
+// The application's script source: index.html plus every extracted js/ module.
+// Content contracts below must hold wherever the code lives after an extraction.
+const app: string = [source, ...Object.keys(modules).sort().map(k => modules[k])].join("\n");
+
 const blocks = [...source.matchAll(
   /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 
@@ -38,24 +55,44 @@ describe("connected-frontend/index.html", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
+  it("every extracted js/ module parses and is loaded by index.html", () => {
+    const names = Object.keys(modules);
+    expect(names.length).toBeGreaterThan(0);
+    for (const [path, src] of Object.entries(modules)) {
+      expect(() => new Function(src), path).not.toThrow();
+      const file = path.split("/").pop();
+      expect(source, `${file} is not referenced by index.html`).toContain(`<script src="js/${file}"></script>`);
+    }
+  });
+
+  it("the local run script serves everything the production image serves", () => {
+    const served = [...(dockerfile as unknown as string).matchAll(
+      /^COPY\s+(\S+)\s+\/usr\/share\/nginx\/html\//gm)].map(m => m[1].replace(/\/$/, ""));
+    expect(served).toEqual(expect.arrayContaining(["index.html", "js"]));
+    for (const path of served) {
+      expect(runScript as unknown as string, `local run script does not serve ${path}`)
+        .toContain(`"$SRC_DIR/${path}"`);
+    }
+  });
+
   it("leaves no function declared with nothing calling it", () => {
     for (const name of ["ynCreateYear", "ynDoRollover", "ynStartEdit"]) {
-      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(source);
+      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(app);
       const referenced = new RegExp(`${name}\\s*\\(`).test(
-        source.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
+        app.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
       expect(declared && !referenced,
         `${name} is declared but never called`).toBe(false);
     }
   });
 
   it("has one outcome-entry workflow and no authorised Matrix shortcut", () => {
-    expect(source).not.toContain("Matrix ↗");
-    expect(source.match(/>Sessions Needing Outcome Entry</g)).toHaveLength(1);
-    expect(source).not.toContain("Outcome needed —");
+    expect(app).not.toContain("Matrix ↗");
+    expect(app.match(/>Sessions Needing Outcome Entry</g)).toHaveLength(1);
+    expect(app).not.toContain("Outcome needed —");
   });
 
   it("passes the canonical timing block when creating a direct planner session", () => {
-    expect(source).toContain("const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;");
-    expect(source).toContain("timing_block_id:s.timingBlockId||null,");
+    expect(app).toContain("const _tbId=(_ips.find(ip=>ip.period_number===period)||{}).timing_block_id||null;");
+    expect(app).toContain("timing_block_id:s.timingBlockId||null,");
   });
 });

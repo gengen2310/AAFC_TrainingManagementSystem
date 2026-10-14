@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
@@ -48,13 +48,52 @@ from ..models.training import (
 from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
+from ..permissions import level_scope_clause, squadron_scope_clause  # noqa: E402
+from ..permissions import planning_year_outside_scope, wing_admin_outside_own_wing  # noqa: E402
+from ..permissions import (Principal, resolve_view_squadron_id,
+                           require_role, require_write_role,
+                           require_can_write_squadron, require_can_view_squadron)
 from ..services import audit
-from ..services import (visible_curriculum_item, scoped_facilitator,
+from ..services import (resolve_national_id, visible_curriculum_item, scoped_facilitator,
                         scoped_training_area)
+from ..services_parade_dates import ParadeDateRuleError, classify_parade_dates
 from ..services_year import (
     PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
     selectable_years, year_display_name, year_state,
+)
+from ..services_timing import effective_template
+from ..services_curriculum_progress import class_curriculum_progress
+from ..services_data_quality import data_freshness
+from ..services_planning_conflicts import (  # moved verbatim from this router (C5)
+    _detect_conflicts,
+    _run_conflict_check,
+)
+from ..services_planning_serialisers import (  # moved verbatim from this router (C5)
+    _year_out,
+    _night_out_as_date,
+    _holiday_out,
+    _anchor_out,
+    _location_out,
+    _session_out_context,
+    _real_session_out,
+    _conflict_out,
+    _notice_out,
+    _cea_activity_out,
+)
+from ..services_planning_io import (  # moved verbatim from this router (C5)
+    _parse_prog_date,
+    _parse_prog_time,
+    _is_parade_row,
+    _resolve_unit_sqn,
+    _parse_program_file,
+    _neutralise_cell,
+    _normalise_cea_row,
+    cea_row_problems,
+    cea_row_is_blank,
+    cea_row_error_entries,
+    _parse_json_list,
+    _validate_iso_date,
 )
 
 
@@ -65,7 +104,6 @@ def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
     except PastYearLocked as exc:
         raise HTTPException(403, detail={"error": "past_year_read_only",
                                          "message": str(exc)})
-from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
@@ -103,9 +141,16 @@ def _cadet_group_for_class(db: DBSession, tc: "TrainingClass | None") -> str | N
     if tc.training_stage_id:
         phase = db.get(CurriculumPhase, tc.training_stage_id)
         if phase:
-            name = (phase.display_name or phase.name or "").lower()
+            # Canonical name is the governed semantic key; display_name is UI
+            # copy and may be something generic such as "Stage A". Check both
+            # independently so a non-empty display label never masks a useful
+            # canonical value such as "A. Orientation".
+            phase_names = [
+                (phase.name or "").lower(),
+                (phase.display_name or "").lower(),
+            ]
             for cg in _STAGE_CODE_CADET_GROUP.values():
-                if cg in name:
+                if any(cg in phase_name for phase_name in phase_names):
                     return cg
     return None
 
@@ -232,120 +277,17 @@ def _check_version(obj, client_version: int | None) -> None:
         })
 
 
-def _parse_json_list(val) -> list:
-    """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
-    if not val:
-        return []
-    if isinstance(val, list):
-        return val
-    if isinstance(val, str):
-        try:
-            result = _json.loads(val)
-            return result if isinstance(result, list) else []
-        except (_json.JSONDecodeError, TypeError):
-            return []
-    return []
-
-
-# ── Annual Program import helpers ────────────────────────────
-
-_PROG_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
-
-
-def _parse_prog_date(raw: str) -> str | None:
-    """Parse a date string to ISO YYYY-MM-DD."""
-    if not raw:
-        return None
-    from datetime import datetime
-    for fmt in _PROG_DATE_FMTS:
-        try:
-            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-    return raw.strip()[:10] or None
-
-
-def _parse_prog_time(raw: str) -> str | None:
-    """Normalise a time string to HH:MM."""
-    if not raw:
-        return None
-    raw = raw.strip()
-    parts = raw.split(":")
-    if len(parts) >= 2:
-        try:
-            return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
-        except ValueError:
-            pass
-    return raw[:5] or None
-
-
-_PARADE_KWORDS = ("parade night", "training night", "parade ngt", "parade nt")
-
-
-def _is_parade_row(name: str) -> bool:
-    n = name.strip().lower()
-    return any(kw in n for kw in _PARADE_KWORDS)
-
-
-def _resolve_unit_sqn(unit_str: str, all_sqns: list) -> "Squadron | None":
-    """Match a Unit column value to a Squadron by code or number prefix."""
-    if not unit_str:
-        return None
-    u_up = unit_str.strip().upper()
-    for sq in all_sqns:
-        if sq.code and sq.code.strip().upper() == u_up:
-            return sq
-    m = re.match(r'^(\d+)', unit_str.strip())
-    if m:
-        num = m.group(1)
-        for sq in all_sqns:
-            if sq.code and re.match(r'^' + re.escape(num) + r'\b', sq.code.strip()):
-                return sq
-    u_lo = unit_str.strip().lower()
-    for sq in all_sqns:
-        if sq.name and u_lo in sq.name.lower():
-            return sq
-    return None
-
-
-def _parse_program_file(content: bytes, is_xlsx: bool) -> list[dict]:
-    """Decode CSV or XLSX bytes into a list of {header: value} dicts."""
-    if is_xlsx:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-        ws = wb.active
-        rows_iter = ws.iter_rows(values_only=True)
-        header_row = next(rows_iter, None)
-        if not header_row:
-            return []
-        headers = [str(c).strip() if c is not None else "" for c in header_row]
-        result = []
-        for row in rows_iter:
-            if all(v is None for v in row):
-                continue
-            result.append({h: (str(v) if v is not None else "") for h, v in zip(headers, row)})
-        return result
-    try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = content.decode("latin-1")
-    reader = _csv.DictReader(io.StringIO(text))
-    return [dict(row) for row in reader]
-
-
 # ─────────────────────────────────────────────────────────────
 # RBAC helpers
 # ─────────────────────────────────────────────────────────────
 
-_WRITE_BLOCKED = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
 _NAT_ROLES     = frozenset({"national_admin", "system_admin"})
 _WING_ROLES    = frozenset({"wing_admin", *_NAT_ROLES})
 _ALL_ADMIN     = frozenset({"sqn_admin", "wing_admin", "national_admin", "system_admin"})
 
 
 def _require_plan_write(p: Principal) -> None:
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
 
 
 def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
@@ -356,20 +298,14 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
     rather than at each of the fifteen year-scoped write endpoints so that a new
     endpoint added later inherits the protection instead of forgetting it.
     """
-    if write and p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if write:
+        _require_plan_write(p)
     if write and db is not None and py.unit_id:
         _require_writable_year(db, py.unit_id, py.year, p)
-    if p.role in ("sqn_admin", "sqn_general"):
-        if py.unit_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role == "wing_admin":
-        if py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif p.role in ("wing_viewer", "national_viewer", "auditor"):
-        if p.role == "wing_viewer" and py.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    # national_admin, system_admin: unrestricted
+    # Squadron accounts: own Squadron's years; Wing accounts: own Wing's;
+    # national roles: unrestricted.
+    if planning_year_outside_scope(p, py.unit_id, py.wing_id):
+        raise HTTPException(403, detail={"error": "out_of_scope"})
 
 
 def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
@@ -379,193 +315,10 @@ def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
     return py
 
 
-
 # ─────────────────────────────────────────────────────────────
-# Serialisers
+# Serialisers live in services_planning_serialisers.py; these assistant
+# helpers stay here because they answer with HTTP 422.
 # ─────────────────────────────────────────────────────────────
-
-def _year_out(py: PlanningYear, unit_code: str | None = None,
-              unit_name: str | None = None, wing_code: str | None = None) -> dict:
-    return {
-        "planning_year_id": py.id, "unit_id": py.unit_id, "wing_id": py.wing_id,
-        "year": py.year, "name": py.name, "active_status": py.active_status,
-        # Derived, not stored. state is filled by the caller that knows
-        # which squadron the year is being viewed for; materialised says
-        # a row exists, and is False for logical-only years.
-        "state": None, "materialised": True,
-        "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
-        "created_by": py.created_by, "updated_by": py.updated_by,
-        "created_at": iso_z(py.created_at) if py.created_at else None,
-        "updated_at": iso_z(py.updated_at) if py.updated_at else None,
-        "version": py.version,
-    }
-
-
-def _night_out_as_date(pn: ParadeNight) -> dict:
-    """Serialise a ParadeNight in the parade-dates response shape.
-
-    parade_date_id = pn.id — backward-compat alias used by the React PW's
-    ~40 references to pd.parade_date_id. Do not rename this field.
-    parade_night_id = pn.id — same value; kept for callers that used the
-    old linked-night field and now read the same record.
-    """
-    return {
-        "parade_date_id": pn.id,
-        "planning_year_id": pn.planning_year_id,
-        "unit_id": pn.squadron_id,
-        "parade_date": pn.date,
-        "parade_type": pn.parade_type,
-        "is_active": pn.is_active,
-        "notes": pn.notes,
-        "term": pn.term,
-        "week_number": pn.week_number,
-        "cancellation_reason": pn.cancellation_reason,
-        "parade_night_id": pn.id,
-    }
-
-
-def _holiday_out(h: HolidayPeriod) -> dict:
-    return {
-        "holiday_id": h.id, "planning_year_id": h.planning_year_id,
-        "jurisdiction": h.jurisdiction, "name": h.name,
-        "start_date": h.start_date, "end_date": h.end_date,
-        "holiday_type": getattr(h, "holiday_type", "school_holiday"),
-        "affects_parade": h.affects_parade, "notes": h.notes,
-    }
-
-
-def _anchor_out(a: AnchorEvent) -> dict:
-    return {
-        "anchor_event_id": a.id, "planning_year_id": a.planning_year_id,
-        "owning_level": a.owning_level, "wing_id": a.wing_id, "unit_id": a.unit_id,
-        "event_name": a.event_name, "event_type": a.event_type, "importance": a.importance,
-        "importance_level": getattr(a, "importance_level", None),
-        "start_date": a.start_date, "end_date": a.end_date,
-        # Flat audience fields (expected by frontend TS type)
-        "audience_orientation": a.audience_orientation,
-        "audience_initial": a.audience_initial,
-        "audience_junior": a.audience_junior,
-        "audience_intermediate": a.audience_intermediate,
-        "audience_senior": a.audience_senior,
-        "audience_staff_only": getattr(a, "audience_staff_only", False),
-        "audience_proficient": getattr(a, "audience_proficient", False),
-        "audience_first_years": getattr(a, "audience_first_years", False),
-        # Nested audience object (kept for backward compatibility)
-        "audience": {
-            "orientation": a.audience_orientation, "initial": a.audience_initial,
-            "junior": a.audience_junior, "intermediate": a.audience_intermediate,
-            "senior": a.audience_senior,
-            "staff_only": getattr(a, "audience_staff_only", False),
-            "proficient": getattr(a, "audience_proficient", False),
-            "first_years": getattr(a, "audience_first_years", False),
-        },
-        "cea_activity_id": getattr(a, "cea_activity_id", None),
-        "nomination_end_date": getattr(a, "nomination_end_date", None),
-        "unit_name": getattr(a, "unit_name", None),
-        "planning_impact": a.planning_impact,
-        "readiness_requirements": a.readiness_requirements,
-        "notes": a.notes, "is_archived": a.is_archived,
-        "created_by": a.created_by,
-        "created_at": iso_z(a.created_at) if a.created_at else None,
-        "version": a.version,
-    }
-
-
-def _location_out(loc: TrainingArea) -> dict:
-    # Rooms merger (master transformation plan, Phase 1): Planning Workspace's
-    # Rooms tab now reads/writes the same `training_areas` table connected-
-    # frontend's Resources page uses, instead of the separate `planning_locations`
-    # table. This also fixes a real, live bug: create_session/update_session's
-    # room-resolution (`db.get(TrainingArea, body.location_id)`) only ever looked
-    # up TrainingArea rows — a location_id from the old PlanningLocation-backed
-    # endpoint silently failed to resolve, so a room picked in Planning Workspace
-    # would not actually attach to the session. The response shape below is kept
-    # identical to the old PlanningLocation-backed JSON so no frontend changes
-    # are required.
-    return {
-        "location_id": loc.id, "unit_id": loc.squadron_id, "name": loc.name,
-        "location_type": loc.type, "capacity": loc.capacity,
-        "notes": loc.notes, "active_status": loc.active_status,
-        "capabilities": loc.capabilities,
-    }
-
-
-def _real_session_out(
-    s: TrainingSession, db: DBSession,
-    ci_tier: "dict[str, dict] | None" = None,
-) -> dict:
-    """Serialize a real training Session in the builder grid format."""
-    room_name = s.training_area_name_at_time
-    if not room_name and s.training_area_id:
-        ra = db.get(TrainingArea, s.training_area_id)
-        if ra:
-            room_name = ra.name
-    from ..models.training import SessionAssistantFacilitator as _SAF
-    asst_name: str | None = None
-    if s.assistant_facilitator_id:
-        af = db.get(Facilitator, s.assistant_facilitator_id)
-        if af:
-            asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
-    # Build assistant_facilitators list from the join table
-    asst_rows = db.query(_SAF).filter_by(session_id=s.id).all()
-    assistant_facilitators_list: list[dict] = []
-    for row in asst_rows:
-        f = db.get(Facilitator, row.user_id)
-        if f:
-            disp = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
-        else:
-            disp = row.user_id
-        assistant_facilitators_list.append({"user_id": row.user_id, "display_name": disp})
-    # CLASS-21: curriculum core_status and is_optional for Foundation/Extension/Optional PW filters.
-    # ci_tier pre-loaded by bulk callers (long-range endpoint); falls back to
-    # identity-map PK lookup when not supplied (weekly-program, term-planner).
-    core_status: str | None = None
-    is_optional: bool = False
-    if s.curriculum_item_id:
-        if ci_tier is not None:
-            t = ci_tier.get(s.curriculum_item_id)
-            if t:
-                core_status = t["core_status"]
-                is_optional = t.get("is_optional", False)
-        else:
-            ci_obj = db.get(CurriculumItem, s.curriculum_item_id)
-            if ci_obj:
-                core_status = ci_obj.core_status
-                is_optional = ci_obj.is_optional
-    return {
-        "session_id": s.id,
-        "parade_night_id": s.parade_night_id,
-        "squadron_id": s.squadron_id,
-        "cadet_group": s.cadet_group,
-        "session_number": s.period_number,
-        "part_number": s.part_number,
-        "curriculum_id": s.curriculum_item_id,
-        "curriculum_code": s.curriculum_code_at_time,
-        "curriculum_title": s.curriculum_title_at_time,
-        "activity_title": s.curriculum_title_at_time or s.custom_title,
-        "facilitator_id": s.facilitator_id,
-        "facilitator_name": s.facilitator_display_name_at_time,
-        "assistant_facilitator_id": s.assistant_facilitator_id,
-        "assistant_facilitator_name": asst_name,
-        "assistant_facilitators": assistant_facilitators_list,
-        "location_id": s.training_area_id,
-        "location_name": room_name,
-        "status": s.status,
-        "notes": s.delivery_notes,
-        "is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1,
-        "custom_phase_audiences": [
-            {"custom_phase_id": cp.id, "name": cp.name}
-            for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
-            .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
-            .filter(SessionCustomPhaseAudience.session_id == s.id)
-            .all()
-        ],
-        "override_conflict": False,
-        "created_at": iso_z(s.created_at) if s.created_at else None,
-        "version": s.version,
-        "core_status": core_status,
-        "is_optional": is_optional,
-    }
 
 
 def _resolve_assistants(
@@ -602,18 +355,6 @@ def _write_session_assistants(
         db.add(SessionAssistantFacilitator(session_id=session_id, user_id=uid))
 
 
-def _conflict_out(c: PlanningConflict) -> dict:
-    return {
-        "conflict_id": c.id, "planning_year_id": c.planning_year_id,
-        "parade_night_id": c.parade_night_id,
-        "scheduled_session_id": c.scheduled_session_id,
-        "conflict_type": c.conflict_type, "severity": c.severity,
-        "message": c.message, "is_resolved": c.is_resolved,
-        "override_reason": c.override_reason,
-        "created_at": iso_z(c.created_at) if c.created_at else None,
-    }
-
-
 # ─────────────────────────────────────────────────────────────
 # Planning Years
 # ─────────────────────────────────────────────────────────────
@@ -648,10 +389,9 @@ def list_planning_years(
     this list, so returning them by default would break every one of them.
     """
     q = db.query(PlanningYear)
-    if p.role in ("sqn_admin", "sqn_general"):
-        q = q.filter(PlanningYear.unit_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
-        q = q.filter(PlanningYear.wing_id == p.wing_id)
+    scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(PlanningYear.unit_id == unit_id)
     if wing_id:
@@ -674,7 +414,7 @@ def list_planning_years(
             wing_code=wg.code if wg else None,
         ))
 
-    sqn_id = p.squadron_id if p.role in ("sqn_admin", "sqn_general") else unit_id
+    sqn_id = p.squadron_id if p.is_squadron else unit_id
 
     # Years the user may select that have no row yet. Listing one does NOT
     # create it -- materialisation happens on write, in ensure_year_context.
@@ -815,7 +555,7 @@ def create_planning_year(
         wing_id = p.wing_id
         if unit_id and unit_id != p.squadron_id:
             sqn = db.get(Squadron, unit_id)
-            if not sqn or sqn.wing_id != p.wing_id:
+            if not sqn or wing_admin_outside_own_wing(p, sqn.wing_id):
                 raise HTTPException(403, detail={"error": "out_of_scope"})
     # A squadron-scoped plan is a delegated write on that squadron's data --
     # require the same Proxy/Delegated Intervention state every other
@@ -968,6 +708,16 @@ def delete_planning_year(
                 ).filter(ParadeNight.planning_year_id == year_id)
             ),
         ).count(),
+        # Cadet outcomes are operational training history, not disposable planning
+        # children. Any recorded outcome blocks permanent deletion even when the
+        # parade night is archived or the legacy session has no class audience.
+        "cadet_session_outcomes": db.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.session_id.in_(
+                db.query(TrainingSession.id).join(
+                    ParadeNight, TrainingSession.parade_night_id == ParadeNight.id
+                ).filter(ParadeNight.planning_year_id == year_id)
+            )
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
         "parade_night_prep_plans": db.query(AnchorPrepPlan).join(
@@ -1010,7 +760,6 @@ def delete_planning_year(
                 SessionStatusHistory,
                 SessionAudience,
                 SessionCustomPhaseAudience,
-                CadetSessionOutcome,
             ):
                 db.query(child_model).filter(
                     child_model.session_id.in_(session_ids)
@@ -1135,169 +884,28 @@ def add_parade_date(
     return _night_out_as_date(pn)
 
 
-def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
-    """Return ISO date strings that should become parade dates given the body parameters.
-
-    Supports weekly, fortnightly, monthly (first weekday in month), and daily frequencies.
-    excluded_dates and max_repeats are applied here. Holiday exclusion is optional.
-    """
+def _classify_parade_dates(body: GenerateParadeDatesIn, holidays: list) -> list[dict]:
+    """HTTP adapter over services_parade_dates.classify_parade_dates -- the one
+    recurrence rule shared by preview and generate (see that module)."""
     try:
-        start = date.fromisoformat(body.start_date)
-    except ValueError:
-        raise HTTPException(400, detail={"error": "invalid_date_format"})
+        return classify_parade_dates(
+            weekday=body.weekday, start_date=body.start_date, end_date=body.end_date,
+            frequency=body.frequency, excluded_dates=body.excluded_dates,
+            exclude_holidays=body.exclude_holidays, max_repeats=body.max_repeats,
+            holidays=holidays,
+        )
+    except ParadeDateRuleError as e:
+        raise HTTPException(400, detail={"error": e.code, "message": e.message})
 
-    end: date | None = None
-    if body.end_date:
-        try:
-            end = date.fromisoformat(body.end_date)
-        except ValueError:
-            raise HTTPException(400, detail={"error": "invalid_date_format"})
 
-    if end is None and body.max_repeats is None:
-        raise HTTPException(400, detail={
-            "error": "end_date_or_max_repeats_required",
-            "message": "Provide either end_date or max_repeats.",
-        })
-
-    excluded_set = set(body.excluded_dates or [])
-
-    def in_holiday(d: date) -> bool:
-        ds = d.isoformat()
-        return any(h.start_date <= ds <= h.end_date for h in holidays)
-
-    freq = (body.frequency or "weekly").lower()
-    candidates: list[str] = []
-    d = start
-    last_occurrence: date | None = None
-
-    while True:
-        if end and d > end:
-            break
-        if body.max_repeats is not None and len(candidates) >= body.max_repeats:
-            break
-
-        include = False
-        if freq == "daily":
-            include = True
-        elif freq in ("weekly", "fortnightly"):
-            if d.weekday() == body.weekday:
-                if freq == "weekly":
-                    include = True
-                else:
-                    # fortnightly: every second occurrence
-                    if last_occurrence is None or (d - last_occurrence).days >= 14:
-                        include = True
-        elif freq == "monthly":
-            # First occurrence of weekday in the calendar month
-            if d.weekday() == body.weekday:
-                # Is this the first occurrence of this weekday in the month?
-                if d.day <= 7:
-                    include = True
-        elif freq == "yearly":
-            # Same calendar month/day as the start date, each year.
-            if d.month == start.month and d.day == start.day:
-                include = True
-        else:
-            # Unknown frequency falls back to weekly
-            if d.weekday() == body.weekday:
-                include = True
-
-        if include:
-            ds = d.isoformat()
-            skip = ds in excluded_set
-            if body.exclude_holidays and in_holiday(d):
-                skip = True
-            if not skip:
-                candidates.append(ds)
-                last_occurrence = d
-
-        d += timedelta(days=1)
-
-    return candidates
+def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
+    """The dates generate-parade-dates creates: exactly the preview's will_create rows."""
+    return [r["date"] for r in _classify_parade_dates(body, holidays) if r["status"] == "will_create"]
 
 
 def _compute_candidate_dates_classified(body: GenerateParadeDatesIn, holidays: list) -> list[dict]:
-    """Like _compute_candidate_dates, but returns every date the recurrence
-    pattern touches (not just the ones that would be created), each tagged
-    with why it would or would not be created.
-
-    original_instruction.md Section 9 requires the preview to classify each
-    candidate rather than silently dropping holiday-conflicting and
-    explicitly-skipped dates from the list with no explanation. This is a
-    read-only, additive sibling of _compute_candidate_dates -- the write path
-    (generate_parade_dates) still calls the original function unchanged, so
-    this cannot alter what actually gets created.
-    """
-    try:
-        start = date.fromisoformat(body.start_date)
-    except ValueError:
-        raise HTTPException(400, detail={"error": "invalid_date_format"})
-
-    end: date | None = None
-    if body.end_date:
-        try:
-            end = date.fromisoformat(body.end_date)
-        except ValueError:
-            raise HTTPException(400, detail={"error": "invalid_date_format"})
-
-    if end is None and body.max_repeats is None:
-        raise HTTPException(400, detail={
-            "error": "end_date_or_max_repeats_required",
-            "message": "Provide either end_date or max_repeats.",
-        })
-
-    excluded_set = set(body.excluded_dates or [])
-
-    def in_holiday(d: date) -> bool:
-        ds = d.isoformat()
-        return any(h.start_date <= ds <= h.end_date for h in holidays)
-
-    freq = (body.frequency or "weekly").lower()
-    rows: list[dict] = []
-    included_count = 0
-    d = start
-    last_occurrence: date | None = None
-
-    while True:
-        if end and d > end:
-            break
-        if body.max_repeats is not None and included_count >= body.max_repeats:
-            break
-
-        include = False
-        if freq == "daily":
-            include = True
-        elif freq in ("weekly", "fortnightly"):
-            if d.weekday() == body.weekday:
-                if freq == "weekly":
-                    include = True
-                else:
-                    if last_occurrence is None or (d - last_occurrence).days >= 14:
-                        include = True
-        elif freq == "monthly":
-            if d.weekday() == body.weekday and d.day <= 7:
-                include = True
-        elif freq == "yearly":
-            if d.month == start.month and d.day == start.day:
-                include = True
-        else:
-            if d.weekday() == body.weekday:
-                include = True
-
-        if include:
-            ds = d.isoformat()
-            if ds in excluded_set:
-                rows.append({"date": ds, "status": "explicitly_skipped"})
-            elif body.exclude_holidays and in_holiday(d):
-                rows.append({"date": ds, "status": "holiday_conflict"})
-            else:
-                rows.append({"date": ds, "status": "will_create"})
-                included_count += 1
-                last_occurrence = d
-
-        d += timedelta(days=1)
-
-    return rows
+    """Every date the pattern touches, classified (REM-10 preview)."""
+    return _classify_parade_dates(body, holidays)
 
 
 @router.post("/years/{year_id}/preview-parade-dates")
@@ -1602,13 +1210,6 @@ def delete_parade_date(
 # ─────────────────────────────────────────────────────────────
 # Holidays
 # ─────────────────────────────────────────────────────────────
-
-def _validate_iso_date(v: str, field_name: str) -> str:
-    try:
-        date.fromisoformat(v)
-    except ValueError:
-        raise ValueError(f"{field_name} must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
-    return v
 
 
 class HolidayIn(BaseModel):
@@ -2006,8 +1607,9 @@ def get_term_planner(
         ts_by_night: dict[str, list] = {}
         for s in ts_rows:
             ts_by_night.setdefault(s.parade_night_id, []).append(s)
+        ctx = _session_out_context(db, ts_rows)   # one batch for the whole year
         for pn in all_dates:
-            sessions_by_date[pn.id] = [_real_session_out(s, db) for s in ts_by_night.get(pn.id, [])]
+            sessions_by_date[pn.id] = [_real_session_out(s, db, ctx=ctx) for s in ts_by_night.get(pn.id, [])]
     else:
         for pn in all_dates:
             sessions_by_date[pn.id] = []
@@ -2055,7 +1657,7 @@ def get_builder(
     if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2082,7 +1684,8 @@ def get_builder(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == False,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    real_sessions = [_real_session_out(s, db) for s in ts]
+    ctx = _session_out_context(db, ts)
+    real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
     conflicts = db.query(PlanningConflict).filter(
         PlanningConflict.parade_night_id == date_id,
@@ -2215,8 +1818,8 @@ def create_session(
     # canonical schedule/print endpoint can place the session on its real row.
     placement_template_id = pn.timing_template_id
     if not placement_template_id:
-        effective_template = _effective_template(db, pn.squadron_id, pn.date)
-        placement_template_id = effective_template.id if effective_template else None
+        effective_tmpl = effective_template(db, pn.squadron_id, pn.date)
+        placement_template_id = effective_tmpl.id if effective_tmpl else None
     if placement_template_id:
         period_block = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == placement_template_id,
@@ -2558,7 +2161,8 @@ def list_archived_sessions(
         TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == True,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-    return {"sessions": [_real_session_out(s, db) for s in ts]}
+    ctx = _session_out_context(db, ts)
+    return {"sessions": [_real_session_out(s, db, ctx=ctx) for s in ts]}
 
 
 @router.get("/parade-dates/{date_id}/weekly-program")
@@ -2580,7 +2184,8 @@ def get_weekly_program(
             TrainingSession.parade_night_id == pn.id,
             TrainingSession.is_archived == False,  # noqa: E712
         ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-        real_sessions = [_real_session_out(s, db) for s in ts]
+        ctx = _session_out_context(db, ts)
+        real_sessions = [_real_session_out(s, db, ctx=ctx) for s in ts]
 
         # CLASS-06: which Training Class(es) each session targets, additive
         # to _real_session_out()'s own output. Attached here rather than
@@ -2612,7 +2217,7 @@ def get_weekly_program(
     if pn and pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
     if not tmpl and pn.squadron_id:
-        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+        tmpl = effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2738,24 +2343,32 @@ def get_long_range(
             ParadeNightTimingSnapshot.display_order,
         ).all():
             snaps_by_pn_lr.setdefault(snap.parade_night_id, []).append(snap)
+
+        # Conflicts are another parade-night child collection. Load them once
+        # for the whole range rather than issuing one SELECT per night.
+        conflicts_by_pn_lr: dict[str, list] = {}
+        for conflict in db.query(PlanningConflict).filter(
+            PlanningConflict.parade_night_id.in_(pn_ids_lr),
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        ).all():
+            conflicts_by_pn_lr.setdefault(conflict.parade_night_id, []).append(conflict)
     else:
         ts_by_night_lr = {}
         classes_by_session_lr = {}
         snaps_by_pn_lr = {}
+        conflicts_by_pn_lr = {}
 
+    ctx_lr = _session_out_context(db, [s for v in ts_by_night_lr.values() for s in v])  # whole range, once
     rows = []
     for pn_obj in parade_dates:
         real_sessions: list[dict] = []
         ts = sorted(ts_by_night_lr.get(pn_obj.id, []),
                     key=lambda s: (s.period_number, s.cadet_group or ""))
-        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
+        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr, ctx=ctx_lr) for s in ts]
         for sess_out, s in zip(real_sessions, ts):
             sess_out["training_classes"] = classes_by_session_lr.get(s.id, [])
 
-        conflicts = db.query(PlanningConflict).filter(
-            PlanningConflict.parade_night_id == pn_obj.id,
-            PlanningConflict.is_resolved == False,  # noqa: E712
-        ).all()
+        conflicts = conflicts_by_pn_lr.get(pn_obj.id, [])
 
         pn_snaps_lr = snaps_by_pn_lr.get(pn_obj.id, [])
         instructional_periods = [
@@ -2838,13 +2451,9 @@ def list_locations(
         TrainingArea.active_status == True,  # noqa: E712
         TrainingArea.is_archived == False,  # noqa: E712
     )
-    if p.role in ("sqn_admin", "sqn_general"):
-        q = q.filter(TrainingArea.squadron_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
-        sqn_ids = [s.id for s in db.query(Squadron).filter(
-            Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
-        ).all()]
-        q = q.filter(TrainingArea.squadron_id.in_(sqn_ids))
+    scope = squadron_scope_clause(p, db, TrainingArea.squadron_id, include_archived=False)
+    if scope is not None:
+        q = q.filter(scope)
     if unit_id:
         q = q.filter(TrainingArea.squadron_id == unit_id)
     return [_location_out(loc) for loc in q.order_by(TrainingArea.name).all()]
@@ -2939,15 +2548,14 @@ def list_planning_facilitators(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    # Aligned to the same _view_squadron_id() resolution every other resource
+    # Aligned to the same resolve_view_squadron_id() resolution every other resource
     # endpoint in training.py already standardizes on (GET /api/facilitators,
     # /api/training-areas, /api/equipment, /api/activities) -- this endpoint
     # previously had its own bespoke role filter with no national_admin/
     # system_admin branch at all (silently unfiltered = every facilitator in
     # the system) and no proxy/acting-squadron awareness, so it could disagree
     # with what a squadron's own facilitator list actually shows.
-    from .training import _view_squadron_id
-    sq_id = _view_squadron_id(p, unit_id, db)
+    sq_id = resolve_view_squadron_id(p, unit_id, db)
     q = db.query(Facilitator).filter(
         Facilitator.active_status == True,  # noqa: E712
         Facilitator.squadron_id == sq_id,
@@ -2969,135 +2577,6 @@ def list_planning_facilitators(
 # ─────────────────────────────────────────────────────────────
 # Conflict Detection
 # ─────────────────────────────────────────────────────────────
-
-def _detect_conflicts(year_id: str, night_id: str, db: DBSession) -> list[dict]:
-    """Detect conflicts for one parade night. Reads only -- writes nothing.
-
-    Split out of _run_conflict_check so the same rules can answer two
-    different questions: "record what is wrong" (the persisted conflicts,
-    which carry a user's override and reason) and "what is wrong right now"
-    (the derived plan review, which must not write anything to answer a
-    GET). Two copies of these rules would drift, and a review that
-    disagreed with the recorded conflicts would be worse than no review.
-
-    Anchored on ParadeNight since Phase B merged ParadeDate into it."""
-    pn_obj = db.get(ParadeNight, night_id)
-    # Use real TrainingSession records for conflict detection
-    real_sessions: list = []
-    if pn_obj:
-        real_sessions = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id == pn_obj.id,
-            TrainingSession.is_archived == False,  # noqa: E712
-        ).all()
-
-    conflicts: list[dict] = []
-
-    def _conflict(ctype: str, severity: str, msg: str, sess_id=None):
-        conflicts.append({
-            "conflict_type": ctype, "severity": severity, "message": msg,
-            "scheduled_session_id": sess_id,
-        })
-
-    # Facilitator double-booking
-    fac_map: dict[tuple, list] = {}
-    for s in real_sessions:
-        if s.facilitator_id:
-            key = (s.facilitator_id, s.period_number)
-            fac_map.setdefault(key, []).append(s)
-    for (fid, snum), group in fac_map.items():
-        if len(group) > 1:
-            fac = db.get(Facilitator, fid)
-            name = f"{fac.current_rank or ''} {fac.last_name}".strip() if fac else fid
-            _conflict("facilitator_double_booked", "critical",
-                      f"Facilitator {name} is assigned to multiple groups in session {snum}.",
-                      group[0].id)
-
-    # Room double-booking
-    room_map: dict[tuple, list] = {}
-    for s in real_sessions:
-        if s.training_area_id:
-            key = (s.training_area_id, s.period_number)
-            room_map.setdefault(key, []).append(s)
-    for (lid, snum), group in room_map.items():
-        if len(group) > 1:
-            ra = db.get(TrainingArea, lid)
-            name = ra.name if ra else lid
-            _conflict("room_double_booked", "critical",
-                      f"Location '{name}' is assigned to multiple groups in session {snum}.",
-                      group[0].id)
-
-    # Empty sessions (group has no session for this night)
-    scheduled_groups = {s.cadet_group for s in real_sessions}
-    for grp in CADET_GROUPS:
-        if grp not in scheduled_groups:
-            _conflict("empty_session", "warning",
-                      f"Cadet group '{grp}' has no session scheduled for this parade night.")
-
-    # Anchor event without prep (checked at year level - skip per-date)
-
-    # Holiday conflict
-    if pn_obj:
-        holidays = db.query(HolidayPeriod).filter(
-            HolidayPeriod.planning_year_id == year_id,
-            HolidayPeriod.affects_parade == True,  # noqa: E712
-        ).all()
-        for h in holidays:
-            if h.start_date <= pn_obj.date <= h.end_date:
-                _conflict("holiday_conflict", "warning",
-                          f"This parade date falls within the '{h.name}' holiday period.")
-                break
-
-    # Facilitator on leave
-    if pn_obj:
-        fac_ids = {s.facilitator_id for s in real_sessions if s.facilitator_id}
-        if fac_ids:
-            leave_records = db.query(PlanningFacilitatorLeave).filter(
-                PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
-                PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-                PlanningFacilitatorLeave.start_date <= pn_obj.date,
-                PlanningFacilitatorLeave.end_date >= pn_obj.date,
-            ).all()
-            warned_facs: set[str] = set()
-            for lv in leave_records:
-                if lv.facilitator_id in warned_facs:
-                    continue
-                warned_facs.add(lv.facilitator_id)
-                fac = db.get(Facilitator, lv.facilitator_id)
-                name = f"{fac.current_rank or ''} {fac.last_name}".strip() if fac else lv.facilitator_id
-                reason_part = f" ({lv.reason})" if lv.reason else ""
-                affected = [s for s in real_sessions if s.facilitator_id == lv.facilitator_id]
-                _conflict("facilitator_on_leave", "warning",
-                          f"Facilitator {name} is on leave on this date{reason_part}.",
-                          affected[0].id if affected else None)
-
-    return conflicts
-
-
-def _run_conflict_check(year_id: str, night_id: str, db: DBSession) -> list[PlanningConflict]:
-    """Persist the detected conflicts for one parade night.
-
-    Replaces previous UNRESOLVED results only: a conflict a user has overridden
-    carries their reason and who they are, and re-running checks must never
-    discard that."""
-    db.query(PlanningConflict).filter(
-        PlanningConflict.parade_night_id == night_id,
-        PlanningConflict.is_resolved == False,  # noqa: E712
-    ).delete(synchronize_session=False)
-
-    rows = []
-    for found in _detect_conflicts(year_id, night_id, db):
-        c = PlanningConflict(
-            id=str(uuid.uuid4()), planning_year_id=year_id,
-            parade_night_id=night_id,
-            scheduled_session_id=found["scheduled_session_id"],
-            conflict_type=found["conflict_type"], severity=found["severity"],
-            message=found["message"], is_resolved=False,
-            created_at=utcnow(), updated_at=utcnow(),
-        )
-        rows.append(c)
-        db.add(c)
-    db.commit()
-    return rows
 
 
 @router.get("/years/{year_id}/conflicts")
@@ -3346,7 +2825,6 @@ def get_command_centre(
     p: Principal = Depends(get_principal),
 ):
     from sqlalchemy import or_, func
-    from .dashboard import _data_freshness
 
     today = date.today().isoformat()
 
@@ -3358,10 +2836,9 @@ def get_command_centre(
             _require_year_access(p, py)
     else:
         q = db.query(PlanningYear)
-        if p.role in ("sqn_admin", "sqn_general"):
-            q = q.filter(PlanningYear.unit_id == p.squadron_id)
-        elif p.role in ("wing_admin", "wing_viewer"):
-            q = q.filter(PlanningYear.wing_id == p.wing_id)
+        scope = level_scope_clause(p, wing_column=PlanningYear.wing_id, squadron_column=PlanningYear.unit_id)
+        if scope is not None:
+            q = q.filter(scope)
         py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
         if py is None:
             py = q.order_by(PlanningYear.year.desc()).first()
@@ -3582,7 +3059,7 @@ def get_command_centre(
     nights_missing_fac = len(nights_missing_fac_ids)
 
     # Determine scope for data freshness (command-centre is squadron or wing scoped)
-    _cc_scope = "squadron" if p.role in ("sqn_admin", "sqn_general") else "wing"
+    _cc_scope = "squadron" if p.is_squadron else "wing"
     _cc_sq_id = py.unit_id if _cc_scope == "squadron" else None
     _cc_wing_id = (py.wing_id or p.wing_id) if _cc_scope == "wing" else None
 
@@ -3597,7 +3074,7 @@ def get_command_centre(
         "training_classes": training_classes_out,
         "recent_imports": [],
         "nights_missing_facilitator": nights_missing_fac,
-        "data_freshness": _data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
+        "data_freshness": data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
     }
 
 
@@ -3626,7 +3103,6 @@ def get_class_forecasts(
     """
     from sqlalchemy import func, select as sa_select
     import math
-    from .training import _class_curriculum_progress
 
     py = db.get(PlanningYear, year_id)
     if not py:
@@ -3687,7 +3163,7 @@ def get_class_forecasts(
 
     forecasts = []
     for c in classes:
-        prog = _class_curriculum_progress(db, c)
+        prog = class_curriculum_progress(db, c)
         requirements = prog.get("requirements", [])
         remaining = [r for r in requirements if r["status"] not in _DELIVERED_STATUSES]
         planned = [r for r in remaining if r["status"] == _PLANNED_STATUS]
@@ -3701,7 +3177,7 @@ def get_class_forecasts(
         if c.training_stage_id is None:
             # The five classes auto-created with a planning year carry a
             # stage_code (ORI/INI/...) but no training_stage_id, and
-            # _class_curriculum_progress keys off the stage, so they have zero
+            # class_curriculum_progress keys off the stage, so they have zero
             # requirements for a reason that has nothing to do with progress.
             # Reporting "All requirements delivered." there is a green light
             # for work nobody has scoped yet -- say what is actually true.
@@ -3801,7 +3277,7 @@ def _curriculum_scope_query(db: DBSession, p: Principal):
         CurriculumItem.is_archived == False,  # noqa: E712
         CurriculumItem.active_status == True,  # noqa: E712
     )
-    if p.role in ("sqn_admin", "sqn_general"):
+    if p.is_squadron:
         sqn = db.get(Squadron, p.squadron_id) if p.squadron_id else None
         wing_id = sqn.wing_id if sqn else None
         q = q.filter(or_(
@@ -3809,7 +3285,7 @@ def _curriculum_scope_query(db: DBSession, p: Principal):
             CurriculumItem.wing_id == wing_id,
             CurriculumItem.squadron_id == p.squadron_id,
         ))
-    elif p.role in ("wing_admin", "wing_viewer"):
+    elif p.is_wing:
         q = q.filter(or_(
             CurriculumItem.owning_level == "national",
             CurriculumItem.wing_id == p.wing_id,
@@ -3878,7 +3354,7 @@ def list_missions(
     # CLASS-05: per-class breakdown, additive to the existing item-level
     # backlog_status/is_scheduled/etc fields below (none of which change).
     # A Training Class's Stage is matched to a CurriculumItem's phase the
-    # same way _class_curriculum_progress (training.py) does -- by
+    # same way class_curriculum_progress (services_curriculum_progress.py) does -- by
     # CurriculumPhase.name == CurriculumItem.phase -- so this reuses that
     # resolution rather than inventing a second one (addendum §44). Classes
     # are not filtered by training_year_id: the Session<->Class assignment
@@ -4697,11 +4173,6 @@ def rollover_year(
 # Spreadsheet Export — Annual Program + Schedule
 # ─────────────────────────────────────────────────────────────
 
-def _neutralise_cell(v):
-    """Prevent CSV/formula injection in spreadsheet cells."""
-    s = str(v) if v is not None else ""
-    return ("'" + s) if s[:1] in ("=", "+", "-", "@") else s
-
 
 @router.get("/years/{year_id}/export.xlsx")
 def export_annual_program_xlsx(
@@ -4757,9 +4228,10 @@ def export_annual_program_xlsx(
     for cell in ws3[1]:
         cell.fill = hdr_fill; cell.font = hdr_font
     for a in db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id, AnchorEvent.is_archived == False).order_by(AnchorEvent.start_date).all():  # noqa: E712
-        ws3.append([_neutralise_cell(a.name), a.start_date, a.end_date or "",
+        # AnchorEvent has event_name/notes, no location (D15); column kept blank.
+        ws3.append([_neutralise_cell(a.event_name), a.start_date, a.end_date or "",
                     a.event_type or "", a.importance_level or "",
-                    _neutralise_cell(a.location or ""), _neutralise_cell(a.description or "")])
+                    "", _neutralise_cell(a.notes or "")])
 
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     audit(db, p, object_type="export", object_id=year_id, action="export",
@@ -5609,19 +5081,6 @@ def facilitator_workload(
 
 # ── Night Summaries ──────────────────────────────────────────────────────────
 
-def _notice_out(n: PlanningNotice) -> dict:
-    return {
-        "notice_id": n.id,
-        "parade_night_id": n.parade_night_id,
-        "notice_text": n.notice_text,
-        "audience": n.audience,
-        "priority": n.priority,
-        "created_by": n.created_by,
-        "is_archived": n.is_archived,
-        "created_at": iso_z(n.created_at) if n.created_at else None,
-        "updated_at": iso_z(n.updated_at) if n.updated_at else None,
-    }
-
 
 @router.get("/years/{year_id}/night-summaries")
 def night_summaries(
@@ -5895,42 +5354,6 @@ def archive_notice(
 
 # ── CEA Activities ────────────────────────────────────────────────────────────
 
-def _cea_activity_out(a: CeaActivity) -> dict:
-    return {
-        "id": a.id,
-        "import_batch_id": a.import_batch_id,
-        "planning_year_id": a.planning_year_id,
-        "wing_id": a.wing_id,
-        "unit_id": a.unit_id,
-        "cea_activity_id": a.cea_activity_id,
-        "activity_type": a.activity_type,
-        "status_name": a.status_name,
-        "parent_unit": a.parent_unit,
-        "host_unit": a.host_unit,
-        "activity_name": a.activity_name,
-        "nomination_start_date": a.nomination_start_date,
-        "nomination_end_date": a.nomination_end_date,
-        "activity_start_date": a.activity_start_date,
-        "activity_end_date": a.activity_end_date,
-        "start_time": a.start_time,
-        "end_time": a.end_time,
-        "location": a.location,
-        "activity_poc": a.activity_poc,
-        "notes": a.notes,
-        "source_type": a.source_type,
-        "classification_status": a.classification_status,
-        "importance": a.importance,
-        "audience_staff_only": a.audience_staff_only,
-        "audience_seniors": a.audience_seniors,
-        "audience_proficient": a.audience_proficient,
-        "audience_first_years": a.audience_first_years,
-        "classified_by": a.classified_by,
-        "classified_at": a.classified_at,
-        "is_removed_from_cea": a.is_removed_from_cea,
-        "is_archived": a.is_archived,
-        "created_at": iso_z(a.created_at) if a.created_at else None,
-    }
-
 
 @router.get("/years/{year_id}/cea/activities")
 def list_cea_activities(
@@ -6003,56 +5426,6 @@ def list_cea_batches(
     ]}
 
 
-def _parse_cea_date(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    raw = raw.strip()
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
-        try:
-            from datetime import datetime as _dt
-            return _dt.strptime(raw, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return raw[:10] if len(raw) >= 10 else raw
-
-
-def _parse_cea_time(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    raw = raw.strip()
-    if len(raw) >= 5 and ":" in raw:
-        return raw[:5]
-    return None
-
-
-def _normalise_cea_row(row: dict) -> dict:
-    """Map both full-export and simple-export CSV column names to internal fields."""
-    def g(*keys: str) -> str | None:
-        for k in keys:
-            v = row.get(k, "").strip()
-            if v:
-                return v
-        return None
-
-    return {
-        "cea_activity_id": g("ActivityID", "SeqNr"),
-        "activity_type": g("ActivityTypeName", "SupportRequestType"),
-        "status_name": g("StatusName"),
-        "parent_unit": g("UnitParentName"),
-        "host_unit": g("UnitName", "Unit"),
-        "activity_name": g("SeqNrAndName", "Name", "ActivityName"),
-        "nomination_start_date": _parse_cea_date(g("NominationStartDate")),
-        "nomination_end_date": _parse_cea_date(g("NominationEndDate")),
-        "activity_start_date": _parse_cea_date(g("StartDate", "Start date")),
-        "activity_end_date": _parse_cea_date(g("EndDate", "End date")),
-        "start_time": _parse_cea_time(g("StartTime", "Start time")),
-        "end_time": _parse_cea_time(g("EndTime", "End time")),
-        "location": g("Location"),
-        "activity_poc": g("POC"),
-        "notes": g("ActivityNotes", "Activity Notes", "SupportRequestTypeCode"),
-    }
-
-
 @router.post("/years/{year_id}/cea/import")
 async def import_cea_csv(
     year_id: str,
@@ -6112,12 +5485,23 @@ async def import_cea_csv(
         key = (act.activity_name or "", act.activity_start_date or "")
         existing_by_name_date.setdefault(key, []).append(act)
 
-    for row in rows:
+    row_errors: list[dict] = []
+    for row_number, row in enumerate(rows, start=2):        # row 1 is the header
+        if cea_row_is_blank(row):
+            skipped += 1
+            continue
         try:
             parsed = _normalise_cea_row(row)
             name = parsed.get("activity_name") or ""
-            if not name:
-                skipped += 1
+            # Validate the whole row before touching anything, so a bad row is
+            # never half-applied to an existing activity (D18).
+            problems = cea_row_problems(row, parsed)
+            if problems:
+                row_errors.extend(cea_row_error_entries(row_number, problems))
+                if not name:
+                    skipped += 1
+                else:
+                    errors += 1
                 continue
 
             cea_id = parsed.get("cea_activity_id")
@@ -6174,6 +5558,8 @@ async def import_cea_csv(
 
         except Exception:
             errors += 1
+            row_errors.append({"row": row_number, "field": None,
+                               "message": f"Row {row_number}: could not be imported."})
 
     # Mark activities no longer present in the import
     current_cea_ids = {
@@ -6203,6 +5589,7 @@ async def import_cea_csv(
         "duplicates": duplicates,
         "skipped": skipped,
         "errors": errors,
+        "row_errors": row_errors,
         "preview": previews[:50],
     }
 
@@ -6236,7 +5623,7 @@ def classify_cea_activity(
     # their own squadron's manual activity, but must never be able to
     # overwrite a wing-wide CEA activity's classification for every
     # squadron in the wing at once.
-    if act.unit_id != p.squadron_id and p.role == "sqn_admin":
+    if sqn_admin_outside_own_squadron(p, act.unit_id):
         raise HTTPException(403, detail={
             "error": "wing_wide_activity",
             "message": "Only a Wing Admin or higher can classify a wing-wide CEA activity.",

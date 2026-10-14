@@ -2,7 +2,7 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main, "release/**", "next-stage/**"]
+    branches: [main, "release/**", "next-stage/**", "stabilise/**", "refactor/**"]
   pull_request:
     branches: [main, "release/**"]
 

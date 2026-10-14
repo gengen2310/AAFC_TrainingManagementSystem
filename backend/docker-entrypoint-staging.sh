@@ -4,8 +4,10 @@
 set -e
 
 echo "[entrypoint] Running Alembic migrations..."
-alembic upgrade head
-echo "[entrypoint] Migrations complete."
+# Upgrades to head, or -- when the database is AHEAD of this build (a rollback
+# deploy) -- leaves it untouched and continues instead of crash-looping (D23).
+python -m scripts.migrate_or_hold
+echo "[entrypoint] Migrations step complete."
 
 # Bootstrap only when no system_admin exists.
 # The seed is idempotent and reads STAGING_BOOTSTRAP_SYSADMIN_CODE from env.

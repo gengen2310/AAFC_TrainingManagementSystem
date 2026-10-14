@@ -106,6 +106,7 @@ def test_system_admin_can_create_system_admin(client):
     r = client.post("/api/accounts", headers=h, json={
         "display_name": "Second System Admin",
         "role": "system_admin",
+        "recovery_email": "second-system-admin@example.test",
     })
     assert r.status_code == 200, r.text
 
@@ -1046,6 +1047,7 @@ def test_change_role_never_drives_active_admin_count_below_one(client):
     create_r = client.post("/api/accounts", headers=h_sa, json={
         "display_name": "Second Sysadmin",
         "role": "system_admin",
+        "recovery_email": "second-role-guard@example.test",
     })
     uid2 = create_r.json()["user_id"]
 

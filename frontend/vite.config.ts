@@ -6,8 +6,10 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 // `base` controls the public path. For GitHub Pages *project* sites the app is served from
 // /<repo>/, so set VITE_BASE=/<repo>/ at build time. Defaults to "/" (same-domain / local).
 //
-// `mode=single` produces a self-contained index.html with all JS/CSS inlined; used by
-// `make connected` to regenerate connected-frontend/index.html from the React source.
+// `mode=single` produces a self-contained Planning Workspace index.html with all
+// JS/CSS inlined (dist-single/). It does NOT produce the Main TMS:
+// connected-frontend/index.html is hand-maintained and must never be overwritten
+// with this output.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const isSingle = mode === "single";

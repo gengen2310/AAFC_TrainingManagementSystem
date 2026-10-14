@@ -689,12 +689,42 @@ else
 fi
 TESTS_RUN=$((TESTS_RUN+1))
 
+# ── B1–B2: branch allow-list and computed Alembic head (2026-10-12) ─────────
+b_ok=1
+for br in main release/production-readiness-20261009 release/x.1; do
+  [[ "$br" =~ $STAGING_ALLOWED_BRANCH_RE ]] || { b_ok=0; echo "    should allow: $br"; }
+done
+for br in feature/x production release/ myrelease/x main2 "release/a b"; do
+  [[ "$br" =~ $STAGING_ALLOWED_BRANCH_RE ]] && { b_ok=0; echo "    should refuse: $br"; }
+done
+[ "$b_ok" -eq 1 ] && _pass "B1: staging branch allow-list = main | release/*" \
+                  || _fail "B1: staging branch allow-list wrong"
+TESTS_RUN=$((TESTS_RUN+1))
+expected_head=$(python3 "$SCRIPT_DIR/../backend/scripts/compute_alembic_head.py" "$SCRIPT_DIR/../backend/alembic/versions")
+[ -n "$REQUIRED_ALEMBIC_HEAD" ] && [ "$REQUIRED_ALEMBIC_HEAD" = "$expected_head" ] \
+  && _pass "B2: REQUIRED_ALEMBIC_HEAD computed from migrations ($REQUIRED_ALEMBIC_HEAD)" \
+  || _fail "B2: REQUIRED_ALEMBIC_HEAD='$REQUIRED_ALEMBIC_HEAD', migrations say '$expected_head'"
+TESTS_RUN=$((TESTS_RUN+1))
+
+# ── B3: API calls carry the Main TMS Origin (D24, 2026-10-12) ───────────────
+# Cookie-authenticated writes without an allowed Origin are refused (D13); the
+# staging CRUD gate failed with 403 origin_not_allowed until the helper sent it.
+_args_file=$(mktemp); COOKIE_JAR=$(mktemp)
+curl() { printf '%s\n' "$@" >> "$_args_file"; printf '\n__STATUS__201\n'; }
+staging_api_call POST "/api/subject-area-tags" '{"display_name":"x","scope":"global"}' >/dev/null 2>&1
+staging_api_call GET "/api/auth/me" >/dev/null 2>&1
+origins=$(grep -c "^Origin: https://${EXPECTED_STAGING_FRONTEND_DOMAIN}$" "$_args_file" || true)
+[ "$origins" = "2" ] && _pass "B3: staging_api_call sends Origin https://${EXPECTED_STAGING_FRONTEND_DOMAIN} on writes and reads" \
+                     || _fail "B3: expected 2 Origin headers, saw ${origins}"
+TESTS_RUN=$((TESTS_RUN+1))
+rm -f "$_args_file" "$COOKIE_JAR"; unset -f curl
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo
 echo "════════════════════════════════════════════════════════════════════"
 printf "  Tests run: %d   \033[0;32mPASS: %d\033[0m   \033[0;31mFAIL: %d\033[0m\n" \
   "$TESTS_RUN" "$TESTS_PASSED" "$TESTS_FAILED"
-echo "  (A–G: deployment tracking · T1–T13: auth/cookie/cleanup)"
+echo "  (A–G: deployment tracking · T1–T13: auth/cookie/cleanup · B1–B3: branch/head/origin)"
 echo "════════════════════════════════════════════════════════════════════"
 echo
 [ "$TESTS_FAILED" -eq 0 ] || exit 1

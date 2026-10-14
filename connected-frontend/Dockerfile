@@ -2,6 +2,8 @@ FROM nginx:1.27-alpine
 
 # Copy static app and configuration
 COPY index.html /usr/share/nginx/html/index.html
+# Modules extracted from index.html (loaded as same-origin classic scripts).
+COPY js/ /usr/share/nginx/html/js/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

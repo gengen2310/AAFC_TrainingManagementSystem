@@ -108,6 +108,36 @@ def test_read_only_roles_cannot_create_account(client):
         assert r.status_code == 403, f"{role} should be denied, got {r.status_code}: {r.text}"
 
 
+def test_read_only_roles_cannot_preview_program_import(client):
+    """Program workbook preview is an import/admin capability, not a read-only one."""
+    for role in READ_ONLY_ROLES:
+        hdr = _hdrs(client, role)
+        r = client.post(
+            "/api/program-imports/preview",
+            json={"source_category": "role-matrix", "filename": "x.xlsx", "file_b64": "AA=="},
+            headers=hdr,
+        )
+        assert r.status_code == 403, (
+            f"{role} should be denied program import preview, got {r.status_code}: {r.text}"
+        )
+
+
+def test_read_only_roles_cannot_change_another_users_access_code(client):
+    """A read-only session must not be enough to rotate another account's credential."""
+    admin_hdr = _hdrs(client, "sqn_admin")
+    target_id = client.get("/api/auth/me", headers=admin_hdr).json()["session"]["user_id"]
+    for role in READ_ONLY_ROLES:
+        hdr = _hdrs(client, role)
+        r = client.post(
+            "/api/auth/change-code",
+            json={"user_id": target_id, "new_code": "ROLEMATRIX-NOT-APPLIED"},
+            headers=hdr,
+        )
+        assert r.status_code == 403, (
+            f"{role} should be denied cross-account code change, got {r.status_code}: {r.text}"
+        )
+
+
 # ── system_admin-only endpoints: every non-system_admin role denied, including the
 # other 3 write-capable roles (national_admin/wing_admin/sqn_admin) -- system-console
 # authority is not implied by write authority elsewhere. ──────────────────────────

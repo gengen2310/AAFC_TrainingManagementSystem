@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "captured_from": "9f24d42b61e1a8d775d5c4f0a24465d145fe0e85",
+  "captured_at": "2026-10-03",
+  "connected_frontend": {
+    "path": "connected-frontend/index.html",
+    "max_bytes": 418332,
+    "max_lines": 5236,
+    "max_named_function_declarations": 11
+  },
+  "router_direct_role_checks": {
+    "backend/app/routers/__init__.py": 0,
+    "backend/app/routers/accounts.py": 0,
+    "backend/app/routers/auth.py": 0,
+    "backend/app/routers/custom_phases.py": 1,
+    "backend/app/routers/dashboard.py": 0,
+    "backend/app/routers/export_import.py": 0,
+    "backend/app/routers/health.py": 0,
+    "backend/app/routers/jobs.py": 0,
+    "backend/app/routers/ops.py": 0,
+    "backend/app/routers/organisations.py": 0,
+    "backend/app/routers/planning.py": 3,
+    "backend/app/routers/search.py": 0,
+    "backend/app/routers/service_desk.py": 0,
+    "backend/app/routers/setup.py": 0,
+    "backend/app/routers/system.py": 0,
+    "backend/app/routers/timing.py": 0,
+    "backend/app/routers/training.py": 1,
+    "backend/app/routers/wing_calendar.py": 0
+  },
+  "router_cross_imports": {},
+  "router_inline_scope_comparisons": {
+    "backend/app/routers/__init__.py": 0,
+    "backend/app/routers/accounts.py": 0,
+    "backend/app/routers/auth.py": 0,
+    "backend/app/routers/custom_phases.py": 3,
+    "backend/app/routers/dashboard.py": 0,
+    "backend/app/routers/export_import.py": 0,
+    "backend/app/routers/health.py": 0,
+    "backend/app/routers/jobs.py": 0,
+    "backend/app/routers/ops.py": 0,
+    "backend/app/routers/organisations.py": 0,
+    "backend/app/routers/planning.py": 8,
+    "backend/app/routers/search.py": 0,
+    "backend/app/routers/service_desk.py": 0,
+    "backend/app/routers/setup.py": 0,
+    "backend/app/routers/system.py": 0,
+    "backend/app/routers/timing.py": 0,
+    "backend/app/routers/training.py": 0,
+    "backend/app/routers/wing_calendar.py": 0
+  },
+  "router_max_lines": {
+    "backend/app/routers/planning.py": 5743,
+    "backend/app/routers/training.py": 7534
+  }
+}

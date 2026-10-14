@@ -45,18 +45,20 @@ export async function firstFreeParadeDate(
 
 const GOOGLE_FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 
-export const test = base.extend<{ fontFetchTimeoutMs: number; _externalFontsGuard: void }>({
-  fontFetchTimeoutMs: [5000, { option: true }],
+export const test = base.extend<{ _externalFontsGuard: void }>({
   _externalFontsGuard: [
-    async ({ context, fontFetchTimeoutMs }, use) => {
+    async ({ context }, use) => {
+      // CI must not depend on a third-party CDN. A timed route.fetch() can race
+      // another handler/browser cancellation and then attempt to fulfil an
+      // already-handled Route (seen on Firefox). Stub both stylesheet and font
+      // requests immediately; application behavior under test is unchanged.
       await context.route(GOOGLE_FONTS, async (route) => {
-        try {
-          const response = await route.fetch({ timeout: fontFetchTimeoutMs });
-          await route.fulfill({ response });
-        } catch {
-          const css = route.request().resourceType() === "stylesheet";
-          await route.fulfill({ status: 200, contentType: css ? "text/css" : "font/woff2", body: "" });
-        }
+        const css = route.request().resourceType() === "stylesheet";
+        await route.fulfill({
+          status: 200,
+          contentType: css ? "text/css" : "font/woff2",
+          body: "",
+        });
       });
       await use();
     },

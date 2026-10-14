@@ -40,7 +40,7 @@ export const authApi = {
   me: () => api.get<{ session: SessionInfo }>("/api/auth/me"),
   logout: () => api.post<{ ok: boolean }>("/api/auth/logout"),
   refresh: () => api.post<{ token: string; session: SessionInfo }>("/api/auth/refresh"),
-  changeCode: (user_id: string, new_code: string) => api.post<{ ok: boolean }>("/api/auth/change-code", { user_id, new_code }),
+  changeCode: (user_id: string, new_code: string, current_code?: string) => api.post<{ ok: boolean }>("/api/auth/change-code", { user_id, new_code, ...(current_code ? { current_code } : {}) }),
 };
 
 export const orgApi = {
@@ -384,6 +384,7 @@ export const planningApi = {
   updateSession: (session_id: string, body: {
     curriculum_id?: string | null; activity_title?: string | null;
     facilitator_id?: string | null; assistant_facilitator_id?: string | null;
+    assistant_facilitator_ids?: string[] | null;
     location_id?: string | null; cadet_group?: string | null;
     part_number?: number | null; notes?: string | null;
     training_class_ids?: string[] | null;

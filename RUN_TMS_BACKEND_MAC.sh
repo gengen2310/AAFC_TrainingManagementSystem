@@ -23,7 +23,8 @@ if [ ! -f "aafc_tms.db" ]; then
 fi
 
 # 4. Run. CORS allows the React frontend (5173) and the connected client (8080).
-export CORS_ALLOWED_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080"
+# Respect an origin list the caller already set (e.g. frontends on other ports).
+export CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}"
 export PLANNING_WORKSPACE_URL="${PLANNING_WORKSPACE_URL:-http://localhost:5173}"
 export PORT="${PORT:-8000}"
 echo "Backend Source of Truth: http://localhost:${PORT}"

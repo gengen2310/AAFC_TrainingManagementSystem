@@ -1,3 +1,9 @@
+> **OBSOLETE (marked 2026-10-12).** This describes the V17.1 Render + Supabase staging
+> setup. Staging now runs on **Railway**: deploy with `scripts/deploy-staging.sh` (see its
+> header; it needs Railway CLI auth and a staging System Admin code), self-test the deploy
+> logic with `scripts/test_deploy_logic.sh`, and roll back with
+> `docs/release/rollback_runbook.md`. Kept for history only.
+
 # AAFC TMS — Staging Deployment Guide (V17.1)
 
 ## Architecture

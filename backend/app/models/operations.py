@@ -75,6 +75,27 @@ class SystemSetting(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 
+class RateLimitBucket(Base):
+    """Fixed-window hit counter shared by every worker (e.g. forgot-code)."""
+    __tablename__ = "rate_limit_buckets"
+    key: Mapped[str] = mapped_column(String(300), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class IdempotencyKey(Base):
+    """One row per (user, endpoint, Idempotency-Key) claim, shared by every
+    worker. The primary key makes the claim atomic: the first insert wins and
+    runs the handler; a concurrent duplicate sees the row instead. status_code
+    is NULL while the first request is still in progress."""
+    __tablename__ = "idempotency_keys"
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, index=True)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class ImportLog(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "import_logs"
     user_id: Mapped[str | None] = mapped_column(String(36))

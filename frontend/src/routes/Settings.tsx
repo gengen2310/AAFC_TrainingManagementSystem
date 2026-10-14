@@ -30,19 +30,23 @@ function unitLabel(u: UserRecord): string {
 }
 
 export function Settings() {
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
 
   // ── Self-service: change own code ──────────────────────────────────────────
+  const [selfCurrent, setSelfCurrent] = useState("");
   const [selfNew, setSelfNew] = useState("");
   const [selfConfirm, setSelfConfirm] = useState("");
   const [selfMsg, setSelfMsg] = useState("");
   const [selfErr, setSelfErr] = useState("");
 
   const selfChange = useMutation({
-    mutationFn: () => authApi.changeCode(session!.user_id, selfNew),
-    onSuccess: () => {
-      setSelfMsg("Access code updated.");
-      setSelfNew(""); setSelfConfirm(""); setSelfErr("");
+    mutationFn: () => authApi.changeCode(session!.user_id, selfNew, selfCurrent),
+    onSuccess: async () => {
+      setSelfMsg("Access code updated. Sign in again with your new code.");
+      setSelfCurrent(""); setSelfNew(""); setSelfConfirm(""); setSelfErr("");
+      // change-code increments token_version, so the current session is
+      // intentionally invalid after a successful credential rotation.
+      await logout();
     },
     onError: (e) => {
       setSelfMsg("");
@@ -51,7 +55,7 @@ export function Settings() {
   });
 
   const mismatch = selfConfirm.length > 0 && selfNew !== selfConfirm;
-  const selfDisabled = !selfNew.trim() || selfNew !== selfConfirm || selfChange.isPending;
+  const selfDisabled = !selfCurrent.trim() || !selfNew.trim() || selfNew !== selfConfirm || selfChange.isPending;
 
   // ── Admin: reset another user's code ──────────────────────────────────────
   const [selected, setSelected] = useState<UserRecord | null>(null);
@@ -81,11 +85,14 @@ export function Settings() {
 
   const q = filter.toLowerCase();
   const filtered = (users ?? []).filter((u) =>
-    !q
-    || u.display_name.toLowerCase().includes(q)
-    || u.role.includes(q)
-    || (u.squadron_code ?? "").toLowerCase().includes(q)
-    || (u.wing_code ?? "").toLowerCase().includes(q),
+    u.user_id !== session?.user_id
+    && (
+      !q
+      || u.display_name.toLowerCase().includes(q)
+      || u.role.includes(q)
+      || (u.squadron_code ?? "").toLowerCase().includes(q)
+      || (u.wing_code ?? "").toLowerCase().includes(q)
+    ),
   );
 
   function selectUser(u: UserRecord) { setSelected(u); setNewCode(""); setMsg(""); setErr(""); }
@@ -98,10 +105,19 @@ export function Settings() {
       {/* ── Self-service card ── always visible ── */}
       <Card title="Change my access code">
         <p className="muted" style={{ marginBottom: 12 }}>
-          Change your own access code. The current code is not required. The previous code cannot
-          be recovered once changed.
+          Change your own access code. Re-enter your current code to confirm the change. The previous
+          code cannot be recovered once changed.
         </p>
         <div className="form" style={{ maxWidth: 340 }}>
+          <label htmlFor="sc-current">Current access code</label>
+          <input
+            id="sc-current"
+            type="password"
+            value={selfCurrent}
+            onChange={(e) => { setSelfCurrent(e.target.value); setSelfMsg(""); setSelfErr(""); }}
+            autoComplete="current-password"
+            placeholder="Enter current code"
+          />
           <label htmlFor="sc-new">New access code</label>
           <input
             id="sc-new"

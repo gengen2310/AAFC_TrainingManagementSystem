@@ -1112,3 +1112,40 @@ def test_apply_template_requires_confirmed_when_sessions_exist(client):
         json={"timing_template_id": tmpl1["timing_template_id"], "confirmed": True},
     )
     assert r2.status_code == 200, r2.text
+
+
+def test_adding_training_period_after_explicit_periods_allocates_next_number(client):
+    """Regression: a new block with no number follows existing explicit numbers."""
+    h = login(client, "ADMIN703")
+    initial = [
+        {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
+         "is_instructional_period": True, "period_number": 1},
+        {"display_order": 1, "block_name": "Period 2", "block_type": "training_period",
+         "is_instructional_period": True, "period_number": 2},
+        {"display_order": 2, "block_name": "Period 3", "block_type": "training_period",
+         "is_instructional_period": True, "period_number": 3},
+    ]
+    data = _create_template(
+        client, h, name="Period Allocation Regression", effective_from="2199-01-01",
+        blocks=initial,
+    )
+    tid = data["timing_template_id"]
+
+    edited = initial + [{
+        "display_order": 3,
+        "block_name": "Period 4",
+        "block_type": "training_period",
+        "is_instructional_period": True,
+        "period_number": None,
+    }]
+    r = client.patch(
+        f"/api/timing-templates/{tid}",
+        headers=h,
+        json={"blocks": edited, "version": data["version"]},
+    )
+    assert r.status_code == 200, r.text
+    periods = [
+        b["period_number"] for b in r.json()["blocks"]
+        if b["block_type"] == "training_period"
+    ]
+    assert periods == [1, 2, 3, 4]

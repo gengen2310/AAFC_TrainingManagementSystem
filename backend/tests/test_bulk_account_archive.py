@@ -31,6 +31,10 @@ def _sqn_id_by_code(client, hdr, code):
 
 def _create_account(client, hdr, display_name, role, **scope):
     body = {"display_name": display_name, "role": role, **scope}
+    if role == "system_admin":
+        body["recovery_email"] = (
+            display_name.lower().replace(" ", ".") + "@example.test"
+        )
     r = client.post("/api/accounts", json=body, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()["user_id"]

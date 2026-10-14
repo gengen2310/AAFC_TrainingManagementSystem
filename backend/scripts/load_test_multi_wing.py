@@ -38,6 +38,8 @@ except ImportError:
     raise
 
 BASE = os.environ.get("BASE_URL", "https://aafc-tms-backend-staging.up.railway.app")
+# Cookie-authenticated writes (here: logout) need a trusted Origin since D13.
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "https://aafc-tms-frontend-staging.up.railway.app")
 
 # Wing 1 (7WG) — 16 squadrons with deterministic codes from seed_all.py
 _7WG_CODES = []
@@ -118,20 +120,43 @@ def _get(session: requests.Session, path: str, wing: str) -> tuple[int, float]:
         return 0, ms
 
 
+def _lookup_body(user_spec: dict) -> dict:
+    """The unit+role body the real sign-in sends to /api/auth/lookup."""
+    sqn = user_spec["sqn"]
+    if sqn == "NAT":
+        return {"unit_type": "national", "role": user_spec["role"]}
+    if sqn in ("7WG", "1WG") or sqn == user_spec["wing"]:
+        return {"unit_type": "wing", "identifier": sqn, "role": user_spec["role"]}
+    return {"unit_type": "squadron", "identifier": sqn, "role": user_spec["role"]}
+
+
 def _worker(user_spec: dict, ramp_delay_s: float):
     stop = _results["stop_event"]
     time.sleep(ramp_delay_s)
 
     session = requests.Session()
+    session.headers['Origin'] = FRONTEND_ORIGIN
     code = user_spec["code"]
     wing = user_spec["wing"]
     sqn = user_spec["sqn"]
     is_sqn = sqn not in ("7WG", "1WG", "NAT")
 
+    # Production sign-in is two calls: lookup (unit + role -> user_id), then
+    # login with that user_id. Code-only login is refused outside
+    # development/test, and would not measure the real path anyway.
+    user_id = None
     while not stop.is_set():
         t0 = time.perf_counter()
         try:
-            r = session.post(f"{BASE}/api/auth/login", json={"code": code}, timeout=15)
+            if user_id is None:
+                lr = session.post(f"{BASE}/api/auth/lookup", json=_lookup_body(user_spec), timeout=15)
+                _record("/api/auth/lookup", lr.status_code, (time.perf_counter() - t0) * 1000, wing)
+                if lr.status_code != 200:
+                    time.sleep(random.uniform(5, 15))
+                    continue
+                user_id = lr.json()["user_id"]
+                t0 = time.perf_counter()
+            r = session.post(f"{BASE}/api/auth/login", json={"code": code, "user_id": user_id}, timeout=15)
             ms = (time.perf_counter() - t0) * 1000
             _record("/api/auth/login", r.status_code, ms, wing)
             if r.status_code != 200:
@@ -174,6 +199,7 @@ def _worker(user_spec: dict, ramp_delay_s: float):
         except Exception:
             pass
         session = requests.Session()
+        session.headers['Origin'] = FRONTEND_ORIGIN
         time.sleep(random.uniform(2, 8))
 
 

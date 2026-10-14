@@ -3,7 +3,8 @@
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │  PRODUCTION DEPLOY — RUNS LIVE MIGRATIONS AGAINST PRODUCTION DATABASE  │
-# │  Irreversible until a manual rollback is triggered in Railway dashboard │
+# │  Rollback = docs/release/rollback_runbook.md (1a: restore the verified  │
+# │  pre-deploy backup into an EMPTY schema, then the previous build).      │
 # └─────────────────────────────────────────────────────────────────────────┘
 #
 # Authentication:
@@ -50,7 +51,9 @@ EXPECTED_PRODUCTION_PW_DOMAIN="aafc-tms-planning-workspace-preview-production.up
 
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="7f61608fa538"
+# Computed from the migration files (single head required), never hand-pinned:
+# a pinned value went stale at v69 while the code reached v76 (2026-10-12).
+REQUIRED_ALEMBIC_HEAD="$(python3 backend/scripts/compute_alembic_head.py backend/alembic/versions 2>/dev/null || echo "UNRESOLVED")"
 
 BACKEND_GATE_TIMEOUT=600
 FRONTEND_GATE_TIMEOUT=600
@@ -79,7 +82,7 @@ cleanup() {
   if [ -n "${COOKIE_JAR:-}" ] && [ -f "${COOKIE_JAR:-}" ] && [ -s "${COOKIE_JAR:-}" ]; then
     curl -s -X POST \
       --connect-timeout 5 --max-time 10 \
-      --cookie "$COOKIE_JAR" \
+      -H "Origin: https://$EXPECTED_PRODUCTION_FRONTEND_DOMAIN" --cookie "$COOKIE_JAR" \
       "https://$EXPECTED_PRODUCTION_BACKEND_DOMAIN/api/auth/logout" \
       >/dev/null 2>&1 || true
     info "Production logout called."
@@ -332,6 +335,8 @@ prod_reauth_if_needed() {
 
 # ── Authenticated production API call ──────────────────────────────────────────
 prod_api_call() {
+  # Cookie-authenticated writes must carry a TMS Origin (D13); this script acts
+  # for the Main TMS page, so it sends that origin on every call (D24).
   local method="$1" path="$2" body="${3:-}"
   local url="https://$EXPECTED_PRODUCTION_BACKEND_DOMAIN$path"
   local raw
@@ -339,13 +344,13 @@ prod_api_call() {
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" -H "Content-Type: application/json" \
-      --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
       -d "$body" "$url" 2>/dev/null)
   else
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
-      --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
+      -H "Origin: https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}" --cookie "$COOKIE_JAR" --cookie-jar "$COOKIE_JAR" \
       "$url" 2>/dev/null)
   fi
   PROD_API_CODE=$(echo "$raw" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")
@@ -389,6 +394,69 @@ import json,sys; print('yes' if any(t.get('tag_id')=='$tag_id' for t in json.loa
   [ "$still" = "no" ] \
     && ok "Archived tag absent from active list — CRUD PASS" \
     || die "Archived tag $tag_id still in active list — HARD FAIL."
+}
+
+
+# ── Pre-deploy gates added 2026-10-12 (release review) ─────────────────────────
+# 1. A verified backup immediately before deploying is MANDATORY: once this
+#    release migrates, the previous build cannot start against the database
+#    (D23), so the only rollback is restoring that backup (rollback_runbook 1a).
+BACKUP_WORKFLOW_NAME="PostgreSQL Backup — Production — Daily"
+RESTORE_WORKFLOW_NAME="PostgreSQL Restore Test — Production — Weekly"
+BACKUP_MAX_AGE_HOURS="${BACKUP_MAX_AGE_HOURS:-6}"
+
+# check_backup_gate <backup_run_json> <restore_run_json> <now_epoch>
+# Each JSON is `gh run view <id> --json workflowName,conclusion,createdAt`.
+# Prints nothing and returns 0 when: the backup run is the production backup
+# workflow, succeeded, and is at most BACKUP_MAX_AGE_HOURS old; and the restore
+# run is the production restore test, succeeded, and started after the backup.
+check_backup_gate() {
+  python3 - "$1" "$2" "$3" "$BACKUP_WORKFLOW_NAME" "$RESTORE_WORKFLOW_NAME" "$BACKUP_MAX_AGE_HOURS" <<'PY'
+import json, sys
+from datetime import datetime
+b, r, now, bname, rname, max_h = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4], sys.argv[5], float(sys.argv[6])
+try:
+    b, r = json.loads(b), json.loads(r)
+except ValueError:
+    sys.exit("backup/restore run details are not readable")
+ts = lambda x: datetime.fromisoformat(x["createdAt"].replace("Z", "+00:00")).timestamp()
+problems = []
+if b.get("workflowName") != bname: problems.append(f"backup run is '{b.get('workflowName')}', not the production backup workflow")
+if b.get("conclusion") != "success": problems.append(f"backup run conclusion is {b.get('conclusion')}")
+if r.get("workflowName") != rname: problems.append(f"restore run is '{r.get('workflowName')}', not the production restore test")
+if r.get("conclusion") != "success": problems.append(f"restore run conclusion is {r.get('conclusion')}")
+if not problems:
+    age_h = (now - ts(b)) / 3600
+    if age_h > max_h: problems.append(f"backup is {age_h:.1f} h old (max {max_h:g} h)")
+    if ts(r) < ts(b): problems.append("restore test ran before that backup, so it does not verify it")
+if problems:
+    sys.exit("; ".join(problems))
+PY
+}
+
+# 2. Configuration the release depends on (read-only checks of two variables).
+# check_prod_config <CORS_ALLOWED_ORIGINS value> <API_RATE_LIMIT value>
+# Cookie-authenticated writes need an allowed Origin (D13): both frontends'
+# exact origins must be present. API_RATE_LIMIT must be set explicitly -- the
+# limit is now enforced accurately (D14), so its value is an owner decision.
+check_prod_config() {
+  local cors="$1" rate="$2" origin missing=""
+  for origin in "https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}" "https://${EXPECTED_PRODUCTION_PW_DOMAIN}"; do
+    case ",${cors// /}," in *",${origin},"*) ;; *) missing="$missing $origin" ;; esac
+  done
+  [ -z "$missing" ] || { echo "CORS_ALLOWED_ORIGINS lacks:$missing"; return 1; }
+  [[ "$rate" =~ ^[0-9]+$ ]] || { echo "API_RATE_LIMIT is not set explicitly (owner decision; see STAGING_EVIDENCE.md)"; return 1; }
+}
+
+# 3. Stamp the build commit so the deployed fingerprint names the real code
+#    (production reported 0cf2e8d -- a v46-era commit -- against a v64 database).
+stamp_build_commit() {
+  local svc_id="$1" svc_label="$2"
+  railway variable set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
+    --service "$svc_id" --environment "$ACTUAL_TARGET_ENV_ID" --project "$EXPECTED_PROJECT_ID" \
+    --skip-deploys >/dev/null 2>&1 \
+    || die "Could not set APP_BUILD_COMMIT on $svc_label — refusing to deploy an unidentifiable build."
+  ok "$svc_label APP_BUILD_COMMIT stamped: ${CURRENT_HEAD}"
 }
 
 # ── FUNCTIONS_ONLY guard ───────────────────────────────────────────────────────
@@ -525,6 +593,7 @@ CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "UNKNOWN")
 [ "$CURRENT_BRANCH" = "$EXPECTED_BRANCH" ] \
   && ok "Branch: $CURRENT_BRANCH" || die "Branch '$CURRENT_BRANCH' ≠ '$EXPECTED_BRANCH'."
 CURRENT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "UNKNOWN")
+CURRENT_HEAD_FULL=$(git rev-parse HEAD 2>/dev/null || echo "UNKNOWN")
 info "HEAD: $CURRENT_HEAD — $(git log -1 --format='%s')"
 git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null \
   && ok "Fix commit $REQUIRED_ANCESTOR is ancestor of $CURRENT_HEAD" \
@@ -580,7 +649,7 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v51)" \
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (single head, computed from the migration files)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD — ABORT."
 deactivate 2>/dev/null || true
 popd > /dev/null
@@ -640,6 +709,25 @@ printf "  %-30s %s\n" "Branch:" "$CURRENT_BRANCH"
 printf "  %-30s %s\n" "HEAD:"   "$CURRENT_HEAD — $(git log -1 --format='%s')"
 echo
 
+# ══ Pre-deploy gates (backup + configuration) ═════════════════════════════════
+echo
+echo "  [12/12] Pre-deploy backup and configuration…"
+command -v gh >/dev/null 2>&1 || die "gh CLI required for the backup gate."
+[ -n "${PRE_DEPLOY_BACKUP_RUN_ID:-}" ] && [ -n "${PRE_DEPLOY_RESTORE_RUN_ID:-}" ] \
+  || die "Set PRE_DEPLOY_BACKUP_RUN_ID and PRE_DEPLOY_RESTORE_RUN_ID (a backup run from the last ${BACKUP_MAX_AGE_HOURS} h and a successful restore test after it)."
+_b=$(gh run view "$PRE_DEPLOY_BACKUP_RUN_ID" --json workflowName,conclusion,createdAt 2>/dev/null || echo '{}')
+_r=$(gh run view "$PRE_DEPLOY_RESTORE_RUN_ID" --json workflowName,conclusion,createdAt 2>/dev/null || echo '{}')
+_why=$(check_backup_gate "$_b" "$_r" "$(date +%s)" 2>&1) \
+  && ok "Backup run $PRE_DEPLOY_BACKUP_RUN_ID fresh and verified by restore run $PRE_DEPLOY_RESTORE_RUN_ID" \
+  || die "Backup gate: $_why"
+_cfg=$(railway variable list --project "$EXPECTED_PROJECT_ID" --environment "$ACTUAL_TARGET_ENV_ID" \
+        --service "$ACTUAL_BACKEND_SVC_ID" --json 2>/dev/null \
+       | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('CORS_ALLOWED_ORIGINS',''));print(d.get('API_RATE_LIMIT',''))" 2>/dev/null)
+_why=$(check_prod_config "$(echo "$_cfg" | sed -n 1p)" "$(echo "$_cfg" | sed -n 2p)") \
+  && ok "CORS_ALLOWED_ORIGINS has both frontends; API_RATE_LIMIT set explicitly" \
+  || die "Configuration gate: $_why"
+unset _b _r _why _cfg
+
 # ══ Authorization gate ════════════════════════════════════════════════════════
 REQUIRED_PHRASE="DEPLOY TO PRODUCTION ${CURRENT_HEAD}"
 echo -e "  ${RED}══ PRODUCTION AUTHORIZATION REQUIRED ══${NC}"
@@ -681,6 +769,7 @@ info "  PRE_LATEST:   $PRE_BACKEND_LATEST"
 info "  PRE_ACTIVE:   $PRE_BACKEND_ACTIVE"
 echo
 
+stamp_build_commit "$ACTUAL_BACKEND_SVC_ID" "Backend"
 railway up ./backend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_BACKEND_SVC_ID" \
@@ -740,6 +829,7 @@ info "  Service UUID: $ACTUAL_FRONTEND_SVC_ID"
 info "  PRE_LATEST:   $PRE_FRONTEND_LATEST"
 echo
 
+stamp_build_commit "$ACTUAL_FRONTEND_SVC_ID" "Frontend"
 railway up ./connected-frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_FRONTEND_SVC_ID" \
@@ -776,6 +866,20 @@ while [ "$_fp_elapsed" -lt 180 ]; do
 done
 [ -z "$FRONTEND_BUILD" ] && die 'Build fingerprint meta NOT found after 180s — HARD FAIL.'
 ok "Frontend build fingerprint: $FRONTEND_BUILD"
+
+# Modules extracted from index.html into connected-frontend/js/ are separate
+# files: the fingerprint above proves only index.html. Every committed module
+# must be served and byte-identical, or the features it carries are broken.
+echo "  ── Frontend modules: served and byte-identical ──────────────────────"
+for _mod in connected-frontend/js/*.js; do
+  [ -e "$_mod" ] || continue
+  _name=$(basename "$_mod")
+  _want=$(shasum -a 256 "$_mod" | cut -d' ' -f1)
+  _got=$(curl -sf --connect-timeout 10 --max-time 30 -H 'Cache-Control: no-cache' \
+    "https://${EXPECTED_PRODUCTION_FRONTEND_DOMAIN}/js/${_name}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+  [ "$_got" = "$_want" ] || die "Frontend module js/${_name} missing or not the committed version — HARD FAIL."
+  ok "Frontend module js/${_name} served (sha256 ${_want:0:12})"
+done
 ok "Frontend gate PASSED."
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -788,6 +892,7 @@ info "  Service UUID: $ACTUAL_PW_SVC_ID"
 info "  PRE_LATEST:   $PRE_PW_LATEST"
 echo
 
+stamp_build_commit "$ACTUAL_PW_SVC_ID" "PW"
 railway up ./frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_PW_SVC_ID" \

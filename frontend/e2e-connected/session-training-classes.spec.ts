@@ -316,3 +316,44 @@ test.describe("Training Class name in compact session card (CLASS-18)", () => {
     await expect(sessInfo).toContainText(className, { timeout: 8000 });
   });
 });
+// D12 (2026-10-11): the scheduling-conflict "Override" link interpolated raw
+// JSON (class ids, containing ") into onclick="...", so the attribute ended at
+// the first quote and the link did nothing. The first audience save is answered
+// with the server's class_conflict 409; clicking Override must re-send the same
+// class ids with override_conflict=true (real server from then on).
+test("Override on a Training Class conflict re-sends the selection with override", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await loginSquadron(page, "ADMIN703");
+  const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
+  const suffix = `ovr${Date.now()}`;
+  const { className, marker, fixtureYear } = await seedClassAndSession(page, token, suffix);
+
+  const audienceBodies: any[] = [];
+  let first = true;
+  await page.route("**/api/sessions/*/audience", async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    audienceBodies.push(route.request().postDataJSON());
+    if (first) {
+      first = false;
+      return route.fulfill({ status: 409, json: { detail: { error: "class_conflict",
+        conflicts: [{ training_class_id: "x", training_class_name: "Other Session Class" }] } } });
+    }
+    return route.continue();
+  });
+
+  await openQuickEditForFirstSession(page, marker, fixtureYear);
+  await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
+  await page.locator("#qe-classes-list label").filter({ hasText: className }).locator("input.qe-class-chk").check();
+  await page.getByRole("button", { name: "Save" }).click();
+  const override = page.locator("#m-sess-edit a", { hasText: "Override" });
+  await expect(override).toBeVisible({ timeout: 8000 });
+  await override.click();
+  await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
+
+  expect(audienceBodies).toHaveLength(2);
+  expect(audienceBodies[1].override_conflict).toBe(true);
+  expect(audienceBodies[1].training_class_ids).toEqual(audienceBodies[0].training_class_ids);
+  expect(audienceBodies[1].training_class_ids).toHaveLength(1);
+  expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
+});

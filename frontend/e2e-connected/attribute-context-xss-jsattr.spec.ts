@@ -79,19 +79,20 @@ test("XSS-ATTR-01: a hostile curriculum title cannot break out of the guided-mod
   }, code);
 
   expect(result.attr).not.toBeNull();
-  // The payload must appear backslash-escaped, still inside the string argument.
-  expect(result.attr).toContain("\\'");
+  // The payload must sit, whole, inside one JavaScript string literal. Since
+  // R13 (jsq) that literal is JSON ("...") rather than '...' with \' escapes.
+  expect(result.attr).toContain(JSON.stringify(PAYLOAD));
   expect(result.fired).toBe(false);
 });
 
 // NOTE ON SCOPE: this second test builds the template inline, so it pins the
-// _jsAttr() CONTRACT for this payload shape -- it does not read the shipped
+// jsq() CONTRACT for this payload shape (it replaced _jsAttr(), R13 2026-10-13) -- it does not read the shipped
 // renderMissions() source and would not catch that call site regressing back to
 // esc(). A call-site test is not possible today: renderMissions() renders into
 // #missions-body, which does not exist in the markup (REM-148), so the function
 // is unreachable. If that container is ever restored, replace this with a real
 // call-site test.
-test("XSS-ATTR-02: _jsAttr() neutralises this payload shape in an onclick argument", async ({ page }) => {
+test("XSS-ATTR-02: jsq() neutralises this payload shape in an onclick argument", async ({ page }) => {
   await loginSquadron(page);
 
   const result = await page.evaluate((title) => {
@@ -99,7 +100,8 @@ test("XSS-ATTR-02: _jsAttr() neutralises this payload shape in an onclick argume
     const m = { curriculum_id: "cur-1", title, code: "X1", part_count: 1 };
     const host = document.createElement("div");
     // mirrors renderMissions()'s Assign button template
-    host.innerHTML = `<button class="btn-xs" onclick="openAssignModal('${(window as any).esc(m.curriculum_id)}','${(window as any)._jsAttr(m.title)}','${(window as any)._jsAttr(m.code)}',${m.part_count})">Assign</button>`;
+    const jsq = (window as any).jsq;
+    host.innerHTML = `<button class="btn-xs" onclick="openAssignModal(${jsq(m.curriculum_id)},${jsq(m.title)},${jsq(m.code)},${m.part_count})">Assign</button>`;
     document.body.appendChild(host);
     const btn = host.querySelector("button")!;
     const attr = btn.getAttribute("onclick");
@@ -110,5 +112,26 @@ test("XSS-ATTR-02: _jsAttr() neutralises this payload shape in an onclick argume
   }, PAYLOAD);
 
   expect(result.fired).toBe(false);
-  expect(result.attr).toContain("\\'");
+  expect(result.attr).toContain(JSON.stringify(PAYLOAD));
+});
+
+// What _jsAttr() could not do: it escaped only \ and ', so a value with a line
+// break (or U+2028) produced a broken handler. jsq() must hand the handler the
+// exact original string for hostile, multi-line and quote-laden values alike.
+test("XSS-ATTR-03: jsq() hands an inline handler the exact original value", async ({ page }) => {
+  await loginSquadron(page);
+  const values = [PAYLOAD, "Line one\nLine two", "Tab\tand \u2028 separator", `He said "hi" & it's <b>bold</b>`, "back\\slash"];
+  const got = await page.evaluate((vals) => {
+    const out: string[] = [];
+    (window as any).__jsqProbe = (v: string) => out.push(v);
+    (window as any).__xssFired = false;
+    const host = document.createElement("div");
+    host.innerHTML = vals.map((v) => `<button onclick="__jsqProbe(${(window as any).jsq(v)})">x</button>`).join("");
+    document.body.appendChild(host);
+    host.querySelectorAll("button").forEach((b) => (b as HTMLButtonElement).click());
+    host.remove();
+    return { out, fired: (window as any).__xssFired === true };
+  }, values);
+  expect(got.fired).toBe(false);
+  expect(got.out).toEqual(values);
 });

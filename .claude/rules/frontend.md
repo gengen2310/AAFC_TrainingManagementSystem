@@ -10,10 +10,11 @@ overrides aesthetic consistency. Do not duplicate the design system in this rule
 
 ## SPA structure
 
-- Single-file SPA: `connected-frontend/index.html`
-- All CSS, HTML, and JS in one file — no build system, no bundler
-- Serve with `python3 -m http.server 8080` from `connected-frontend/`
-- Always test at `http://localhost:8080`, never from file:// or extracted ZIP
+- Current deployed Main TMS artifact: `connected-frontend/index.html` (single-file SPA).
+- During the 2026-10-03 stabilisation programme, **do not add new architecture debt to this monolith**. `tools/architecture/guard.py` prevents silent growth.
+- Behaviour-preserving modularisation is explicitly authorised, but it must be incremental. If modular source/build tooling is introduced, the same PR must prove deterministic generation/deployment parity and update Docker/CI/runtime instructions; do not strand two competing sources of truth.
+- Until such a migration step is merged, serve the current artifact with `python3 -m http.server 8080` from `connected-frontend/`.
+- Always test at `http://localhost:8080`, never from file:// or extracted ZIP.
 
 ## Design tokens (AAFC VIG palette)
 

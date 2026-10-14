@@ -25,14 +25,22 @@ Security invariants enforced here:
   • Flight assignment never grants or restricts permissions — it is display-only.
   • Viewers and auditors are read-only (no create / update / reset / disable).
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.exc import IntegrityError
 
 from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
-from ..permissions import Principal
+from ..permissions import sqn_admin_outside_own_squadron  # noqa: E402
+from ..permissions import has_known_role  # noqa: E402
+from ..permissions import wing_admin_outside_own_wing  # noqa: E402
+from ..permissions import Principal, require_write_role
+from ..permissions import (  # noqa: E402
+    may_move_account_to_another_squadron, may_view_account, require_can_write_flight,
+    squadron_scope_clause, wing_or_squadron_scope_clause,
+)
 import re
 
 from ..security import hash_code, generate_code, verify_code
@@ -41,6 +49,7 @@ from ..services_recovery import (
 )
 from ..email_service import send_mail
 from ..services import audit, fk_dependents
+from ..services_accounts import CREATE_AUTHORITY, account_scope_type, require_manage_authority
 from ..permissions import ROLES as _ALL_ROLES
 
 router = APIRouter(prefix="/api", tags=["accounts"])
@@ -49,35 +58,9 @@ router = APIRouter(prefix="/api", tags=["accounts"])
 # Role authority maps
 # ─────────────────────────────────────────────
 
-# Which roles an actor may CREATE
-_CREATE_AUTHORITY: dict[str, set[str]] = {
-    "system_admin":   {"system_admin", "national_admin", "national_viewer",
-                       "wing_admin", "wing_viewer", "sqn_admin", "sqn_general", "auditor"},
-    "national_admin": {"national_admin", "national_viewer",
-                       "wing_admin", "wing_viewer", "sqn_admin", "sqn_general", "auditor"},
-    "wing_admin":     {"wing_viewer", "sqn_admin", "sqn_general"},
-    "sqn_admin":      {"sqn_general"},
-}
-
 # Which roles an actor may read/manage. sqn_general reads its own squadron's
 # accounts read-only (2026-09-28 product decision); scope is enforced below
-# (list filter + _can_read_account) and writes stay behind _WRITE_ROLES.
-_READ_ROLES = {"sqn_admin", "sqn_general", "wing_viewer", "wing_admin",
-               "national_viewer", "national_admin", "system_admin", "auditor"}
-
-_WRITE_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
-
-_NATIONAL_SCOPE_ROLES = {"national_admin", "national_viewer", "system_admin", "auditor"}
-_WING_SCOPE_ROLES = {"wing_admin", "wing_viewer"}
-_SQN_SCOPE_ROLES = {"sqn_admin", "sqn_general"}
-
-
-def _scope_type(role: str) -> str:
-    if role in _NATIONAL_SCOPE_ROLES:
-        return "national"
-    if role in _WING_SCOPE_ROLES:
-        return "wing"
-    return "squadron"
+# (list filter + _can_read_account) and writes stay behind the central write-role policy.
 
 
 # ─────────────────────────────────────────────
@@ -85,20 +68,19 @@ def _scope_type(role: str) -> str:
 # ─────────────────────────────────────────────
 
 def _require_write_actor(p: Principal) -> None:
-    if p.role not in _WRITE_ROLES:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    require_write_role(p)
 
 
 def _validate_create_scope(p: Principal, target_role: str,
                             nat_id: str | None, wing_id: str | None, sqn_id: str | None,
                             db: DBSession) -> None:
     """Raise 403/404/422 if the actor is not permitted to create an account with this role+scope."""
-    allowed = _CREATE_AUTHORITY.get(p.role, set())
+    allowed = CREATE_AUTHORITY.get(p.role, set())
     if target_role not in allowed:
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": f"Your role ({p.role}) cannot create {target_role} accounts."})
 
-    scope = _scope_type(target_role)
+    scope = account_scope_type(target_role)
 
     if scope == "national":
         pass  # no additional scope constraint — national_admin/system_admin verified above
@@ -109,7 +91,7 @@ def _validate_create_scope(p: Principal, target_role: str,
         w = db.get(Wing, wing_id)
         if not w or w.is_archived:
             raise HTTPException(404, detail={"error": "wing_not_found"})
-        if p.role == "wing_admin" and wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts in their own Wing."})
 
@@ -119,70 +101,66 @@ def _validate_create_scope(p: Principal, target_role: str,
         sqn = db.get(Squadron, sqn_id)
         if not sqn or sqn.is_archived:
             raise HTTPException(404, detail={"error": "squadron_not_found"})
-        if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+        if wing_admin_outside_own_wing(p, sqn.wing_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing Admin can only create accounts for SQNs in their Wing."})
-        if p.role == "sqn_admin" and sqn_id != p.squadron_id:
+        if sqn_admin_outside_own_squadron(p, sqn_id):
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "SQN Admin can only create accounts in their own Squadron."})
 
 
-def _require_manage_authority(p: Principal, target: User, db: DBSession) -> None:
-    """Raise 403 if actor lacks management authority over the target account."""
-    allowed = _CREATE_AUTHORITY.get(p.role, set())
-    if target.role not in allowed:
-        raise HTTPException(403, detail={"error": "forbidden"})
-    scope = _scope_type(target.role)
-    if scope == "wing" and p.role == "wing_admin":
-        if target.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-    elif scope == "squadron":
-        if p.role == "wing_admin":
-            sqn = db.get(Squadron, target.squadron_id)
-            if not sqn or sqn.wing_id != p.wing_id:
-                raise HTTPException(403, detail={"error": "out_of_scope"})
-        elif p.role == "sqn_admin":
-            if target.squadron_id != p.squadron_id:
-                raise HTTPException(403, detail={"error": "out_of_scope"})
-
-
 def _can_read_account(p: Principal, target: User, db: DBSession) -> bool:
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
-        return True
-    if p.role in ("wing_admin", "wing_viewer"):
-        if target.wing_id == p.wing_id:
-            return True
-        if target.squadron_id:
-            sqn = db.get(Squadron, target.squadron_id)
-            return sqn is not None and sqn.wing_id == p.wing_id
-    if p.role in ("sqn_admin", "sqn_general"):
-        return target.squadron_id == p.squadron_id
-    return False
+    return may_view_account(p, target, db)
 
 
 # ─────────────────────────────────────────────
 # Response serialiser (never includes code_hash)
 # ─────────────────────────────────────────────
 
-def _account_out(u: User, db: DBSession) -> dict:
-    ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
-                                     AccessCode.active_status == True).first()  # noqa: E712
+def _accounts_context(db: DBSession, users: list) -> dict:
+    """Pre-load what _account_out() needs for MANY accounts in a constant number
+    of queries. Per-account lookups cost ~3 queries per account (measured: 419
+    queries for /api/accounts on the national qualification dataset)."""
+    ids = [u.id for u in users]
+    ctx: dict = {"code": {}, "sqn": {}, "wing": {}, "nat": {}, "flight": {}}
+    if not ids:
+        return ctx
+    for ac in (db.query(AccessCode).filter(AccessCode.user_id.in_(ids), AccessCode.active_status == True)  # noqa: E712
+               .order_by(AccessCode.user_id, AccessCode.created_at).all()):
+        ctx["code"].setdefault(ac.user_id, ac)
+    for key, model, attr in (("sqn", Squadron, "squadron_id"), ("wing", Wing, "wing_id"),
+                             ("nat", NationalEntity, "national_id"), ("flight", Flight, "flight_id")):
+        wanted = {getattr(u, attr) for u in users if getattr(u, attr)}
+        if wanted:
+            ctx[key] = {o.id: o for o in db.query(model).filter(model.id.in_(wanted)).all()}
+    return ctx
+
+
+def _account_out(u: User, db: DBSession, ctx: "dict | None" = None) -> dict:
+    if ctx is not None:
+        ac = ctx["code"].get(u.id)
+    else:
+        ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
+                                         AccessCode.active_status == True).first()  # noqa: E712
+
+    def _get(key, model, oid):
+        return ctx[key].get(oid) if ctx is not None else db.get(model, oid)
     # Resolve unit names
     sqn_code = sqn_name = wing_code = wing_name = nat_name = flight_name = None
     if u.squadron_id:
-        s = db.get(Squadron, u.squadron_id)
+        s = _get("sqn", Squadron, u.squadron_id)
         if s:
             sqn_code, sqn_name = s.code, s.name
     if u.wing_id:
-        w = db.get(Wing, u.wing_id)
+        w = _get("wing", Wing, u.wing_id)
         if w:
             wing_code, wing_name = w.code, w.name
     if u.national_id:
-        n = db.get(NationalEntity, u.national_id)
+        n = _get("nat", NationalEntity, u.national_id)
         if n:
             nat_name = n.short_name
     if u.flight_id:
-        fl = db.get(Flight, u.flight_id)
+        fl = _get("flight", Flight, u.flight_id)
         if fl:
             flight_name = fl.name
 
@@ -190,7 +168,7 @@ def _account_out(u: User, db: DBSession) -> dict:
         "user_id": u.id,
         "display_name": u.display_name,
         "role": u.role,
-        "scope_type": _scope_type(u.role),
+        "scope_type": account_scope_type(u.role),
         "national_id": u.national_id,
         "national_name": nat_name,
         "wing_id": u.wing_id,
@@ -212,6 +190,9 @@ def _account_out(u: User, db: DBSession) -> dict:
         "code_last_changed": iso_z(ac.updated_at) if ac and ac.updated_at else None,
         "code_changed_by": ac.updated_by if ac else None,
         "locked_until": iso_z(ac.locked_until) if ac and ac.locked_until else None,
+        "recovery_email": mask_email(u.recovery_email) if u.recovery_email else None,
+        "recovery_email_verified": bool(u.recovery_email_verified_at),
+        "must_change_code": bool(getattr(u, "must_change_code", False)),
     }
 
 
@@ -227,6 +208,62 @@ class AccountCreateIn(BaseModel):
     squadron_id: str | None = None
     flight_id: str | None = None
     new_code: str | None = None   # if omitted, auto-generated
+    recovery_email: str | None = None
+
+
+
+def _normalise_recovery_email(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    addr = raw.strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", addr) or len(addr) > 254:
+        raise HTTPException(400, detail={
+            "error": "invalid_email", "message": "Enter a valid email address."})
+    return addr
+
+
+def _ensure_recovery_email_available(
+    db: DBSession, addr: str, *, exclude_user_id: str | None = None
+) -> None:
+    """Prevent ambiguous recovery routing without disclosing another account."""
+    q = db.query(User).filter(User.recovery_email == addr)
+    if exclude_user_id:
+        q = q.filter(User.id != exclude_user_id)
+    if q.first() is not None:
+        raise HTTPException(409, detail={
+            "error": "recovery_email_in_use",
+            "message": "That recovery email is already assigned to another account.",
+        })
+
+
+def _commit_recovery_safe(db: DBSession) -> None:
+    """Commit while translating the DB-level recovery-email race into HTTP 409."""
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        detail = str(getattr(exc, "orig", exc)).lower()
+        if "recovery_email" in detail and ("unique" in detail or "duplicate" in detail):
+            raise HTTPException(409, detail={
+                "error": "recovery_email_in_use",
+                "message": "That recovery email is already assigned to another account.",
+            }) from exc
+        raise
+
+
+def _flush_recovery_safe(db: DBSession) -> None:
+    """Flush a newly-created account while preserving the recovery-email 409 contract."""
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        detail = str(getattr(exc, "orig", exc)).lower()
+        if "recovery_email" in detail and ("unique" in detail or "duplicate" in detail):
+            raise HTTPException(409, detail={
+                "error": "recovery_email_in_use",
+                "message": "That recovery email is already assigned to another account.",
+            }) from exc
+        raise
 
 
 class AccountUpdateIn(BaseModel):
@@ -261,42 +298,61 @@ class FlightUpdateIn(BaseModel):
 # Account endpoints
 # ─────────────────────────────────────────────
 
+# GET /accounts optional page size cap (see list_accounts).
+ACCOUNT_PAGE_MAX = 500
+
+
 @router.get("/accounts")
-def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
-                  flight_id: str | None = None, role: str | None = None,
+def list_accounts(response: Response,
+                  wing_id: str | None = None, squadron_id: str | None = None,
+                  flight_id: str | None = None,
+                  role: list[str] | None = Query(default=None),
                   active_status: bool | None = None, include_archived: bool = False,
+                  limit: int | None = Query(default=None, ge=1, le=ACCOUNT_PAGE_MAX),
+                  offset: int = Query(default=0, ge=0),
                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    """Accounts in the caller's scope, ordered by display name then id.
+
+    The default is the full scoped list: the Main TMS Accounts page filters and
+    batch-edits it in memory (docs/stabilisation/bounded-responses.md). Callers
+    that can page pass `limit`/`offset`; `X-Total-Count` always carries the
+    filtered total. `role` may repeat (e.g. the Service Desk's assignees)."""
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     q = db.query(User)
     if not include_archived:
         q = q.filter(User.is_archived == False)  # noqa: E712
 
     # Scope filtering based on actor role
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+    if p.is_national:
         if wing_id:
             # Filter by wing: both direct wing users and sqn users in that wing
             sqns_in_wing = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == wing_id)]
             q = q.filter((User.wing_id == wing_id) | (User.squadron_id.in_(sqns_in_wing)))
         if squadron_id:
             q = q.filter(User.squadron_id == squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
-        sqns_in_wing = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
-        q = q.filter((User.wing_id == p.wing_id) | (User.squadron_id.in_(sqns_in_wing)))
-        if squadron_id:
+    else:
+        # Wing: own-Wing accounts plus accounts in the Wing's Squadrons;
+        # Squadron: own Squadron (permissions.wing_or_squadron_scope_clause).
+        q = q.filter(wing_or_squadron_scope_clause(
+            p, db, wing_column=User.wing_id, squadron_column=User.squadron_id))
+        if p.is_wing and squadron_id:
             q = q.filter(User.squadron_id == squadron_id)
-    else:  # sqn_admin / sqn_general
-        q = q.filter(User.squadron_id == p.squadron_id)
 
     if flight_id:
         q = q.filter(User.flight_id == flight_id)
     if role:
-        q = q.filter(User.role == role)
+        q = q.filter(User.role.in_(role))
     if active_status is not None:
         q = q.filter(User.active_status == active_status)
 
-    users = q.order_by(User.display_name).all()
-    return [_account_out(u, db) for u in users]
+    response.headers["X-Total-Count"] = str(q.order_by(None).count())
+    q = q.order_by(User.display_name, User.id)
+    if limit is not None:
+        q = q.limit(limit).offset(offset)
+    users = q.all()
+    ctx = _accounts_context(db, users)
+    return [_account_out(u, db, ctx) for u in users]
 
 
 @router.post("/accounts")
@@ -317,10 +373,21 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     # Validate actor authority and scope
     _validate_create_scope(p, body.role, body.national_id, body.wing_id, body.squadron_id, db)
 
+    recovery_email = _normalise_recovery_email(body.recovery_email)
+    if body.role == "system_admin" and not recovery_email:
+        raise HTTPException(422, detail={
+            "error": "recovery_email_required",
+            "message": "System Administrator accounts require a recovery email.",
+        })
+    if recovery_email:
+        if body.role not in RECOVERY_ROLES:
+            raise HTTPException(422, detail={"error": "role_not_recoverable"})
+        _ensure_recovery_email_available(db, recovery_email)
+
     # Flight assignment: only valid for squadron-scoped accounts, and must belong to correct SQN
     flight_id = None
     if body.flight_id:
-        if _scope_type(body.role) != "squadron":
+        if account_scope_type(body.role) != "squadron":
             raise HTTPException(422, detail={"error": "flight_only_for_squadron_scope"})
         fl = db.get(Flight, body.flight_id)
         if not fl or fl.is_archived:
@@ -334,19 +401,31 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     nat_id = body.national_id
     wing_id = body.wing_id
     sqn_id = body.squadron_id
-    if _scope_type(body.role) == "squadron" and not wing_id and sqn_id:
+    if account_scope_type(body.role) == "squadron" and not wing_id and sqn_id:
         sqn_obj = db.get(Squadron, sqn_id)
         if sqn_obj:
             wing_id = sqn_obj.wing_id
-    if _scope_type(body.role) == "national" and not nat_id:
+    if account_scope_type(body.role) == "national" and not nat_id:
         nat = db.query(NationalEntity).first()
         nat_id = nat.id if nat else None
 
     u = User(display_name=name, role=body.role,
              national_id=nat_id, wing_id=wing_id, squadron_id=sqn_id,
-             flight_id=flight_id, active_status=True, created_by=p.user_id)
+             flight_id=flight_id, active_status=True, created_by=p.user_id,
+             # Every administrator-issued initial credential is known to
+             # someone other than the account holder, whether generated or
+             # manually entered. Force the holder to choose their own code on
+             # first sign-in.
+             must_change_code=True,
+             recovery_email=recovery_email,
+             recovery_email_verified_at=None,
+             recovery_email_updated_at=utcnow() if recovery_email else None,
+             recovery_email_updated_by=p.user_id if recovery_email else None)
     db.add(u)
-    db.flush()  # get u.id
+    if recovery_email:
+        _flush_recovery_safe(db)
+    else:
+        db.flush()  # get u.id
 
     # Generate or hash the initial code
     if body.new_code:
@@ -364,7 +443,25 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
                     active_status=True, created_by=p.user_id,
                     updated_by=p.user_id, updated_at=utcnow())
     db.add(ac)
-    db.commit()
+    verification_raw = None
+    if recovery_email:
+        verification_raw = mint_token(
+            db, u, "verify_email", VERIFY_TTL_MINUTES, None
+        )
+    if recovery_email:
+        _commit_recovery_safe(db)
+    else:
+        db.commit()
+
+    verification_sent = False
+    if recovery_email and verification_raw:
+        verification_sent = send_mail(
+            recovery_email,
+            "Verify your AAFC TMS recovery email",
+            "Confirm this address so it can be used to recover your access code.\n\n"
+            f"Verification code: {verification_raw}\n\n"
+            "It expires in 24 hours. If you did not request this, ignore this email.",
+        )
 
     audit(db, p, object_type="account", object_id=u.id, action="account_created",
           new={"role": body.role, "display_name": body.display_name})
@@ -374,12 +471,16 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     # Return new code once only — it will not be retrievable again
     out["new_code"] = plain
     out["new_code_notice"] = "This code will not be shown again. Copy it now."
+    if recovery_email:
+        out["recovery_email"] = mask_email(recovery_email)
+        out["recovery_email_verified"] = False
+        out["recovery_verification_sent"] = verification_sent
     return out
 
 
 @router.get("/accounts/{uid}")
 def get_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    if p.role not in _READ_ROLES:
+    if not has_known_role(p):
         raise HTTPException(403, detail={"error": "forbidden"})
     u = db.get(User, uid)
     if not u or u.is_archived:
@@ -399,14 +500,14 @@ def update_account(uid: str, body: AccountUpdateIn, db: DBSession = Depends(get_
     # Editing your OWN account (display name / flight only -- AccountUpdateIn
     # has no role/scope field, so this carries no privilege-escalation risk)
     # must not go through _require_manage_authority: that check is keyed off
-    # _CREATE_AUTHORITY, whose wing_admin/sqn_admin entries deliberately don't
+    # CREATE_AUTHORITY, whose wing_admin/sqn_admin entries deliberately don't
     # include their own role (so they can't mass-create peer-level accounts)
     # -- which meant a wing_admin/sqn_admin editing even their own display
     # name always 403'd. Every other account-management endpoint
     # (change-role, archive, disable, reset-code, ...) keeps its own existing
     # self-action guards untouched; this bypass is scoped to this endpoint only.
     if uid != p.user_id:
-        _require_manage_authority(p, u, db)
+        require_manage_authority(p, u, db)
 
     if body.display_name is not None:
         name = body.display_name.strip()
@@ -422,7 +523,7 @@ def update_account(uid: str, body: AccountUpdateIn, db: DBSession = Depends(get_
         if body.flight_id == "":
             u.flight_id = None
         else:
-            if _scope_type(u.role) != "squadron":
+            if account_scope_type(u.role) != "squadron":
                 raise HTTPException(422, detail={"error": "flight_only_for_squadron_scope"})
             fl = db.get(Flight, body.flight_id)
             if not fl or fl.is_archived:
@@ -456,18 +557,18 @@ def change_role(uid: str, body: ChangeRoleIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "not_found"})
     if uid == p.user_id:
         raise HTTPException(400, detail={"error": "cannot_change_own_role"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
 
     new_role = body.new_role
     if new_role not in _ALL_ROLES:
         raise HTTPException(422, detail={"error": "invalid_role"})
-    allowed = _CREATE_AUTHORITY.get(p.role, set())
+    allowed = CREATE_AUTHORITY.get(p.role, set())
     if new_role not in allowed:
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": f"Your role ({p.role}) cannot assign {new_role}."})
     if new_role == u.role:
         raise HTTPException(400, detail={"error": "role_unchanged"})
-    if _scope_type(new_role) != _scope_type(u.role):
+    if account_scope_type(new_role) != account_scope_type(u.role):
         raise HTTPException(422, detail={"error": "cross_scope_role_change",
                                           "message": "Changing role across scope levels isn't supported here. Archive this account and create a new one with the target role/scope instead."})
     if (u.role == "system_admin" and u.active_status
@@ -516,9 +617,9 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "not_found"})
     if uid == p.user_id:
         raise HTTPException(400, detail={"error": "cannot_change_own_scope"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
 
-    scope = _scope_type(u.role)
+    scope = account_scope_type(u.role)
     if scope == "national":
         raise HTTPException(422, detail={"error": "scope_change_not_applicable",
                                           "message": "National-scope accounts have no Squadron/Wing to move."})
@@ -536,7 +637,7 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
             raise HTTPException(400, detail={"error": "scope_unchanged"})
         # _require_manage_authority above already restricts which actors can
         # even reach this branch: wing_admin cannot manage other wing_admin/
-        # wing_viewer accounts at all (not in its own _CREATE_AUTHORITY set),
+        # wing_viewer accounts at all (not in its own CREATE_AUTHORITY set),
         # so only system_admin/national_admin ever get here -- no further
         # destination-authority check is needed.
         old_wing = db.get(Wing, u.wing_id) if u.wing_id else None
@@ -564,10 +665,10 @@ def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
         raise HTTPException(404, detail={"error": "squadron_not_found"})
     if body.new_squadron_id == u.squadron_id:
         raise HTTPException(400, detail={"error": "scope_unchanged"})
-    if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+    if wing_admin_outside_own_wing(p, sqn.wing_id):
         raise HTTPException(403, detail={"error": "out_of_scope",
                                           "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
-    if p.role == "sqn_admin":
+    if not may_move_account_to_another_squadron(p):
         # sqn_admin's manage-authority already restricts them to accounts in
         # their own Squadron, and they can never have a valid *different*
         # destination Squadron -- reject explicitly rather than falling
@@ -619,7 +720,7 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
                 "error": "reauth_required",
                 "message": "Enter your current access code to change it."})
     else:
-        _require_manage_authority(p, u, db)
+        require_manage_authority(p, u, db)
 
     raw = (body.new_code or "").strip()
     if raw:
@@ -644,6 +745,10 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     u.token_version = (u.token_version or 0) + 1
+    # Self-service reset with the current credential is the holder choosing a
+    # new code. An administrator-issued reset is a temporary credential and
+    # must be rotated by the target on first use.
+    u.must_change_code = uid != p.user_id
     db.commit()
 
     action = "change_own_code" if uid == p.user_id else "reset_access"
@@ -672,17 +777,16 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
         raise HTTPException(404, detail={"error": "not_found"})
     if uid != p.user_id:
         _require_write_actor(p)
-        _require_manage_authority(p, u, db)
+        require_manage_authority(p, u, db)
 
     if u.role not in RECOVERY_ROLES:
         raise HTTPException(400, detail={
             "error": "role_not_recoverable",
             "message": "Recovery email is only held for administrator accounts."})
 
-    addr = (body.email or "").strip().lower()
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", addr) or len(addr) > 254:
-        raise HTTPException(400, detail={
-            "error": "invalid_email", "message": "Enter a valid email address."})
+    addr = _normalise_recovery_email(body.email)
+    assert addr is not None
+    _ensure_recovery_email_available(db, addr, exclude_user_id=u.id)
 
     # Re-authenticate the CALLER against their own live code.
     caller_codes = db.query(AccessCode).filter(
@@ -699,7 +803,7 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
     u.recovery_email_updated_by = p.user_id
 
     raw = mint_token(db, u, "verify_email", VERIFY_TTL_MINUTES, None)
-    db.commit()
+    _commit_recovery_safe(db)
 
     sent = send_mail(
         addr,
@@ -711,7 +815,7 @@ def set_recovery_email(uid: str, body: RecoveryEmailIn,
     audit(db, p, object_type="user", object_id=uid, action="recovery_email_changed",
           old={"had_address": bool(old_addr)}, new={"verified": False})
     return {"ok": True, "recovery_email": mask_email(addr),
-            "verified": False, "email_sent": sent}
+            "verified": False, "email_sent": sent, "verification_sent": sent}
 
 
 @router.post("/accounts/{uid}/disable")
@@ -722,7 +826,7 @@ def disable_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
         raise HTTPException(404, detail={"error": "not_found"})
     if uid == p.user_id:
         raise HTTPException(400, detail={"error": "cannot_disable_self"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     if (u.role == "system_admin" and u.active_status
             and _last_active_system_admin_count(db) <= 1):
         raise HTTPException(409, detail={
@@ -751,7 +855,7 @@ def reactivate_account(uid: str, db: DBSession = Depends(get_db), p: Principal =
     u = db.get(User, uid)
     if not u or u.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     u.active_status = True
     u.updated_by = p.user_id
     for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
@@ -779,7 +883,7 @@ def archive_account(uid: str, reason: str | None = None, db: DBSession = Depends
         raise HTTPException(404, detail={"error": "not_found"})
     if uid == p.user_id:
         raise HTTPException(400, detail={"error": "cannot_archive_self"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     if u.role == "system_admin" and u.active_status and _last_active_system_admin_count(db) <= 1:
         raise HTTPException(409, detail={"error": "last_active_system_admin",
                                           "message": "Cannot archive the last active System Administrator."})
@@ -805,7 +909,7 @@ def restore_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
     u = db.get(User, uid)
     if not u or not u.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     u.is_archived = False
     u.archived_at = None
     u.active_status = True
@@ -839,7 +943,7 @@ def delete_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
     u = db.get(User, uid)
     if not u:
         raise HTTPException(404, detail={"error": "not_found"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     if not u.is_archived:
         raise HTTPException(409, detail={"error": "not_archived",
                                           "message": "Archive this account first before permanently deleting it."})
@@ -925,7 +1029,7 @@ def batch_archive_accounts(body: BatchArchiveIn, db: DBSession = Depends(get_db)
                                "display_name": u.display_name, "role": u.role})
                 continue
             try:
-                _require_manage_authority(p, u, db)
+                require_manage_authority(p, u, db)
             except HTTPException:
                 results.append({"account_id": uid, "result": "failed", "reason": "out_of_scope",
                                "display_name": u.display_name, "role": u.role})
@@ -977,7 +1081,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
     u = db.get(User, uid)
     if not u or u.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
-    _require_manage_authority(p, u, db)
+    require_manage_authority(p, u, db)
     ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
                                      AccessCode.active_status == True).first()  # noqa: E712
     if not ac:
@@ -996,18 +1100,7 @@ def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
 
 def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
     """Only sqn_admin (own SQN), wing_admin (own Wing), nat_admin, system_admin."""
-    if p.role in ("national_admin", "system_admin"):
-        return
-    if p.role == "wing_admin":
-        sqn = db.get(Squadron, sqn_id)
-        if not sqn or sqn.wing_id != p.wing_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    if p.role == "sqn_admin":
-        if sqn_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope"})
-        return
-    raise HTTPException(403, detail={"error": "forbidden"})
+    require_can_write_flight(p, sqn_id, db)
 
 
 @router.get("/flights")
@@ -1017,18 +1110,13 @@ def list_flights(squadron_id: str | None = None, include_archived: bool = False,
     q = db.query(Flight)
     if not include_archived:
         q = q.filter(Flight.is_archived == False)  # noqa: E712
-    if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
-        if squadron_id:
-            q = q.filter(Flight.squadron_id == squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
-        sqn_ids = [s.id for s in db.query(Squadron).filter(Squadron.wing_id == p.wing_id)]
-        q = q.filter(Flight.squadron_id.in_(sqn_ids))
-        if squadron_id:
-            q = q.filter(Flight.squadron_id == squadron_id)
-    else:
-        q = q.filter(Flight.squadron_id == p.squadron_id)
-        if squadron_id and squadron_id != p.squadron_id:
-            return []
+    scope = squadron_scope_clause(p, db, Flight.squadron_id)
+    if scope is not None:
+        q = q.filter(scope)
+    if squadron_id:
+        # A Squadron account naming another Squadron gets [] (the two filters
+        # cannot both hold), as it always did.
+        q = q.filter(Flight.squadron_id == squadron_id)
     return [_flight_out(f, db) for f in q.order_by(Flight.name).all()]
 
 

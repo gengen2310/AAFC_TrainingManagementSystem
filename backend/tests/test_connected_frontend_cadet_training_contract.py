@@ -18,9 +18,12 @@ HTML = Path(__file__).resolve().parents[2] / "connected-frontend" / "index.html"
 
 
 def _html() -> str:
+    # index.html plus the js/ modules extracted from it: the contracts hold
+    # wherever the code lives.
     if not HTML.exists():
         pytest.skip("connected-frontend/index.html not present in this checkout")
-    return HTML.read_text(encoding="utf-8")
+    modules = sorted((HTML.parent / "js").glob("*.js"))
+    return "\n".join([HTML.read_text(encoding="utf-8"), *(m.read_text(encoding="utf-8") for m in modules)])
 
 
 def _slice(src: str, start: str, end: str | None = None, *, limit: int = 12000) -> str:

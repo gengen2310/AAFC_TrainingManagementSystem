@@ -1,0 +1,21 @@
+name: Architecture Guard
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "stabilise/**", "refactor/**"]
+concurrency:
+  group: architecture-guard-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  architecture-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Self-test the architecture guard
+        run: python -m unittest discover -s tools/architecture -p "test_*.py"
+      - name: Enforce stabilisation architecture ratchets
+        run: python tools/architecture/guard.py

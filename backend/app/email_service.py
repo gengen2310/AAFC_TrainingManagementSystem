@@ -33,9 +33,9 @@ def send_ticket_notification(ticket_data: dict, recipients: list[str]) -> None:
 
     if not settings.SMTP_HOST:
         logger.info(
-            "SMTP not configured — skipping notification email for ticket %s (would notify: %s)",
+            "SMTP not configured — skipping notification email for ticket %s (%d recipient(s))",
             ticket_data.get("ticket_id"),
-            ", ".join(recipients),
+            len(recipients),
         )
         return
 
@@ -61,19 +61,55 @@ def send_ticket_notification(ticket_data: dict, recipients: list[str]) -> None:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = settings.SMTP_FROM
-    msg["To"] = ", ".join(recipients)
+    # Configured system/national/wing support addresses are operational
+    # configuration and should not be disclosed to one another. Keep them off
+    # the visible To/Cc headers and use only the SMTP envelope for delivery.
+    msg["To"] = settings.SMTP_FROM
     msg.attach(MIMEText(body, "plain"))
 
     try:
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
             smtp.ehlo()
+            # Service Desk content contains submitter PII and free text. Match
+            # account-recovery transport semantics: always negotiate TLS when
+            # SMTP is configured, regardless of whether authentication is used.
+            smtp.starttls()
             if settings.SMTP_USER:
-                smtp.starttls()
                 smtp.login(settings.SMTP_USER, settings.SMTP_PASS)
             smtp.sendmail(settings.SMTP_FROM, recipients, msg.as_string())
         logger.info("Ticket notification sent to %d recipients", len(recipients))
     except Exception as exc:
         logger.error("Failed to send ticket notification: %s", exc)
+
+
+def send_ticket_update_notification(ticket_data: dict, changed: dict) -> bool:
+    """Notify the ticket submitter about externally meaningful workflow changes.
+
+    Admin-only notes are intentionally never included. The submitter address is
+    collected on ticket creation and is the only recipient of this message.
+    """
+    to = (ticket_data.get("email") or "").strip()
+    if not to:
+        return False
+
+    status = ticket_data.get("status") or "open"
+    assignee = ticket_data.get("assigned_to_name")
+    change_lines: list[str] = []
+    if "status" in changed:
+        change_lines.append(f"Status: {status.replace('_', ' ').title()}")
+    if "assigned_to_name" in changed:
+        change_lines.append(f"Assigned to: {assignee or 'Unassigned'}")
+    if not change_lines:
+        return True
+
+    ticket_id = ticket_data.get("ticket_id") or ""
+    subject = f"[AAFC TMS] Support Ticket Updated — {ticket_id}"
+    body = (
+        "Your AAFC TMS support ticket has been updated.\n\n"
+        + "\n".join(change_lines)
+        + "\n\nLog in to the AAFC TMS if you need to review the current ticket state.\n"
+    )
+    return send_mail(to, subject, body)
 
 
 def send_mail(to: str, subject: str, body: str) -> bool:

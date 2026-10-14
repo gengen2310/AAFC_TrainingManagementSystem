@@ -1,5 +1,5 @@
 """Training-domain models with point-in-time historical fields."""
-from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, Float, DateTime, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, Float, DateTime, JSON, UniqueConstraint, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 
@@ -401,9 +401,14 @@ class ParadeNightTimingOverride(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
     Archived overrides are retained for audit history.
     """
     __tablename__ = "parade_night_timing_overrides"
-    # R5-M14: unique=True removed; replaced by partial unique index in v55
-    # migration (uq_pnto_active_per_night WHERE is_archived = 0) so that a
-    # new override can be created after the previous one is archived.
+    # At most one ACTIVE override per night; archived history is unlimited, so
+    # "set or replace" (archive the active one, insert the new one) works.
+    # Declared here so create_all and alembic check agree with migration v75
+    # (v55/821e had left PostgreSQL with a FULL unique and SQLite with none).
+    __table_args__ = (
+        Index("uq_pnto_active_per_night", "parade_night_id", unique=True,
+              postgresql_where=text("NOT is_archived"), sqlite_where=text("NOT is_archived")),
+    )
     parade_night_id: Mapped[str] = mapped_column(
         ForeignKey("parade_nights.id"), index=True,
     )
